@@ -23,9 +23,9 @@
 
 #define MAVLINK_PACKET_MAX_SIZE 255
 
-struct packet {
+struct buffer {
     unsigned int len;
-    uint8_t buf[MAVLINK_PACKET_MAX_SIZE * 10];
+    uint8_t *data;
 };
 
 class Endpoint {
@@ -33,12 +33,12 @@ public:
     Endpoint();
     virtual ~Endpoint();
 
-    virtual int read_msg(const struct packet **pkt) = 0;
-    virtual int write_msg(const struct packet *pkt) = 0;
+    virtual int read_msg(struct buffer *pbuf) = 0;
+    virtual int write_msg(const struct buffer *pbuf) = 0;
     virtual int flush_pending_msgs() = 0;
 
-    struct packet packet;
-    uint8_t *txbuf;
+    struct buffer rx_buf;
+    struct buffer tx_buf;
     int fd = -1;
 };
 
@@ -46,8 +46,8 @@ class UartEndpoint : public Endpoint {
 public:
     UartEndpoint() { }
     virtual ~UartEndpoint() { }
-    int read_msg(const struct packet **pkt) override;
-    int write_msg(const struct packet *pkt) override;
+    int read_msg(struct buffer *pbuf) override;
+    int write_msg(const struct buffer *pbuf) override;
     int flush_pending_msgs() override { return -ENOSYS; }
 
     int open(const char *path, speed_t baudrate);
@@ -57,8 +57,8 @@ class UdpEndpoint : public Endpoint {
 public:
     virtual ~UdpEndpoint() { }
 
-    int read_msg(const struct packet **pkt) override;
-    int write_msg(const struct packet *pkt) override;
+    int read_msg(struct buffer *pbuf) override;
+    int write_msg(const struct buffer *pbuf) override;
     int flush_pending_msgs() override { return -ENOSYS; }
 
     int open(const char *addr);

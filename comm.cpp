@@ -18,9 +18,11 @@
 #include "comm.h"
 
 #include <arpa/inet.h>
+#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
@@ -31,10 +33,18 @@
 #include "log.h"
 #include "util.h"
 
+#define RX_BUF_MAX_SIZE (8U * 1024U)
+#define TX_BUF_MAX_SIZE (8U * 1024U)
+
 Endpoint::Endpoint()
 {
-    memset(&packet, 0, sizeof(struct packet));
-    txbuf = nullptr;
+    rx_buf.data = (uint8_t *) malloc(RX_BUF_MAX_SIZE);
+    rx_buf.len = 0;
+    tx_buf.data = (uint8_t *) malloc(TX_BUF_MAX_SIZE);
+    tx_buf.len = 0;
+
+    assert(rx_buf.data);
+    assert(tx_buf.data);
 }
 
 Endpoint::~Endpoint()
@@ -84,12 +94,12 @@ fail:
     return -1;
 }
 
-int UartEndpoint::read_msg(const struct packet **pkt)
+int UartEndpoint::read_msg(struct buffer *pbuf)
 {
     if (fd < 0)
         log_error("Trying to read invalid fd");
 
-    ssize_t r = ::read(fd, packet.buf, sizeof(packet.buf));
+    ssize_t r = ::read(fd, rx_buf.data, RX_BUF_MAX_SIZE);
     if ((r == -1 && errno == EAGAIN) || r == 0)
         return 0;
     if (r == -1)
@@ -97,12 +107,13 @@ int UartEndpoint::read_msg(const struct packet **pkt)
 
     log_info("UART: Got %zd bytes", r > 0 ? r : 0);
 
-    *pkt = &packet;
+    pbuf->data = rx_buf.data;
+    pbuf->len = r;
 
     return r;
 }
 
-int UartEndpoint::write_msg(const struct packet *pkt)
+int UartEndpoint::write_msg(const struct buffer *pbuf)
 {
     return -ENOSYS;
 }
@@ -161,12 +172,12 @@ fail:
     return -1;
 }
 
-int UdpEndpoint::read_msg(const struct packet **pkt)
+int UdpEndpoint::read_msg(struct buffer *pbuf)
 {
     if (fd < 0)
         log_error("Trying to read invalid fd");
 
-    ssize_t r = ::recv(fd, packet.buf, sizeof(packet.buf), 0);
+    ssize_t r = ::recv(fd, rx_buf.data, RX_BUF_MAX_SIZE, 0);
     if (r == -1 && errno == EAGAIN)
         return 0;
     if (r == -1)
@@ -174,11 +185,14 @@ int UdpEndpoint::read_msg(const struct packet **pkt)
 
     log_info("UDP: Got %zd bytes", r > 0 ? r : 0);
 
+    pbuf->data = rx_buf.data;
+    pbuf->len = r;
+
     return 0;
 }
 
-int UdpEndpoint::write_msg(const struct packet *pkt)
+int UdpEndpoint::write_msg(const struct buffer *pbuf)
 {
-    printf("writting %u bytes\n", pkt->len);
+    printf("writting %u bytes\n", pbuf->len);
     return -ENOSYS;
 }

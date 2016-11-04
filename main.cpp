@@ -44,7 +44,7 @@ public:
     void loop();
     void handle_read(Endpoint *e);
     void handle_canwrite(Endpoint *e);
-    void write_msg(Endpoint *e, const struct packet *packet);
+    void write_msg(Endpoint *e, const struct buffer *buf);
 
     int epollfd = -1;
 };
@@ -157,9 +157,9 @@ int Mainloop::add_fd(int fd, void *data, int events)
     return 0;
 }
 
-void Mainloop::write_msg(Endpoint *e, const struct packet *packet)
+void Mainloop::write_msg(Endpoint *e, const struct buffer *buf)
 {
-    int r = e->write_msg(packet);
+    int r = e->write_msg(buf);
 
     /*
      * If endpoint would block, add EPOLLOUT event to get notified when it's
@@ -171,9 +171,9 @@ void Mainloop::write_msg(Endpoint *e, const struct packet *packet)
 
 void Mainloop::handle_read(Endpoint *endpoint)
 {
-    const struct packet *packet = nullptr;
-
     assert(endpoint);
+
+    struct buffer buf{};
 
     /*
      * We read from this endpoint and forward to the other endpoints.
@@ -184,13 +184,13 @@ void Mainloop::handle_read(Endpoint *endpoint)
      * This logic should be replaced with a routing logic so each endpoint
      * can talk to each one without involving the flight stack.
      */
-    while (endpoint->read_msg(&packet) > 0) {
+    while (endpoint->read_msg(&buf) > 0) {
         if (endpoint == g_master) {
             for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
-                write_msg(*e, packet);
+                write_msg(*e, &buf);
             }
         } else {
-            write_msg(g_master, packet);
+            write_msg(g_master, &buf);
         }
     }
 }
