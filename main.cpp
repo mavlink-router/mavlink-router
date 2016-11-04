@@ -51,7 +51,7 @@ public:
 static struct opt {
     long unsigned baudrate;
 } opt = {
-    .baudrate = 57600U,
+    .baudrate = 115200U,
 };
 
 static Endpoint *g_master;
