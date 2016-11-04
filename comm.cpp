@@ -117,7 +117,29 @@ int UartEndpoint::read_msg(struct buffer *pbuf)
 
 int UartEndpoint::write_msg(const struct buffer *pbuf)
 {
-    return -ENOSYS;
+    if (fd < 0) {
+        log_error("Trying to write invalid fd");
+        return -EINVAL;
+    }
+
+    /* TODO: send any pending data */
+    if (tx_buf.len > 0) {
+        ;
+    }
+
+    ssize_t r = ::write(fd, pbuf->data, pbuf->len);
+    if (r == -1 && errno == EAGAIN)
+        return -EAGAIN;
+
+    /* Incomplete packet, we warn and discard the rest */
+    if (r != (ssize_t) pbuf->len) {
+        log_warning("Discarding packet, incomplete write %zd but len=%u",
+                    r, pbuf->len);
+    }
+
+    log_debug("UART: wrote %zd bytes", r);
+
+    return r;
 }
 
 int UdpEndpoint::open(const char *addr)
@@ -197,6 +219,30 @@ int UdpEndpoint::read_msg(struct buffer *pbuf)
 
 int UdpEndpoint::write_msg(const struct buffer *pbuf)
 {
-    printf("writting %u bytes\n", pbuf->len);
-    return -ENOSYS;
+    if (fd < 0) {
+        log_error("Trying to write invalid fd");
+        return -EINVAL;
+    }
+
+    /* TODO: send any pending data */
+    if (tx_buf.len > 0) {
+        ;
+    }
+
+    ssize_t r = ::send(fd, pbuf->data, pbuf->len, 0);
+    if (r == -1) {
+        if (errno != EAGAIN && errno != ECONNREFUSED)
+            log_error_errno(errno, "Error sending udp packet (%m)");
+        return -errno;
+    };
+
+    /* Incomplete packet, we warn and discard the rest */
+    if (r != (ssize_t) pbuf->len) {
+        log_warning("Discarding packet, incomplete write %zd but len=%u",
+                    r, pbuf->len);
+    }
+
+    log_debug("UDP: wrote %zd bytes", r);
+
+    return r;
 }
