@@ -188,7 +188,7 @@ int UdpEndpoint::read_msg(struct buffer *pbuf)
     pbuf->data = rx_buf.data;
     pbuf->len = r;
 
-    return 0;
+    return r;
 }
 
 int UdpEndpoint::write_msg(const struct buffer *pbuf)
