@@ -107,7 +107,7 @@ int UartEndpoint::read_msg(struct buffer *pbuf)
     if (r == -1)
         return -errno;
 
-    log_info("UART: Got %zd bytes", r > 0 ? r : 0);
+    log_debug("UART: Got %zd bytes", r > 0 ? r : 0);
 
     pbuf->data = rx_buf.data;
     pbuf->len = r;
@@ -187,7 +187,7 @@ int UdpEndpoint::read_msg(struct buffer *pbuf)
     if (r == -1)
         return -errno;
 
-    log_info("UDP: Got %zd bytes", r > 0 ? r : 0);
+    log_debug("UDP: Got %zd bytes", r > 0 ? r : 0);
 
     pbuf->data = rx_buf.data;
     pbuf->len = r;
