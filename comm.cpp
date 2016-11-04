@@ -96,8 +96,10 @@ fail:
 
 int UartEndpoint::read_msg(struct buffer *pbuf)
 {
-    if (fd < 0)
+    if (fd < 0) {
         log_error("Trying to read invalid fd");
+        return -EINVAL;
+    }
 
     ssize_t r = ::read(fd, rx_buf.data, RX_BUF_MAX_SIZE);
     if ((r == -1 && errno == EAGAIN) || r == 0)
@@ -174,8 +176,10 @@ fail:
 
 int UdpEndpoint::read_msg(struct buffer *pbuf)
 {
-    if (fd < 0)
+    if (fd < 0) {
         log_error("Trying to read invalid fd");
+        return -EINVAL;
+    }
 
     ssize_t r = ::recv(fd, rx_buf.data, RX_BUF_MAX_SIZE, 0);
     if (r == -1 && errno == EAGAIN)
