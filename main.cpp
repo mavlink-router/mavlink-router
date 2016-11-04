@@ -20,6 +20,7 @@
 #include <errno.h>
 #include <getopt.h>
 #include <poll.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -56,6 +57,7 @@ static struct opt {
 
 static Endpoint *g_master;
 static Endpoint *g_endpoints[MAX_PORTS];
+static bool g_should_exit;
 
 static void help(FILE *fp) {
     fprintf(fp,
@@ -214,7 +216,7 @@ void Mainloop::loop()
     if (epollfd < 0)
         return;
 
-    do {
+    while (!g_should_exit) {
         int i;
 
         r = epoll_wait(epollfd, events, max_events, -1);
@@ -230,7 +232,22 @@ void Mainloop::loop()
             if (events[i].events & EPOLLOUT)
                 handle_canwrite(e);
         }
-    } while (true);
+    }
+}
+
+static void exit_signal_handler(int signum)
+{
+    g_should_exit = true;
+}
+
+static void setup_signal_handlers()
+{
+    struct sigaction sa = { };
+
+    sa.sa_flags = SA_NOCLDSTOP;
+    sa.sa_handler = exit_signal_handler;
+    sigaction(SIGTERM, &sa, NULL);
+    sigaction(SIGINT, &sa, NULL);
 }
 
 int main(int argc, char *argv[])
@@ -239,6 +256,8 @@ int main(int argc, char *argv[])
     UdpEndpoint udp;
     UartEndpoint uart{};
     Mainloop mainloop{};
+
+    setup_signal_handlers();
 
     log_open();
 
