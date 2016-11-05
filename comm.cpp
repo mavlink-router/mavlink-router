@@ -142,12 +142,9 @@ int UartEndpoint::write_msg(const struct buffer *pbuf)
     return r;
 }
 
-int UdpEndpoint::open(const char *addr)
+int UdpEndpoint::open(const char *ip, unsigned long port)
 {
     struct sockaddr_in sockaddr;
-    unsigned long port = 14550U;
-    char *addrbuf = nullptr;
-    char *ip, *portstr;
 
     fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (fd == -1) {
@@ -155,23 +152,12 @@ int UdpEndpoint::open(const char *addr)
         return -1;
     }
 
-    addrbuf = strdup(addr);
-    if (!addrbuf)
-        goto fail;
-
-    ip = addrbuf;
-    portstr = strchrnul(addrbuf, ':');
-    if (portstr && *portstr && safe_atoul(portstr + 1, &port) < 0) {
-        log_error("Invalid port in argument: %s", addr);
-        goto fail;
-    }
-
     bzero(&sockaddr, sizeof(sockaddr));
     sockaddr.sin_family = AF_INET;
     sockaddr.sin_addr.s_addr = inet_addr(ip);
     sockaddr.sin_port = htons(port);
 
-    log_info("Connecting to %.*s port %lu", (int)(portstr - ip), ip, port);
+    log_info("Connecting to %s:%lu", ip, port);
 
     if (connect(fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) < 0) {
         log_error_errno(errno, "Error connecting socket (%m)");
@@ -183,8 +169,6 @@ int UdpEndpoint::open(const char *addr)
         goto fail;
     }
 
-    free(addrbuf);
-
     return fd;
 
 fail:
@@ -192,7 +176,6 @@ fail:
         ::close(fd);
         fd = -1;
     }
-    free(addrbuf);
     return -1;
 }
 

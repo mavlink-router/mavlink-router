@@ -33,9 +33,6 @@
 #include "log.h"
 #include "util.h"
 
-#define MAX_PORTS 10
-
-
 class Mainloop {
 public:
     int open();
@@ -49,28 +46,61 @@ public:
     int epollfd = -1;
 };
 
+struct endpoint_address {
+    struct endpoint_address *next;
+    const char *ip;
+    unsigned long port;
+};
+
 static struct opt {
     long unsigned baudrate;
+    struct endpoint_address *ep_addrs;
 } opt = {
     .baudrate = 115200U,
+    .ep_addrs = nullptr,
 };
 
 static Endpoint *g_master;
-static Endpoint *g_endpoints[MAX_PORTS];
+static Endpoint **g_endpoints;
 static bool g_should_exit;
 
 static void help(FILE *fp) {
     fprintf(fp,
-            "%s [OPTIONS...] <uart> <ip:port>\n\n"
+            "%s [OPTIONS...] <uart>\n\n"
             "  -h --help                    Print this message\n"
             "  -b --baudrate                Use baudrate for UART\n"
+            "  -e --endpoint <ip[:port]>    Add UDP endpoint to communicate port is optional\n"
+            "                               and in case it's not given it starts in 14550 and\n"
+            "                               continues increasing not to collide with previous\n"
+            "                               ports\n"
             , program_invocation_short_name);
 }
 
-static int parse_argv(int argc, char *argv[], const char **uart, const char **addr)
+static unsigned long find_next_endpoint_port(const char *ip)
+{
+    unsigned long port = 14550U;
+
+    while (true) {
+        endpoint_address *e;
+
+        for (e = opt.ep_addrs; e; e = e->next) {
+            if (streq(e->ip, ip) && e->port == port) {
+                port++;
+                break;
+            }
+        }
+        if (!e)
+            break;
+    }
+
+    return port;
+}
+
+static int parse_argv(int argc, char *argv[], const char **uart)
 {
     static const struct option options[] = {
         { "baudrate",   required_argument,  NULL,   'b' },
+        { "endpoints",  required_argument,  NULL,   'e' },
         { }
     };
     int c;
@@ -78,9 +108,8 @@ static int parse_argv(int argc, char *argv[], const char **uart, const char **ad
     assert(argc >= 0);
     assert(argv);
     assert(uart);
-    assert(addr);
 
-    while ((c = getopt_long(argc, argv, "hb:", options, NULL)) >= 0) {
+    while ((c = getopt_long(argc, argv, "hb:e:", options, NULL)) >= 0) {
         switch (c) {
         case 'h':
             help(stdout);
@@ -92,6 +121,30 @@ static int parse_argv(int argc, char *argv[], const char **uart, const char **ad
                 return -EINVAL;
             }
             break;
+        case 'e': {
+            char *ip = strdup(optarg);
+
+            char *portstr = strchrnul(ip, ':');
+            unsigned long port;
+            if (*portstr == '\0') {
+                port = find_next_endpoint_port(ip);
+            } else {
+                *portstr = '\0';
+                if (safe_atoul(portstr + 1, &port) < 0) {
+                    log_error("Invalid port in argument: %s", optarg);
+                    free(ip);
+                    help(stderr);
+                    return -EINVAL;
+                }
+            }
+
+            struct endpoint_address *e = (struct endpoint_address*) malloc(sizeof(*e));
+            e->next = opt.ep_addrs;
+            e->ip = ip;
+            e->port = port;
+            opt.ep_addrs = e;
+            break;
+        }
         case '?':
         default:
             help(stderr);
@@ -100,14 +153,13 @@ static int parse_argv(int argc, char *argv[], const char **uart, const char **ad
     }
 
     /* positional arguments */
-    if (optind + 2 != argc) {
+    if (optind + 1 != argc) {
         log_error("Error parsing required argument %d %d", optind, argc);
         help(stderr);
         return -EINVAL;
     }
 
     *uart = argv[optind++];
-    *addr = argv[optind];
 
     return 2;
 }
@@ -250,10 +302,46 @@ static void setup_signal_handlers()
     sigaction(SIGINT, &sa, NULL);
 }
 
+static void free_endpoints()
+{
+    for (Endpoint **e = g_endpoints; *e; e++) {
+        delete *e;
+    }
+
+    for (auto e = opt.ep_addrs; e;) {
+        auto next = e->next;
+        free(e);
+        e = next;
+    }
+}
+
+static bool add_endpoints(Mainloop &mainloop)
+{
+    unsigned n_endpoints = 0, i = 0;
+    struct endpoint_address *e;
+
+    for (e = opt.ep_addrs; e; e = e->next)
+        n_endpoints++;
+
+    g_endpoints = (Endpoint**) calloc(n_endpoints + 1, sizeof(Endpoint*));
+
+    for (e = opt.ep_addrs; e; e = e->next) {
+        UdpEndpoint *udp = new UdpEndpoint{};
+        if (udp->open(e->ip, e->port) < 0) {
+            log_error("Could not open %s:%ld", e->ip, e->port);
+            return false;
+        }
+
+        g_endpoints[i++] = udp;
+        mainloop.add_fd(udp->fd, udp, EPOLLIN);
+    }
+
+    return true;
+}
+
 int main(int argc, char *argv[])
 {
-    const char *uartstr = NULL, *addrstr = NULL;
-    UdpEndpoint udp;
+    const char *uartstr = NULL;
     UartEndpoint uart{};
     Mainloop mainloop{};
 
@@ -261,7 +349,7 @@ int main(int argc, char *argv[])
 
     log_open();
 
-    if (parse_argv(argc, argv, &uartstr, &addrstr) != 2)
+    if (parse_argv(argc, argv, &uartstr) != 2)
         goto close_log;
 
     if (mainloop.open() < 0)
@@ -270,16 +358,15 @@ int main(int argc, char *argv[])
     if (uart.open(uartstr, opt.baudrate) < 0)
         goto close_log;
 
-    if (udp.open(addrstr) < 0)
-        goto close_log;
-
     g_master = &uart;
     mainloop.add_fd(uart.fd, &uart, EPOLLIN);
 
-    g_endpoints[0] = &udp;
-    mainloop.add_fd(udp.fd, &udp, EPOLLIN);
+    if (!add_endpoints(mainloop))
+        goto close_log;
 
     mainloop.loop();
+
+    free_endpoints();
 
     log_close();
 
