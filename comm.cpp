@@ -142,32 +142,29 @@ int UartEndpoint::write_msg(const struct buffer *pbuf)
     return r;
 }
 
+UdpEndpoint::UdpEndpoint()
+{
+    bzero(&sockaddr, sizeof(sockaddr));
+}
+
 int UdpEndpoint::open(const char *ip, unsigned long port)
 {
-    struct sockaddr_in sockaddr;
-
     fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (fd == -1) {
         log_error_errno(errno, "Could not create socket (%m)");
         return -1;
     }
 
-    bzero(&sockaddr, sizeof(sockaddr));
     sockaddr.sin_family = AF_INET;
     sockaddr.sin_addr.s_addr = inet_addr(ip);
     sockaddr.sin_port = htons(port);
-
-    log_info("Connecting to %s:%lu", ip, port);
-
-    if (connect(fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) < 0) {
-        log_error_errno(errno, "Error connecting socket (%m)");
-        goto fail;
-    }
 
     if (fcntl(fd, F_SETFL, O_NONBLOCK | FASYNC) < 0) {
         log_error_errno(errno, "Error setting socket fd as non-blocking (%m)");
         goto fail;
     }
+
+    log_info("Open %s:%lu", ip, port);
 
     return fd;
 
@@ -186,7 +183,9 @@ int UdpEndpoint::read_msg(struct buffer *pbuf)
         return -EINVAL;
     }
 
-    ssize_t r = ::recv(fd, rx_buf.data, RX_BUF_MAX_SIZE, 0);
+    socklen_t len = sizeof(sockaddr);
+    ssize_t r = ::recvfrom(fd, rx_buf.data, RX_BUF_MAX_SIZE, 0,
+                           (struct sockaddr *)&sockaddr, &len);
     if (r == -1 && errno == EAGAIN)
         return 0;
     if (r == -1)
@@ -212,7 +211,8 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
         ;
     }
 
-    ssize_t r = ::send(fd, pbuf->data, pbuf->len, 0);
+    ssize_t r = ::sendto(fd, pbuf->data, pbuf->len, 0,
+                         (struct sockaddr *)&sockaddr, sizeof(sockaddr));
     if (r == -1) {
         if (errno != EAGAIN && errno != ECONNREFUSED)
             log_error_errno(errno, "Error sending udp packet (%m)");

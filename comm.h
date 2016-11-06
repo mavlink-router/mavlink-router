@@ -17,6 +17,7 @@
  */
 #pragma once
 
+#include <arpa/inet.h>
 #include <asm/termbits.h>
 #include <errno.h>
 #include <inttypes.h>
@@ -55,6 +56,7 @@ public:
 
 class UdpEndpoint : public Endpoint {
 public:
+    UdpEndpoint();
     virtual ~UdpEndpoint() { }
 
     int read_msg(struct buffer *pbuf) override;
@@ -62,4 +64,6 @@ public:
     int flush_pending_msgs() override { return -ENOSYS; }
 
     int open(const char *ip, unsigned long port);
+
+    struct sockaddr_in sockaddr;
 };
