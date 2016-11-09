@@ -18,6 +18,12 @@
 /config.status
 /configure
 /libtool
+/mav.data
+/mav.parm
+/mav.tlog
+/mav.tlog.raw
+/perf.data
+/perf.data.old
 /stamp-h1
 
 *~
