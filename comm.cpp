@@ -30,11 +30,33 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <mavlink.h>
+
 #include "log.h"
 #include "util.h"
 
-#define RX_BUF_MAX_SIZE (8U * 1024U)
+#define RX_BUF_MAX_SIZE (MAVLINK_MAX_PACKET_LEN * 4)
 #define TX_BUF_MAX_SIZE (8U * 1024U)
+
+/*
+ * mavlink 2.0 packet in its wire format
+ *
+ * Packet size:
+ *      sizeof(mavlink_router_mavlink_header)
+ *      + payload length
+ *      + 2 (checksum)
+ *      + signature (0 if not signed)
+ */
+struct _packed_ mavlink_router_mavlink_header {
+    uint8_t magic;
+    uint8_t payload_len;
+    uint8_t incompat_flags;
+    uint8_t compat_flags;
+    uint8_t seq;
+    uint8_t sysid;
+    uint8_t compid;
+    uint32_t msgid : 24;
+};
 
 Endpoint::Endpoint(const char *name)
     : _name{name}
@@ -57,21 +79,102 @@ Endpoint::~Endpoint()
 
 int Endpoint::read_msg(struct buffer *pbuf)
 {
+    bool should_read_more = true;
+
     if (fd < 0) {
         log_error("Trying to read invalid fd");
         return -EINVAL;
     }
 
-    ssize_t r = _read_msg(rx_buf.data + rx_buf.len, RX_BUF_MAX_SIZE - rx_buf.len);
-    if (r <= 0)
-        return r;
+    if (_last_packet_len != 0) {
+        /*
+         * read_msg() should be called in a loop after writting to each
+         * output. However we don't want to keep busy looping on a single
+         * endpoint reading more data. If we left data behind, move them
+         * to the beginning and check we have a complete packet, but don't
+         * read more data right now - it will be handled on next
+         * iteration when more data is available
+         */
+        should_read_more = false;
 
-    log_debug("%s: Got %zd bytes", _name, r);
+        /* see TODO below about using bigger buffers: we could just walk on
+         * the buffer rather than moving bytes */
+        rx_buf.len -= _last_packet_len;
+        if (rx_buf.len > 0) {
+            memmove(rx_buf.data, rx_buf.data + _last_packet_len, rx_buf.len);
+        }
+
+        _last_packet_len = 0;
+    }
+
+    if (should_read_more) {
+        ssize_t r = _read_msg(rx_buf.data + rx_buf.len, RX_BUF_MAX_SIZE - rx_buf.len);
+        if (r <= 0)
+            return r;
+
+        log_debug("%s: Got %zd bytes", _name, r);
+        rx_buf.len += r;
+    }
+
+    /*
+     * Find magic byte as the start byte:
+     *
+     * we either enter here due to new bytes being written to the
+     * beginning of the buffer or due to _last_packet_len not being 0
+     * above, which means we moved some bytes we read previously
+     */
+    if (rx_buf.data[0] != MAVLINK_STX) {
+        unsigned int stx_pos = 0;
+
+        for (unsigned int i = 1; i < (unsigned int) rx_buf.len; i++) {
+            if (rx_buf.data[i] == MAVLINK_STX) {
+                stx_pos = i;
+                break;
+            }
+        }
+
+        /* Discarding data since we don't have a marker */
+        if (stx_pos == 0) {
+            rx_buf.len = 0;
+            return 0;
+        }
+
+        /*
+         * TODO: a larger buffer would allow to avoid the memmove in case a
+         * new message would still fit in our buffer
+         */
+        rx_buf.len -= stx_pos;
+        memmove(rx_buf.data, rx_buf.data + stx_pos, rx_buf.len);
+    }
+
+    struct mavlink_router_mavlink_header *hdr = (struct mavlink_router_mavlink_header *)rx_buf.data;
+
+    /* check if we have a valid mavlink packet */
+    if (rx_buf.len < sizeof(*hdr))
+        return 0;
+
+    const uint8_t checksum_len = 2;
+    size_t expected_size = sizeof(*hdr);
+    expected_size += hdr->payload_len;
+    expected_size += checksum_len;
+    if (hdr->incompat_flags & MAVLINK_IFLAG_SIGNED)
+        expected_size += MAVLINK_SIGNATURE_BLOCK_LEN;
+
+    /* check if we have a valid mavlink packet */
+    if (rx_buf.len < expected_size)
+        return 0;
+
+    /* length matches, check crc: TODO */
+
+    /* We always want to transmit one packet at a time; record the number
+     * of bytes read in addition to the expected size and leave them for
+     * the next iteration */
+    _last_packet_len = expected_size;
 
     pbuf->data = rx_buf.data;
-    pbuf->len = r;
+    pbuf->len = expected_size;
 
-    return r;
+    return 1;
 }
 
 int UartEndpoint::open(const char *path, speed_t baudrate)
