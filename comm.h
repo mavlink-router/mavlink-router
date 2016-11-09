@@ -22,8 +22,6 @@
 #include <errno.h>
 #include <inttypes.h>
 
-#define MAVLINK_PACKET_MAX_SIZE 255
-
 struct buffer {
     unsigned int len;
     uint8_t *data;
