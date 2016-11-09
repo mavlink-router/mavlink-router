@@ -17,6 +17,7 @@
 /config.log
 /config.status
 /configure
+/include/mavlink
 /libtool
 /mav.data
 /mav.parm
