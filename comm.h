@@ -29,27 +29,33 @@ struct buffer {
 
 class Endpoint {
 public:
-    Endpoint();
+    Endpoint(const char *name);
     virtual ~Endpoint();
 
-    virtual int read_msg(struct buffer *pbuf) = 0;
+    int read_msg(struct buffer *pbuf);
     virtual int write_msg(const struct buffer *pbuf) = 0;
     virtual int flush_pending_msgs() = 0;
 
     struct buffer rx_buf;
     struct buffer tx_buf;
     int fd = -1;
+
+protected:
+    virtual ssize_t _read_msg(struct buffer *pbuf) = 0;
+
+    const char *_name;
 };
 
 class UartEndpoint : public Endpoint {
 public:
-    UartEndpoint() { }
+    UartEndpoint() : Endpoint{"UART"} { }
     virtual ~UartEndpoint() { }
-    int read_msg(struct buffer *pbuf) override;
     int write_msg(const struct buffer *pbuf) override;
     int flush_pending_msgs() override { return -ENOSYS; }
 
     int open(const char *path, speed_t baudrate);
+protected:
+    ssize_t _read_msg(struct buffer *pbuf) override;
 };
 
 class UdpEndpoint : public Endpoint {
@@ -57,11 +63,13 @@ public:
     UdpEndpoint();
     virtual ~UdpEndpoint() { }
 
-    int read_msg(struct buffer *pbuf) override;
     int write_msg(const struct buffer *pbuf) override;
     int flush_pending_msgs() override { return -ENOSYS; }
 
     int open(const char *ip, unsigned long port);
 
     struct sockaddr_in sockaddr;
+
+protected:
+    ssize_t _read_msg(struct buffer *pbuf) override;
 };

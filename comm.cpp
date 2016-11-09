@@ -36,7 +36,8 @@
 #define RX_BUF_MAX_SIZE (8U * 1024U)
 #define TX_BUF_MAX_SIZE (8U * 1024U)
 
-Endpoint::Endpoint()
+Endpoint::Endpoint(const char *name)
+    : _name{name}
 {
     rx_buf.data = (uint8_t *) malloc(RX_BUF_MAX_SIZE);
     rx_buf.len = 0;
@@ -53,6 +54,26 @@ Endpoint::~Endpoint()
         ::close(fd);
     }
 }
+
+int Endpoint::read_msg(struct buffer *pbuf)
+{
+    if (fd < 0) {
+        log_error("Trying to read invalid fd");
+        return -EINVAL;
+    }
+
+    ssize_t r = _read_msg(&rx_buf);
+    if (r <= 0)
+        return r;
+
+    log_debug("%s: Got %zd bytes", _name, r);
+
+    pbuf->data = rx_buf.data;
+    pbuf->len = r;
+
+    return r;
+}
+
 int UartEndpoint::open(const char *path, speed_t baudrate)
 {
     struct termios2 tc;
@@ -94,23 +115,13 @@ fail:
     return -1;
 }
 
-int UartEndpoint::read_msg(struct buffer *pbuf)
+ssize_t UartEndpoint::_read_msg(struct buffer *pbuf)
 {
-    if (fd < 0) {
-        log_error("Trying to read invalid fd");
-        return -EINVAL;
-    }
-
     ssize_t r = ::read(fd, rx_buf.data, RX_BUF_MAX_SIZE);
     if ((r == -1 && errno == EAGAIN) || r == 0)
         return 0;
     if (r == -1)
         return -errno;
-
-    log_debug("UART: Got %zd bytes", r > 0 ? r : 0);
-
-    pbuf->data = rx_buf.data;
-    pbuf->len = r;
 
     return r;
 }
@@ -143,6 +154,7 @@ int UartEndpoint::write_msg(const struct buffer *pbuf)
 }
 
 UdpEndpoint::UdpEndpoint()
+    : Endpoint{"UDP"}
 {
     bzero(&sockaddr, sizeof(sockaddr));
 }
@@ -176,13 +188,8 @@ fail:
     return -1;
 }
 
-int UdpEndpoint::read_msg(struct buffer *pbuf)
+ssize_t UdpEndpoint::_read_msg(struct buffer *pbuf)
 {
-    if (fd < 0) {
-        log_error("Trying to read invalid fd");
-        return -EINVAL;
-    }
-
     socklen_t len = sizeof(sockaddr);
     ssize_t r = ::recvfrom(fd, rx_buf.data, RX_BUF_MAX_SIZE, 0,
                            (struct sockaddr *)&sockaddr, &len);
@@ -190,11 +197,6 @@ int UdpEndpoint::read_msg(struct buffer *pbuf)
         return 0;
     if (r == -1)
         return -errno;
-
-    log_debug("UDP: Got %zd bytes", r > 0 ? r : 0);
-
-    pbuf->data = rx_buf.data;
-    pbuf->len = r;
 
     return r;
 }
