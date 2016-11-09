@@ -23,6 +23,7 @@
 #define _always_inline_ __inline__ __attribute__((always_inline))
 #define _cleanup_(x) __attribute__((cleanup(x)))
 #define _pure_ __attribute__((pure))
+#define _packed_ __attribute__((packed))
 
 #define IOVEC_SET_STRING(i, s)          \
     do {                                \
