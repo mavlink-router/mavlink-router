@@ -41,7 +41,7 @@ public:
     int fd = -1;
 
 protected:
-    virtual ssize_t _read_msg(struct buffer *pbuf) = 0;
+    virtual ssize_t _read_msg(uint8_t *buf, size_t len) = 0;
 
     const char *_name;
 };
@@ -55,7 +55,7 @@ public:
 
     int open(const char *path, speed_t baudrate);
 protected:
-    ssize_t _read_msg(struct buffer *pbuf) override;
+    ssize_t _read_msg(uint8_t *buf, size_t len) override;
 };
 
 class UdpEndpoint : public Endpoint {
@@ -71,5 +71,5 @@ public:
     struct sockaddr_in sockaddr;
 
 protected:
-    ssize_t _read_msg(struct buffer *pbuf) override;
+    ssize_t _read_msg(uint8_t *buf, size_t len) override;
 };

@@ -62,7 +62,7 @@ int Endpoint::read_msg(struct buffer *pbuf)
         return -EINVAL;
     }
 
-    ssize_t r = _read_msg(&rx_buf);
+    ssize_t r = _read_msg(rx_buf.data + rx_buf.len, RX_BUF_MAX_SIZE - rx_buf.len);
     if (r <= 0)
         return r;
 
@@ -115,9 +115,9 @@ fail:
     return -1;
 }
 
-ssize_t UartEndpoint::_read_msg(struct buffer *pbuf)
+ssize_t UartEndpoint::_read_msg(uint8_t *buf, size_t len)
 {
-    ssize_t r = ::read(fd, rx_buf.data, RX_BUF_MAX_SIZE);
+    ssize_t r = ::read(fd, buf, len);
     if ((r == -1 && errno == EAGAIN) || r == 0)
         return 0;
     if (r == -1)
@@ -188,11 +188,11 @@ fail:
     return -1;
 }
 
-ssize_t UdpEndpoint::_read_msg(struct buffer *pbuf)
+ssize_t UdpEndpoint::_read_msg(uint8_t *buf, size_t len)
 {
-    socklen_t len = sizeof(sockaddr);
-    ssize_t r = ::recvfrom(fd, rx_buf.data, RX_BUF_MAX_SIZE, 0,
-                           (struct sockaddr *)&sockaddr, &len);
+    socklen_t addrlen = sizeof(sockaddr);
+    ssize_t r = ::recvfrom(fd, buf, len, 0,
+                           (struct sockaddr *)&sockaddr, &addrlen);
     if (r == -1 && errno == EAGAIN)
         return 0;
     if (r == -1)
