@@ -62,7 +62,7 @@ static struct opt {
 
 static Endpoint *g_master;
 static Endpoint **g_endpoints;
-static bool g_should_exit;
+static volatile bool g_should_exit;
 
 static void help(FILE *fp) {
     fprintf(fp,
