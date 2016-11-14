@@ -250,6 +250,11 @@ int UartEndpoint::open(const char *path, speed_t baudrate)
         goto fail;
     }
 
+    if (ioctl(fd, TCFLSH, TCIOFLUSH) == -1) {
+        log_error_errno(errno, "Could not flush terminal (%m)");
+        goto fail;
+    }
+
     return fd;
 
 fail:
