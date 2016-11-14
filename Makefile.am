@@ -3,6 +3,8 @@ EXTRA_DIST =
 CLEANFILES = $(BUILT_FILES)
 noinst_LTLIBRARIES =
 bin_PROGRAMS =
+noinst_PROGRAMS =
+noinst_SCRIPTS =
 BUILT_FILES =
 ACLOCAL_AMFLAGS = -I m4 ${ACLOCAL_FLAGS}
 AM_MAKEFLAGS = --no-print-directory
@@ -126,3 +128,9 @@ mavlink_router_SOURCES = \
 	main.cpp \
 	util.c \
 	util.h
+
+noinst_PROGRAMS += heartbeat_print
+heartbeat_print_SOURCES = \
+	examples/heartbeat_print.cpp
+
+noinst_SCRIPTS += examples/heartbeat_print.py

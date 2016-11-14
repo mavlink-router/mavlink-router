@@ -33,3 +33,4 @@ cscope.out
 tags
 
 /mavlink_router
+/heartbeat_print
