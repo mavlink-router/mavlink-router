@@ -234,11 +234,11 @@ int UartEndpoint::open(const char *path, speed_t baudrate)
         goto fail;
     }
 
-    /* disable LF -> CR/LF */
-    tc.c_iflag &= ~(BRKINT | IGNBRK | ICRNL | IXON | IXOFF);
-    tc.c_oflag &= ~(OPOST | ONLCR);
-    tc.c_lflag &= ~(ISIG | ICANON | IEXTEN | ECHO | TOSTOP);
-    tc.c_cflag &= ~(CRTSCTS);
+    tc.c_iflag &= ~(IGNBRK | BRKINT | ICRNL | INLCR | PARMRK | INPCK | ISTRIP | IXON);
+    tc.c_oflag &= ~(OCRNL | ONLCR | ONLRET | ONOCR | OFILL | OPOST);
+    tc.c_lflag &= ~(ECHO | ECHONL | ICANON | IEXTEN | ISIG | TOSTOP);
+    tc.c_cflag &= ~(CSIZE | PARENB | CBAUD | CRTSCTS);
+    tc.c_cflag |= CS8 | BOTHER;
 
     tc.c_cc[VMIN] = 0;
     tc.c_cc[VTIME] = 0;
