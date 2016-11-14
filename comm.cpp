@@ -42,12 +42,12 @@
  * mavlink 2.0 packet in its wire format
  *
  * Packet size:
- *      sizeof(mavlink_router_mavlink_header)
+ *      sizeof(mavlink_router_mavlink2_header)
  *      + payload length
  *      + 2 (checksum)
  *      + signature (0 if not signed)
  */
-struct _packed_ mavlink_router_mavlink_header {
+struct _packed_ mavlink_router_mavlink2_header {
     uint8_t magic;
     uint8_t payload_len;
     uint8_t incompat_flags;
@@ -56,6 +56,23 @@ struct _packed_ mavlink_router_mavlink_header {
     uint8_t sysid;
     uint8_t compid;
     uint32_t msgid : 24;
+};
+
+/*
+ * mavlink 1.0 packet in its wire format
+ *
+ * Packet size:
+ *      sizeof(mavlink_router_mavlink1_header)
+ *      + payload length
+ *      + 2 (checksum)
+ */
+struct _packed_ mavlink_router_mavlink1_header {
+    uint8_t magic;
+    uint8_t payload_len;
+    uint8_t seq;
+    uint8_t sysid;
+    uint8_t compid;
+    uint8_t msgid;
 };
 
 Endpoint::Endpoint(const char *name)
@@ -116,6 +133,9 @@ int Endpoint::read_msg(struct buffer *pbuf)
         rx_buf.len += r;
     }
 
+    bool mavlink2 = rx_buf.data[0] == MAVLINK_STX;
+    bool mavlink1 = rx_buf.data[0] == MAVLINK_STX_MAVLINK1;
+
     /*
      * Find magic byte as the start byte:
      *
@@ -123,11 +143,16 @@ int Endpoint::read_msg(struct buffer *pbuf)
      * beginning of the buffer or due to _last_packet_len not being 0
      * above, which means we moved some bytes we read previously
      */
-    if (rx_buf.data[0] != MAVLINK_STX) {
+    if (!mavlink1 && !mavlink2) {
         unsigned int stx_pos = 0;
 
         for (unsigned int i = 1; i < (unsigned int) rx_buf.len; i++) {
-            if (rx_buf.data[i] == MAVLINK_STX) {
+            if (rx_buf.data[i] == MAVLINK_STX)
+                mavlink2 = true;
+            else if (rx_buf.data[i] == MAVLINK_STX_MAVLINK1)
+                mavlink1 = true;
+
+            if (mavlink1 || mavlink2) {
                 stx_pos = i;
                 break;
             }
@@ -147,18 +172,33 @@ int Endpoint::read_msg(struct buffer *pbuf)
         memmove(rx_buf.data, rx_buf.data + stx_pos, rx_buf.len);
     }
 
-    struct mavlink_router_mavlink_header *hdr = (struct mavlink_router_mavlink_header *)rx_buf.data;
-
-    /* check if we have a valid mavlink packet */
-    if (rx_buf.len < sizeof(*hdr))
-        return 0;
-
     const uint8_t checksum_len = 2;
-    size_t expected_size = sizeof(*hdr);
-    expected_size += hdr->payload_len;
-    expected_size += checksum_len;
-    if (hdr->incompat_flags & MAVLINK_IFLAG_SIGNED)
-        expected_size += MAVLINK_SIGNATURE_BLOCK_LEN;
+    size_t expected_size;
+
+    if (mavlink2) {
+        struct mavlink_router_mavlink2_header *hdr =
+                (struct mavlink_router_mavlink2_header *)rx_buf.data;
+
+        if (rx_buf.len < sizeof(*hdr))
+            return 0;
+
+        expected_size = sizeof(*hdr);
+        expected_size += hdr->payload_len;
+        expected_size += checksum_len;
+        if (hdr->incompat_flags & MAVLINK_IFLAG_SIGNED)
+            expected_size += MAVLINK_SIGNATURE_BLOCK_LEN;
+    } else {
+        struct mavlink_router_mavlink1_header *hdr =
+                (struct mavlink_router_mavlink1_header *)rx_buf.data;
+
+        if (rx_buf.len < sizeof(*hdr))
+            return 0;
+
+        expected_size = sizeof(*hdr);
+        expected_size += hdr->payload_len;
+        expected_size += checksum_len;
+    }
+
 
     /* check if we have a valid mavlink packet */
     if (rx_buf.len < expected_size)
