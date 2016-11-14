@@ -309,6 +309,7 @@ UdpEndpoint::UdpEndpoint()
 
 int UdpEndpoint::open(const char *ip, unsigned long port)
 {
+    const int broadcast_val = 1;
     fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (fd == -1) {
         log_error_errno(errno, "Could not create socket (%m)");
@@ -318,6 +319,11 @@ int UdpEndpoint::open(const char *ip, unsigned long port)
     sockaddr.sin_family = AF_INET;
     sockaddr.sin_addr.s_addr = inet_addr(ip);
     sockaddr.sin_port = htons(port);
+
+    if (setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &broadcast_val, sizeof(broadcast_val))) {
+        log_error_errno(errno, "Error enabling broadcast in socket (%m)");
+        goto fail;
+    }
 
     if (fcntl(fd, F_SETFL, O_NONBLOCK | FASYNC) < 0) {
         log_error_errno(errno, "Error setting socket fd as non-blocking (%m)");
