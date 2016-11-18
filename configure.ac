@@ -16,14 +16,17 @@ AC_PREFIX_DEFAULT([/usr])
 AM_MAINTAINER_MODE([enable])
 AM_INIT_AUTOMAKE([check-news foreign 1.11 silent-rules tar-pax no-dist-gzip dist-xz subdir-objects color-tests parallel-tests])
 AM_SILENT_RULES([yes])
-LT_INIT([disable-static pic-only])
 
 #####################################################################
 # Program checks and configurations
 #####################################################################
 
 AC_PROG_CC_C99
-AC_PROG_CXX
+AX_CXX_COMPILE_STDCXX([11], [ext], [mandatory])
+
+#####################################################################
+
+LT_INIT([disable-static pic-only])
 
 #####################################################################
 # Function and structure checks
