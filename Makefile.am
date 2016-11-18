@@ -24,7 +24,7 @@ include/mavlink/common/mavlink.h: modules/mavlink/pymavlink/tools/mavgen.py modu
 		-o include/mavlink \
 		--lang C \
 		--wire-protocol 2.0 \
-		modules/mavlink/message_definitions/v1.0/common.xml
+		$(srcdir)/modules/mavlink/message_definitions/v1.0/common.xml
 
 AM_CPPFLAGS = \
 	-include $(top_builddir)/config.h \
