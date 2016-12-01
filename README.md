@@ -43,7 +43,7 @@ Install:
 To route mavlink packets from master `ttyS1` to 2 other UDP endpoints, do as
 following:
 
-    $ mavlink_router -b 1500000 -e 192.168.7.1:14550 -e 127.0.0.1:14550 /dev/ttyS1
+    $ mavlink-routerd -b 1500000 -e 192.168.7.1:14550 -e 127.0.0.1:14550 /dev/ttyS1
 
 The `-b` switch above is used to set the UART baudrate. See more options with
-`mavlink_router --help`
+`mavlink-routerd --help`

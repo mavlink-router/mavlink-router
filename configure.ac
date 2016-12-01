@@ -1,8 +1,8 @@
 AC_PREREQ(2.64)
-AC_INIT([mavlink_router],
+AC_INIT([mavlink-router],
 	[1],
 	[],
-	[mavlink_router],
+	[mavlink-router],
 	[])
 
 AC_CONFIG_SRCDIR([main.cpp])

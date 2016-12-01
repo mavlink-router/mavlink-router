@@ -118,8 +118,8 @@ AM_LDFLAGS = \
 	-Wl,--no-undefined \
 	-Wl,--gc-sections
 
-bin_PROGRAMS += mavlink_router
-mavlink_router_SOURCES = \
+bin_PROGRAMS += mavlink-routerd
+mavlink_routerd_SOURCES = \
 	comm.cpp \
 	comm.h \
 	log.c \
