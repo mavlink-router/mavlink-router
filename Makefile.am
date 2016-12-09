@@ -129,8 +129,8 @@ mavlink_routerd_SOURCES = \
 	util.c \
 	util.h
 
-noinst_PROGRAMS += heartbeat_print
+noinst_PROGRAMS += heartbeat-print
 heartbeat_print_SOURCES = \
-	examples/heartbeat_print.cpp
+	examples/heartbeat-print.cpp
 
-noinst_SCRIPTS += examples/heartbeat_print.py
+noinst_SCRIPTS += examples/heartbeat-print.py
