@@ -45,6 +45,9 @@ protected:
 
     const char *_name;
     size_t _last_packet_len = 0;
+
+private:
+    bool check_crc();
 };
 
 class UartEndpoint : public Endpoint {
