@@ -199,22 +199,67 @@ int Endpoint::read_msg(struct buffer *pbuf)
         expected_size += checksum_len;
     }
 
-
     /* check if we have a valid mavlink packet */
     if (rx_buf.len < expected_size)
         return 0;
-
-    /* length matches, check crc: TODO */
 
     /* We always want to transmit one packet at a time; record the number
      * of bytes read in addition to the expected size and leave them for
      * the next iteration */
     _last_packet_len = expected_size;
 
+    if (!check_crc())
+        return 0;
+
     pbuf->data = rx_buf.data;
     pbuf->len = expected_size;
 
     return 1;
+}
+
+bool Endpoint::check_crc()
+{
+    const bool mavlink2 = rx_buf.data[0] == MAVLINK_STX;
+    uint32_t msg_id;
+    uint16_t crc_msg, crc_calc;
+    uint8_t payload_len, header_len, *payload;
+    const mavlink_msg_entry_t *msg_entry;
+
+    if (mavlink2) {
+        struct mavlink_router_mavlink2_header *hdr =
+                    (struct mavlink_router_mavlink2_header *)rx_buf.data;
+        payload = rx_buf.data + sizeof(*hdr);
+        msg_id = hdr->msgid;
+        header_len = sizeof(*hdr);
+        payload_len = hdr->payload_len;
+    } else {
+        struct mavlink_router_mavlink1_header *hdr =
+                    (struct mavlink_router_mavlink1_header *)rx_buf.data;
+        payload = rx_buf.data + sizeof(*hdr);
+        msg_id = hdr->msgid;
+        header_len = sizeof(*hdr);
+        payload_len = hdr->payload_len;
+    }
+
+    msg_entry = mavlink_get_msg_entry(msg_id);
+    if (!msg_entry) {
+        /*
+         * It is accepting and forwarding unknown messages ids because
+         * it can be a new MAVLink message implemented only in
+         * Ground Station and Flight Stack. Although it can also be a
+         * corrupted message is better forward than silent drop it.
+         */
+        return true;
+    }
+
+    crc_msg = payload[payload_len] | (payload[payload_len + 1] << 8);
+    crc_calc = crc_calculate(&rx_buf.data[1], header_len + payload_len - 1);
+    crc_accumulate(msg_entry->crc_extra, &crc_calc);
+    if (crc_calc != crc_msg) {
+        return false;
+    }
+
+    return true;
 }
 
 int UartEndpoint::open(const char *path, speed_t baudrate)
