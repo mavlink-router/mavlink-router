@@ -33,6 +33,7 @@
 
 #include "comm.h"
 #include "log.h"
+#include "ulog.h"
 #include "util.h"
 
 #define MAVLINK_TCP_PORT 5760
@@ -54,11 +55,13 @@ static struct opt {
     struct endpoint_address *ep_addrs;
     unsigned long tcp_port;
     bool report_msg_statistics;
+    char *logs_dir;
 } opt = {
     .baudrate = 115200U,
     .ep_addrs = nullptr,
     .tcp_port = MAVLINK_TCP_PORT,
     .report_msg_statistics = false,
+    .logs_dir = NULL,
 };
 
 static Endpoint *g_master;
@@ -81,6 +84,7 @@ static void help(FILE *fp) {
             "  -t --tcp-port                Port in which mavlink-router will listen for TCP\n"
             "                               connections. Pass 0 to disable TCP listening.\n"
             "                               Default port 5760\n"
+            "  -l --log [directory]         Enable Flight Stack logging\n"
             "  -h --help                    Print this message\n"
             , program_invocation_short_name);
 }
@@ -112,6 +116,7 @@ static int parse_argv(int argc, char *argv[], const char **uart, char **udp_addr
         { "endpoints",              required_argument,  NULL,   'e' },
         { "report_msg_statistics",  no_argument,        NULL,   'r' },
         { "tcp-port",               required_argument,  NULL,   't' },
+        { "log",                    optional_argument,  NULL,   'l' },
         { }
     };
     int c;
@@ -125,7 +130,7 @@ static int parse_argv(int argc, char *argv[], const char **uart, char **udp_addr
     *uart = NULL;
     *udp_port = 0;
 
-    while ((c = getopt_long(argc, argv, "hb:e:rt:", options, NULL)) >= 0) {
+    while ((c = getopt_long(argc, argv, "hb:e:rt:l", options, NULL)) >= 0) {
         switch (c) {
         case 'h':
             help(stdout);
@@ -171,6 +176,13 @@ static int parse_argv(int argc, char *argv[], const char **uart, char **udp_addr
                 help(stderr);
                 return -EINVAL;
             }
+            break;
+        }
+        case 'l': {
+            if (!optarg) {
+                optarg = (char *)".";
+            }
+            opt.logs_dir = strdup(optarg);
             break;
         }
         case '?':
@@ -310,6 +322,13 @@ void Mainloop::handle_read(Endpoint *endpoint)
      */
     while (endpoint->read_msg(&buf) > 0) {
         if (endpoint == g_master) {
+
+            if (_on_master_msg_cb) {
+                if (_on_master_msg_cb(&buf, (void *)_on_master_msg_cb_data)) {
+                    continue;
+                }
+            }
+
             for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
                 write_msg(*e, &buf);
             }
@@ -528,6 +547,14 @@ void Mainloop::timeout_del(Timeout *t)
     t->remove_me = true;
 }
 
+bool Mainloop::set_on_master_msg_callback(bool (*cb)(struct buffer *buf, void *data),
+                                          const void *data)
+{
+    _on_master_msg_cb = cb;
+    _on_master_msg_cb_data = data;
+    return true;
+}
+
 static void exit_signal_handler(int signum)
 {
     g_should_exit = true;
@@ -633,6 +660,7 @@ int main(int argc, char *argv[])
     const char *uartstr = NULL;
     char *udp_addr = NULL;
     Mainloop mainloop{};
+    ULog *ulog = NULL;
 
     setup_signal_handlers();
 
@@ -669,8 +697,19 @@ int main(int argc, char *argv[])
     if (opt.tcp_port)
         g_tcp_fd = tcp_open(mainloop);
 
+    if (opt.logs_dir) {
+        ulog = new ULog();
+        ulog->start(&mainloop, g_master, opt.logs_dir);
+        free(opt.logs_dir);
+        opt.logs_dir = NULL;
+    }
+
     mainloop.loop();
 
+    if (ulog) {
+        ulog->stop();
+        delete ulog;
+    }
     free_endpoints();
 
     delete g_master;

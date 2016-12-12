@@ -174,10 +174,15 @@ public:
     Timeout *timeout_add(uint32_t timeout_ms, bool (*cb)(void *data), const void *data);
     void timeout_del(Timeout *t);
 
+    bool set_on_master_msg_callback(bool (*cb)(struct buffer *buf, void *data), const void *data);
+
     int epollfd = -1;
     bool should_process_tcp_hangups = false;
 
 private:
     Timeout *_timeout_list[MAX_TIMEOUT];
     void _timeout_process_del(bool del_all);
+
+    bool (*_on_master_msg_cb)(struct buffer *buf, void *data);
+    const void *_on_master_msg_cb_data;
 };
