@@ -70,14 +70,16 @@ static volatile bool g_should_exit;
 
 static void help(FILE *fp) {
     fprintf(fp,
-            "%s [OPTIONS...] <uart>\n\n"
-            "  -h --help                    Print this message\n"
-            "  -b --baudrate                Use baudrate for UART\n"
+            "%s [OPTIONS...] [<uart>|<udp_address>]\n\n"
+            "  <uart>                       UART device that will be routed\n"
+            "  <udp_address>                UDP address (<ip>:<port>) that will be routed\n"
+            "  -b --baudrate <baudrate>     Use baudrate for UART\n"
             "  -e --endpoint <ip[:port]>    Add UDP endpoint to communicate port is optional\n"
             "                               and in case it's not given it starts in 14550 and\n"
             "                               continues increasing not to collide with previous\n"
             "                               ports\n"
             "  -r --report_msg_statistics   Report message statistics\n"
+            "  -h --help                    Print this message\n"
             , program_invocation_short_name);
 }
 
@@ -101,7 +103,7 @@ static unsigned long find_next_endpoint_port(const char *ip)
     return port;
 }
 
-static int parse_argv(int argc, char *argv[], const char **uart)
+static int parse_argv(int argc, char *argv[], const char **uart, char **udp_addr, unsigned long *udp_port)
 {
     static const struct option options[] = {
         { "baudrate",               required_argument,  NULL,   'b' },
@@ -110,10 +112,15 @@ static int parse_argv(int argc, char *argv[], const char **uart)
         { }
     };
     int c;
+    struct stat st;
 
     assert(argc >= 0);
     assert(argv);
     assert(uart);
+    assert(udp_port);
+
+    *uart = NULL;
+    *udp_port = 0;
 
     while ((c = getopt_long(argc, argv, "hb:e:r", options, NULL)) >= 0) {
         switch (c) {
@@ -169,7 +176,39 @@ static int parse_argv(int argc, char *argv[], const char **uart)
         return -EINVAL;
     }
 
-    *uart = argv[optind++];
+    if (stat(argv[optind], &st) == -1 || !S_ISCHR(st.st_mode)) {
+        char *ip = strdup(argv[optind]);
+
+        char *portstr = strchrnul(ip, ':');
+        if (*portstr == '\0') {
+            log_error("Invalid argument for UDP address = %s. Please inform <address>:<port>", argv[optind]);
+            help(stderr);
+            free(ip);
+            return -EINVAL;
+        } else {
+            *portstr = '\0';
+            if (safe_atoul(portstr + 1, udp_port) < 0) {
+                log_error("Invalid argument for UDP port = %s", argv[optind]);
+                help(stderr);
+                free(ip);
+                return -EINVAL;
+            }
+        }
+        *udp_addr = ip;
+    } else {
+        *uart = argv[optind];
+    }
+
+    /* Will route from UART xor UDP */
+    if (*uart && *udp_port) {
+        log_error("Cannot route from UART and UDP at same time!");
+        help(stderr);
+        return -EINVAL;
+    } else if (!*uart && !*udp_port) {
+        log_error("Please, inform a UART device or UDP port to route!");
+        help(stderr);
+        return -EINVAL;
+    }
 
     return 2;
 }
@@ -359,25 +398,36 @@ static bool add_endpoints(Mainloop &mainloop)
 
 int main(int argc, char *argv[])
 {
+    unsigned long udp_port = 0;
     const char *uartstr = NULL;
-    UartEndpoint uart{};
+    char *udp_addr = NULL;
     Mainloop mainloop{};
 
     setup_signal_handlers();
 
     log_open();
 
-    if (parse_argv(argc, argv, &uartstr) != 2)
+    if (parse_argv(argc, argv, &uartstr, &udp_addr, &udp_port) != 2)
         goto close_log;
 
     if (mainloop.open() < 0)
         goto close_log;
 
-    if (uart.open(uartstr, opt.baudrate) < 0)
-        goto close_log;
+    if (uartstr) {
+        UartEndpoint *uart = new UartEndpoint{};
+        if (uart->open(uartstr, opt.baudrate) < 0)
+            goto close_log;
 
-    g_master = &uart;
-    mainloop.add_fd(uart.fd, &uart, EPOLLIN);
+        g_master = uart;
+        mainloop.add_fd(uart->fd, uart, EPOLLIN);
+    } else {
+        UdpEndpoint *udp = new UdpEndpoint{};
+        if (udp->open(udp_addr, udp_port, true) < 0)
+            goto close_log;
+
+        g_master = udp;
+        mainloop.add_fd(udp->fd, udp, EPOLLIN);
+    }
 
     if (!add_endpoints(mainloop))
         goto close_log;
@@ -388,11 +438,16 @@ int main(int argc, char *argv[])
 
     free_endpoints();
 
+    delete g_master;
+    free(udp_addr);
+
     log_close();
 
     return 0;
 
 close_log:
+    delete g_master;
+    free(udp_addr);
     log_close();
     return EXIT_FAILURE;
 }

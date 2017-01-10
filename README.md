@@ -48,6 +48,10 @@ following:
 The `-b` switch above is used to set the UART baudrate. See more options with
 `mavlink-routerd --help`
 
+It's also possible to route mavlinks packets from any interface using:
+
+    $ mavlink-routerd -b 1500000 -e 192.168.7.1:14550 -e 127.0.0.1:14550  0.0.0.0:24550
+
 ### Contributing ###
 
 Pull-requests are accepted on GitHub. Make sure to check coding style with the
