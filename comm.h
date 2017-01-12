@@ -44,7 +44,7 @@ protected:
     virtual ssize_t _read_msg(uint8_t *buf, size_t len) = 0;
 
     const char *_name;
-    size_t _last_packet_len;
+    size_t _last_packet_len = 0;
 };
 
 class UartEndpoint : public Endpoint {
