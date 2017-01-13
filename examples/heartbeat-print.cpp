@@ -65,6 +65,11 @@ int main(int argc, char *argv[])
     int port = 14550;
     int fd;
 
+    if (argc < 2) {
+        printf("Usage: heartbeat-print <ip>:<port>\n");
+        return -1;
+    }
+
     setup_signal_handlers();
 
     fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -79,6 +84,7 @@ int main(int argc, char *argv[])
         *portstr = '\0';
         port = atoi(portstr + 1);
     }
+    printf("Connecting to: %s:%i\n", ip, port);
 
     bzero(&sockaddr, addrlen);
     sockaddr.sin_family = AF_INET;
