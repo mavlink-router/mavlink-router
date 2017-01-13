@@ -75,8 +75,9 @@ struct _packed_ mavlink_router_mavlink1_header {
     uint8_t msgid;
 };
 
-Endpoint::Endpoint(const char *name)
-    : _name{name}
+Endpoint::Endpoint(const char *name, bool check_crc)
+    : _name{name},
+      _check_crc{check_crc}
 {
     rx_buf.data = (uint8_t *) malloc(RX_BUF_MAX_SIZE);
     rx_buf.len = 0;
@@ -208,7 +209,7 @@ int Endpoint::read_msg(struct buffer *pbuf)
      * the next iteration */
     _last_packet_len = expected_size;
 
-    if (!check_crc())
+    if (_check_crc && !check_crc())
         return 0;
 
     pbuf->data = rx_buf.data;
@@ -347,7 +348,7 @@ int UartEndpoint::write_msg(const struct buffer *pbuf)
 }
 
 UdpEndpoint::UdpEndpoint()
-    : Endpoint{"UDP"}
+    : Endpoint{"UDP", false}
 {
     bzero(&sockaddr, sizeof(sockaddr));
 }
