@@ -29,7 +29,7 @@ struct buffer {
 
 class Endpoint {
 public:
-    Endpoint(const char *name, bool check_crc);
+    Endpoint(const char *name, bool crc_check_enabled);
     virtual ~Endpoint();
 
     int read_msg(struct buffer *pbuf);
@@ -43,6 +43,7 @@ public:
 
 protected:
     virtual ssize_t _read_msg(uint8_t *buf, size_t len) = 0;
+    bool _check_crc();
 
     const char *_name;
     size_t _last_packet_len = 0;
@@ -50,10 +51,7 @@ protected:
     uint32_t _read_crc_errors = 0;
     uint32_t _read_total = 0;
     uint32_t _write_total = 0;
-
-private:
-    bool check_crc();
-    const bool _check_crc;
+    const bool _crc_check_enabled;
 };
 
 class UartEndpoint : public Endpoint {

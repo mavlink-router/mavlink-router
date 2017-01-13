@@ -75,9 +75,9 @@ struct _packed_ mavlink_router_mavlink1_header {
     uint8_t msgid;
 };
 
-Endpoint::Endpoint(const char *name, bool check_crc)
-    : _name{name},
-      _check_crc{check_crc}
+Endpoint::Endpoint(const char *name, bool crc_check_enabled)
+    : _name{name}
+    , _crc_check_enabled{crc_check_enabled}
 {
     rx_buf.data = (uint8_t *) malloc(RX_BUF_MAX_SIZE);
     rx_buf.len = 0;
@@ -210,7 +210,7 @@ int Endpoint::read_msg(struct buffer *pbuf)
     _last_packet_len = expected_size;
     _read_total++;
 
-    if (_check_crc && !check_crc())
+    if (_crc_check_enabled && !_check_crc())
         return 0;
 
     pbuf->data = rx_buf.data;
@@ -219,7 +219,7 @@ int Endpoint::read_msg(struct buffer *pbuf)
     return 1;
 }
 
-bool Endpoint::check_crc()
+bool Endpoint::_check_crc()
 {
     const bool mavlink2 = rx_buf.data[0] == MAVLINK_STX;
     uint32_t msg_id;
