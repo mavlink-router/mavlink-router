@@ -245,6 +245,17 @@ void Endpoint::print_statistics()
            _write_total);
 }
 
+int Endpoint::write_msg(const mavlink_message_t *msg)
+{
+    struct buffer buffer;
+    uint8_t data[MAVLINK_MAX_PACKET_LEN];
+
+    buffer.data = data;
+    buffer.len = mavlink_msg_to_send_buffer(data, msg);
+
+    return write_msg(&buffer);
+}
+
 int UartEndpoint::open(const char *path, speed_t baudrate)
 {
     struct termios2 tc;

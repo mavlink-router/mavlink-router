@@ -22,6 +22,8 @@
 #include <errno.h>
 #include <inttypes.h>
 
+#include <mavlink.h>
+
 #include "macro.h"
 
 /*
@@ -74,6 +76,7 @@ public:
     int read_msg(struct buffer *pbuf);
     void print_statistics();
     virtual int write_msg(const struct buffer *pbuf) = 0;
+    int write_msg(const mavlink_message_t *msg);
     virtual int flush_pending_msgs() = 0;
 
     struct buffer rx_buf;
