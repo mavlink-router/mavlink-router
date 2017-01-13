@@ -44,6 +44,7 @@ public:
     void write_msg(Endpoint *e, const struct buffer *buf);
 
     int epollfd = -1;
+    bool report_msg_statistics = false;
 };
 
 struct endpoint_address {
@@ -55,9 +56,11 @@ struct endpoint_address {
 static struct opt {
     long unsigned baudrate;
     struct endpoint_address *ep_addrs;
+    bool report_msg_statistics;
 } opt = {
     .baudrate = 115200U,
     .ep_addrs = nullptr,
+    .report_msg_statistics = false,
 };
 
 static Endpoint *g_master;
@@ -73,6 +76,7 @@ static void help(FILE *fp) {
             "                               and in case it's not given it starts in 14550 and\n"
             "                               continues increasing not to collide with previous\n"
             "                               ports\n"
+            "  -r --report_msg_statistics   Report message statistics\n"
             , program_invocation_short_name);
 }
 
@@ -99,8 +103,9 @@ static unsigned long find_next_endpoint_port(const char *ip)
 static int parse_argv(int argc, char *argv[], const char **uart)
 {
     static const struct option options[] = {
-        { "baudrate",   required_argument,  NULL,   'b' },
-        { "endpoints",  required_argument,  NULL,   'e' },
+        { "baudrate",               required_argument,  NULL,   'b' },
+        { "endpoints",              required_argument,  NULL,   'e' },
+        { "report_msg_statistics",  no_argument,        NULL,   'r' },
         { }
     };
     int c;
@@ -109,7 +114,7 @@ static int parse_argv(int argc, char *argv[], const char **uart)
     assert(argv);
     assert(uart);
 
-    while ((c = getopt_long(argc, argv, "hb:e:", options, NULL)) >= 0) {
+    while ((c = getopt_long(argc, argv, "hb:e:r", options, NULL)) >= 0) {
         switch (c) {
         case 'h':
             help(stdout);
@@ -143,6 +148,10 @@ static int parse_argv(int argc, char *argv[], const char **uart)
             e->ip = ip;
             e->port = port;
             opt.ep_addrs = e;
+            break;
+        }
+        case 'r': {
+            opt.report_msg_statistics = true;
             break;
         }
         case '?':
@@ -284,6 +293,13 @@ void Mainloop::loop()
             if (events[i].events & EPOLLOUT)
                 handle_canwrite(e);
         }
+
+        if (report_msg_statistics) {
+            g_master->print_statistics();
+            for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
+                (*e)->print_statistics();
+            }
+        }
     }
 }
 
@@ -363,6 +379,8 @@ int main(int argc, char *argv[])
 
     if (!add_endpoints(mainloop))
         goto close_log;
+
+    mainloop.report_msg_statistics = opt.report_msg_statistics;
 
     mainloop.loop();
 

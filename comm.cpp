@@ -208,6 +208,7 @@ int Endpoint::read_msg(struct buffer *pbuf)
      * of bytes read in addition to the expected size and leave them for
      * the next iteration */
     _last_packet_len = expected_size;
+    _read_total++;
 
     if (_check_crc && !check_crc())
         return 0;
@@ -257,10 +258,25 @@ bool Endpoint::check_crc()
     crc_calc = crc_calculate(&rx_buf.data[1], header_len + payload_len - 1);
     crc_accumulate(msg_entry->crc_extra, &crc_calc);
     if (crc_calc != crc_msg) {
+        _read_crc_errors++;
         return false;
     }
 
     return true;
+}
+
+void Endpoint::print_statistics()
+{
+    printf("Endpoint {"
+           "\n\tname: %s" \
+           "\n\tmessages read: %u" \
+           "\n\tmessages read with CRC error: %u %f%%" \
+           "\n\tmessages written: %u" \
+           "\n}" \
+           "\n",
+           _name, _read_total, _read_crc_errors,
+           (_read_crc_errors * 100.0f) / (_read_total == 0 ? 1 : _read_total),
+           _write_total);
 }
 
 int UartEndpoint::open(const char *path, speed_t baudrate)
@@ -335,6 +351,8 @@ int UartEndpoint::write_msg(const struct buffer *pbuf)
     ssize_t r = ::write(fd, pbuf->data, pbuf->len);
     if (r == -1 && errno == EAGAIN)
         return -EAGAIN;
+
+    _write_total++;
 
     /* Incomplete packet, we warn and discard the rest */
     if (r != (ssize_t) pbuf->len) {
@@ -420,6 +438,8 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
             log_error_errno(errno, "Error sending udp packet (%m)");
         return -errno;
     };
+
+    _write_total++;
 
     /* Incomplete packet, we warn and discard the rest */
     if (r != (ssize_t) pbuf->len) {

@@ -33,6 +33,7 @@ public:
     virtual ~Endpoint();
 
     int read_msg(struct buffer *pbuf);
+    void print_statistics();
     virtual int write_msg(const struct buffer *pbuf) = 0;
     virtual int flush_pending_msgs() = 0;
 
@@ -45,6 +46,10 @@ protected:
 
     const char *_name;
     size_t _last_packet_len = 0;
+
+    uint32_t _read_crc_errors = 0;
+    uint32_t _read_total = 0;
+    uint32_t _write_total = 0;
 
 private:
     bool check_crc();
