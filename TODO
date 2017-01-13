@@ -1,0 +1,25 @@
+ - Keep a routing table with the systemdid and componentid available on each
+   endpoint so we can transition from having a "master" endpoint to something
+   allowing one endpoint talk to the other
+
+ - Add TCP support: the main use is on local links, not remote links. We should
+   allow to receive new connection requests by listening to a known port and accepting
+   connections; initially this can be done as just creating a socket and adding
+   the endpoint. If necessary we can allow clients to negotiate links to use
+   shm or memfd
+
+ - Add configuration file (INI format): mandating each endpoint to be written
+   to the command-line was an "easy to bootstrap" way for mavlink-router. However
+   it's not ideal since changing the endpoints involves changing the init scripts.
+   
+   We need to add a simple INI parser that has the configuration for the endpoints
+
+ - Add systemd service file
+
+ - Eavesdrop vs normal endpoints (to bypass the routing restrictions)
+
+ - Allow endpoints to filter messages without receiving them
+
+ - Add .ulog (PX4) and .bin (ArduPilot) support for logging
+
+ - Allow to save logs (.ulog and .bin) to disk with proper rotation
