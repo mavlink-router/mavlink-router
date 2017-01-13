@@ -75,8 +75,9 @@ struct _packed_ mavlink_router_mavlink1_header {
     uint8_t msgid;
 };
 
-Endpoint::Endpoint(const char *name)
-    : _name{name}
+Endpoint::Endpoint(const char *name, bool check_crc)
+    : _name{name},
+      _check_crc{check_crc}
 {
     rx_buf.data = (uint8_t *) malloc(RX_BUF_MAX_SIZE);
     rx_buf.len = 0;
@@ -199,22 +200,83 @@ int Endpoint::read_msg(struct buffer *pbuf)
         expected_size += checksum_len;
     }
 
-
     /* check if we have a valid mavlink packet */
     if (rx_buf.len < expected_size)
         return 0;
-
-    /* length matches, check crc: TODO */
 
     /* We always want to transmit one packet at a time; record the number
      * of bytes read in addition to the expected size and leave them for
      * the next iteration */
     _last_packet_len = expected_size;
+    _read_total++;
+
+    if (_check_crc && !check_crc())
+        return 0;
 
     pbuf->data = rx_buf.data;
     pbuf->len = expected_size;
 
     return 1;
+}
+
+bool Endpoint::check_crc()
+{
+    const bool mavlink2 = rx_buf.data[0] == MAVLINK_STX;
+    uint32_t msg_id;
+    uint16_t crc_msg, crc_calc;
+    uint8_t payload_len, header_len, *payload;
+    const mavlink_msg_entry_t *msg_entry;
+
+    if (mavlink2) {
+        struct mavlink_router_mavlink2_header *hdr =
+                    (struct mavlink_router_mavlink2_header *)rx_buf.data;
+        payload = rx_buf.data + sizeof(*hdr);
+        msg_id = hdr->msgid;
+        header_len = sizeof(*hdr);
+        payload_len = hdr->payload_len;
+    } else {
+        struct mavlink_router_mavlink1_header *hdr =
+                    (struct mavlink_router_mavlink1_header *)rx_buf.data;
+        payload = rx_buf.data + sizeof(*hdr);
+        msg_id = hdr->msgid;
+        header_len = sizeof(*hdr);
+        payload_len = hdr->payload_len;
+    }
+
+    msg_entry = mavlink_get_msg_entry(msg_id);
+    if (!msg_entry) {
+        /*
+         * It is accepting and forwarding unknown messages ids because
+         * it can be a new MAVLink message implemented only in
+         * Ground Station and Flight Stack. Although it can also be a
+         * corrupted message is better forward than silent drop it.
+         */
+        return true;
+    }
+
+    crc_msg = payload[payload_len] | (payload[payload_len + 1] << 8);
+    crc_calc = crc_calculate(&rx_buf.data[1], header_len + payload_len - 1);
+    crc_accumulate(msg_entry->crc_extra, &crc_calc);
+    if (crc_calc != crc_msg) {
+        _read_crc_errors++;
+        return false;
+    }
+
+    return true;
+}
+
+void Endpoint::print_statistics()
+{
+    printf("Endpoint {"
+           "\n\tname: %s" \
+           "\n\tmessages read: %u" \
+           "\n\tmessages read with CRC error: %u %f%%" \
+           "\n\tmessages written: %u" \
+           "\n}" \
+           "\n",
+           _name, _read_total, _read_crc_errors,
+           (_read_crc_errors * 100.0f) / (_read_total == 0 ? 1 : _read_total),
+           _write_total);
 }
 
 int UartEndpoint::open(const char *path, speed_t baudrate)
@@ -290,6 +352,8 @@ int UartEndpoint::write_msg(const struct buffer *pbuf)
     if (r == -1 && errno == EAGAIN)
         return -EAGAIN;
 
+    _write_total++;
+
     /* Incomplete packet, we warn and discard the rest */
     if (r != (ssize_t) pbuf->len) {
         log_warning("Discarding packet, incomplete write %zd but len=%u",
@@ -302,7 +366,7 @@ int UartEndpoint::write_msg(const struct buffer *pbuf)
 }
 
 UdpEndpoint::UdpEndpoint()
-    : Endpoint{"UDP"}
+    : Endpoint{"UDP", false}
 {
     bzero(&sockaddr, sizeof(sockaddr));
 }
@@ -374,6 +438,8 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
             log_error_errno(errno, "Error sending udp packet (%m)");
         return -errno;
     };
+
+    _write_total++;
 
     /* Incomplete packet, we warn and discard the rest */
     if (r != (ssize_t) pbuf->len) {
