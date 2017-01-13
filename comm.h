@@ -29,7 +29,7 @@ struct buffer {
 
 class Endpoint {
 public:
-    Endpoint(const char *name);
+    Endpoint(const char *name, bool check_crc);
     virtual ~Endpoint();
 
     int read_msg(struct buffer *pbuf);
@@ -48,11 +48,12 @@ protected:
 
 private:
     bool check_crc();
+    const bool _check_crc;
 };
 
 class UartEndpoint : public Endpoint {
 public:
-    UartEndpoint() : Endpoint{"UART"} { }
+    UartEndpoint() : Endpoint{"UART", true} { }
     virtual ~UartEndpoint() { }
     int write_msg(const struct buffer *pbuf) override;
     int flush_pending_msgs() override { return -ENOSYS; }
