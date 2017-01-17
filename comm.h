@@ -68,7 +68,20 @@ struct buffer {
     uint8_t *data;
 };
 
-class Endpoint {
+class Pollable {
+public:
+    int fd = -1;
+    virtual ~Pollable();
+};
+
+class Timeout : public Pollable {
+public:
+    bool (*cb)(void *data);
+    const void *data;
+    bool remove_me = false;
+};
+
+class Endpoint : public Pollable {
 public:
     Endpoint(const char *name, bool crc_check_enabled);
     virtual ~Endpoint();
@@ -81,7 +94,6 @@ public:
 
     struct buffer rx_buf;
     struct buffer tx_buf;
-    int fd = -1;
 
 protected:
     virtual ssize_t _read_msg(uint8_t *buf, size_t len) = 0;

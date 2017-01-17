@@ -27,6 +27,7 @@
 #include <string.h>
 #include <sys/epoll.h>
 #include <sys/stat.h>
+#include <sys/timerfd.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -35,6 +36,8 @@
 #include "util.h"
 
 #define MAVLINK_TCP_PORT 5760
+
+#define MAX_TIMEOUT 5
 
 struct endpoint_entry {
     struct endpoint_entry *next;
@@ -54,10 +57,16 @@ public:
     void handle_tcp_connection();
     int write_msg(Endpoint *e, const struct buffer *buf);
     void process_tcp_hangups();
+    Timeout *timeout_add(uint32_t timeout_ms, bool (*cb)(void *data), const void *data);
+    void timeout_del(Timeout *t);
 
     int epollfd = -1;
     bool report_msg_statistics = false;
     bool should_process_tcp_hangups = false;
+
+private:
+    Timeout *_timeout_list[MAX_TIMEOUT];
+    void _timeout_process_del(bool del_all);
 };
 
 struct endpoint_address {
@@ -435,13 +444,31 @@ void Mainloop::loop()
                 handle_tcp_connection();
                 continue;
             }
-            Endpoint *e = static_cast<Endpoint*>(events[i].data.ptr);
+            Pollable *p = static_cast<Pollable *>(events[i].data.ptr);
 
-            if (events[i].events & EPOLLIN)
-                handle_read(e);
+            if (Endpoint *e = dynamic_cast<Endpoint *>(p)) {
+                if (events[i].events & EPOLLIN)
+                    handle_read(e);
 
-            if (events[i].events & EPOLLOUT)
-                handle_canwrite(e);
+                if (events[i].events & EPOLLOUT)
+                    handle_canwrite(e);
+
+                continue;
+            }
+
+            if (Timeout *t = dynamic_cast<Timeout *>(p)) {
+                uint64_t val = 0;
+                int ret = read(t->fd, &val, sizeof(val));
+
+                if (ret < 0 || val == 0 || t->remove_me)
+                    continue;
+
+                if (!t->cb((void *)t->data)) {
+                    timeout_del(t);
+                }
+
+                continue;
+            }
         }
 
         if (should_process_tcp_hangups) {
@@ -454,7 +481,84 @@ void Mainloop::loop()
                 (*e)->print_statistics();
             }
         }
+
+        _timeout_process_del(false);
     }
+
+    _timeout_process_del(true);
+}
+
+void Mainloop::_timeout_process_del(bool del_all)
+{
+    for (uint8_t i = 0; i < MAX_TIMEOUT; i++) {
+        Timeout *t = _timeout_list[i];
+
+        if (t == NULL) {
+            continue;
+        }
+        if (!del_all && !t->remove_me) {
+            continue;
+        }
+
+        _timeout_list[i] = NULL;
+        remove_fd(t->fd);
+        delete t;
+    }
+}
+
+Timeout *Mainloop::timeout_add(uint32_t timeout_ms, bool (*cb)(void *data), const void *data)
+{
+    struct itimerspec ts;
+    Timeout *t = new Timeout();
+    bool placed = false;
+    uint8_t index_placed;
+
+    null_check(t, NULL);
+
+    for (index_placed = 0; index_placed < MAX_TIMEOUT; index_placed++) {
+        if (_timeout_list[index_placed] == NULL) {
+            _timeout_list[index_placed] = t;
+            placed = true;
+            break;
+        }
+    }
+
+    if (!placed) {
+        log_error("Maximum limit of timeouts reached");
+        goto error1;
+    }
+
+    t->fd = timerfd_create(CLOCK_MONOTONIC, 0);
+    if (t->fd < 0) {
+        log_error_errno(errno, "Unable to create timerfd: %m");
+        goto error2;
+    }
+
+    ts.it_interval.tv_sec = timeout_ms / MSEC_PER_SEC;
+    ts.it_interval.tv_nsec = (timeout_ms % MSEC_PER_SEC) * NSEC_PER_MSEC;
+    ts.it_value.tv_sec = ts.it_interval.tv_sec;
+    ts.it_value.tv_nsec = ts.it_interval.tv_nsec;
+    timerfd_settime(t->fd, 0, &ts, NULL);
+
+    if (add_fd(t->fd, t, EPOLLIN) < 0) {
+        goto error2;
+    }
+
+    t->cb = cb;
+    t->data = data;
+
+    return t;
+
+error2:
+    _timeout_list[index_placed] = NULL;
+error1:
+    delete t;
+    return NULL;
+}
+
+void Mainloop::timeout_del(Timeout *t)
+{
+    t->remove_me = true;
 }
 
 static void exit_signal_handler(int signum)

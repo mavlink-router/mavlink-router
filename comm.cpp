@@ -38,6 +38,12 @@
 #define RX_BUF_MAX_SIZE (MAVLINK_MAX_PACKET_LEN * 4)
 #define TX_BUF_MAX_SIZE (8U * 1024U)
 
+Pollable::~Pollable()
+{
+    if (fd > -1)
+        ::close(fd);
+}
+
 Endpoint::Endpoint(const char *name, bool crc_check_enabled)
     : _name{name}
     , _crc_check_enabled{crc_check_enabled}
@@ -53,10 +59,6 @@ Endpoint::Endpoint(const char *name, bool crc_check_enabled)
 
 Endpoint::~Endpoint()
 {
-    if (fd >= 0) {
-        ::close(fd);
-    }
-
     free(rx_buf.data);
     free(tx_buf.data);
 }
