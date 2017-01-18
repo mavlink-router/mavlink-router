@@ -34,18 +34,30 @@
 #include "log.h"
 #include "util.h"
 
+#define MAVLINK_TCP_PORT 5760
+
+struct endpoint_entry {
+    struct endpoint_entry *next;
+    Endpoint *endpoint;
+    bool remove;
+};
+
 class Mainloop {
 public:
     int open();
     int add_fd(int fd, void *data, int events);
     int mod_fd(int fd, void *data, int events);
+    int remove_fd(int fd);
     void loop();
     void handle_read(Endpoint *e);
     void handle_canwrite(Endpoint *e);
-    void write_msg(Endpoint *e, const struct buffer *buf);
+    void handle_tcp_connection();
+    int write_msg(Endpoint *e, const struct buffer *buf);
+    void process_tcp_hangups();
 
     int epollfd = -1;
     bool report_msg_statistics = false;
+    bool should_process_tcp_hangups = false;
 };
 
 struct endpoint_address {
@@ -57,16 +69,20 @@ struct endpoint_address {
 static struct opt {
     long unsigned baudrate;
     struct endpoint_address *ep_addrs;
+    unsigned long tcp_port;
     bool report_msg_statistics;
 } opt = {
     .baudrate = 115200U,
     .ep_addrs = nullptr,
+    .tcp_port = MAVLINK_TCP_PORT,
     .report_msg_statistics = false,
 };
 
 static Endpoint *g_master;
 static Endpoint **g_endpoints;
 static volatile bool g_should_exit;
+static int g_tcp_fd;
+static endpoint_entry *g_tcp_endpoints;
 
 static void help(FILE *fp) {
     fprintf(fp,
@@ -79,6 +95,9 @@ static void help(FILE *fp) {
             "                               continues increasing not to collide with previous\n"
             "                               ports\n"
             "  -r --report_msg_statistics   Report message statistics\n"
+            "  -t --tcp-port                Port in which mavlink-router will listen for TCP\n"
+            "                               connections. Pass 0 to disable TCP listening.\n"
+            "                               Default port 5760\n"
             "  -h --help                    Print this message\n"
             , program_invocation_short_name);
 }
@@ -109,6 +128,7 @@ static int parse_argv(int argc, char *argv[], const char **uart, char **udp_addr
         { "baudrate",               required_argument,  NULL,   'b' },
         { "endpoints",              required_argument,  NULL,   'e' },
         { "report_msg_statistics",  no_argument,        NULL,   'r' },
+        { "tcp-port",               required_argument,  NULL,   't' },
         { }
     };
     int c;
@@ -122,7 +142,7 @@ static int parse_argv(int argc, char *argv[], const char **uart, char **udp_addr
     *uart = NULL;
     *udp_port = 0;
 
-    while ((c = getopt_long(argc, argv, "hb:e:r", options, NULL)) >= 0) {
+    while ((c = getopt_long(argc, argv, "hb:e:rt:", options, NULL)) >= 0) {
         switch (c) {
         case 'h':
             help(stdout);
@@ -160,6 +180,14 @@ static int parse_argv(int argc, char *argv[], const char **uart, char **udp_addr
         }
         case 'r': {
             opt.report_msg_statistics = true;
+            break;
+        }
+        case 't': {
+            if (safe_atoul(optarg, &opt.tcp_port) < 0) {
+                log_error("Invalid argument for tcp-port = %s", optarg);
+                help(stderr);
+                return -EINVAL;
+            }
             break;
         }
         case '?':
@@ -258,7 +286,16 @@ int Mainloop::add_fd(int fd, void *data, int events)
     return 0;
 }
 
-void Mainloop::write_msg(Endpoint *e, const struct buffer *buf)
+int Mainloop::remove_fd(int fd) {
+    if (epoll_ctl(epollfd, EPOLL_CTL_DEL, fd, NULL) < 0) {
+        log_error_errno(errno, "Could not remove fd from epoll (%m)");
+        return -1;
+    }
+
+    return 0;
+}
+
+int Mainloop::write_msg(Endpoint *e, const struct buffer *buf)
 {
     int r = e->write_msg(buf);
 
@@ -268,6 +305,8 @@ void Mainloop::write_msg(Endpoint *e, const struct buffer *buf)
      */
     if (r == -EAGAIN)
         mod_fd(e->fd, e, EPOLLIN | EPOLLOUT);
+
+    return r;
 }
 
 void Mainloop::handle_read(Endpoint *endpoint)
@@ -275,6 +314,7 @@ void Mainloop::handle_read(Endpoint *endpoint)
     assert(endpoint);
 
     struct buffer buf{};
+    should_process_tcp_hangups = false;
 
     /*
      * We read from this endpoint and forward to the other endpoints.
@@ -289,6 +329,13 @@ void Mainloop::handle_read(Endpoint *endpoint)
         if (endpoint == g_master) {
             for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
                 write_msg(*e, &buf);
+            }
+            for (struct endpoint_entry *e = g_tcp_endpoints; e; e = e->next) {
+                int r = write_msg(e->endpoint, &buf);
+                if (r == -EPIPE) {
+                    e->remove = true;
+                    should_process_tcp_hangups = true;
+                }
             }
         } else {
             write_msg(g_master, &buf);
@@ -308,6 +355,65 @@ void Mainloop::handle_canwrite(Endpoint *e)
         mod_fd(e->fd, e, EPOLLIN);
 }
 
+void Mainloop::process_tcp_hangups() {
+    // First, remove entries from the beginning of list, ensuring `g_tcp_endpoints` still
+    // points to list beginning
+    struct endpoint_entry **first = &g_tcp_endpoints;
+    while (*first && (*first)->remove) {
+        struct endpoint_entry *next = (*first)->next;
+        remove_fd((*first)->endpoint->fd);
+        delete (*first)->endpoint;
+        free(*first);
+        *first = next;
+    }
+
+    // Remove other entries
+    if (*first) {
+        struct endpoint_entry *prev = *first;
+        struct endpoint_entry *current = prev->next;
+        while (current) {
+            if (current->remove) {
+                prev->next = current->next;
+                remove_fd(current->endpoint->fd);
+                delete current->endpoint;
+                free(current);
+                current = prev->next;
+            } else {
+                prev = current;
+                current = current->next;
+            }
+        }
+    }
+}
+
+void Mainloop::handle_tcp_connection()
+{
+    struct endpoint_entry *tcp_entry;
+    TcpEndpoint *tcp = new TcpEndpoint{};
+    int fd;
+
+    fd = tcp->accept(g_tcp_fd);
+
+    if (fd == -1) {
+        log_error_errno(errno, "Could not accept tcp connection (%m)");
+        delete tcp;
+    }
+
+    tcp_entry = (struct endpoint_entry*)calloc(1, sizeof(struct endpoint_entry));
+    if (!tcp_entry) {
+        log_error_errno(errno, "Could not accept tcp connection (%m)");
+        delete tcp;
+    }
+
+    tcp_entry->next = g_tcp_endpoints;
+    tcp_entry->endpoint = tcp;
+    g_tcp_endpoints = tcp_entry;
+
+    add_fd(fd, tcp, EPOLLIN);
+
+    log_debug("Received tcp connection on fd %d", fd);
+}
+
 void Mainloop::loop()
 {
     const int max_events = 8;
@@ -325,6 +431,10 @@ void Mainloop::loop()
             continue;
 
         for (i = 0; i < r; i++) {
+            if (events[i].data.ptr == &g_tcp_fd) {
+                handle_tcp_connection();
+                continue;
+            }
             Endpoint *e = static_cast<Endpoint*>(events[i].data.ptr);
 
             if (events[i].events & EPOLLIN)
@@ -332,6 +442,10 @@ void Mainloop::loop()
 
             if (events[i].events & EPOLLOUT)
                 handle_canwrite(e);
+        }
+
+        if (should_process_tcp_hangups) {
+            process_tcp_hangups();
         }
 
         if (report_msg_statistics) {
@@ -356,6 +470,9 @@ static void setup_signal_handlers()
     sa.sa_handler = exit_signal_handler;
     sigaction(SIGTERM, &sa, NULL);
     sigaction(SIGINT, &sa, NULL);
+
+    sa.sa_handler = SIG_IGN;
+    sigaction(SIGPIPE, &sa, NULL);
 }
 
 static void free_endpoints()
@@ -396,6 +513,39 @@ static bool add_endpoints(Mainloop &mainloop)
     return true;
 }
 
+static int tcp_open(Mainloop &mainloop) {
+    int fd;
+    struct sockaddr_in sockaddr = { };
+
+    fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+    if (fd == -1) {
+        log_error_errno(errno, "Could not create tcp socket (%m)");
+        return -1;
+    }
+
+    sockaddr.sin_family = AF_INET;
+    sockaddr.sin_port = htons(opt.tcp_port);
+    sockaddr.sin_addr.s_addr = INADDR_ANY;
+
+    if (bind(fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) < 0) {
+        log_error_errno(errno, "Could not bind to tcp socket (%m)");
+        close(fd);
+        return -1;
+    }
+
+    if (listen(fd, SOMAXCONN) < 0) {
+        log_error_errno(errno, "Could not listen on tcp socket (%m)");
+        close(fd);
+        return -1;
+    }
+
+    mainloop.add_fd(fd, &g_tcp_fd, EPOLLIN);
+
+    log_info("Open TCP 0.0.0.0:%lu", opt.tcp_port);
+
+    return fd;
+}
+
 int main(int argc, char *argv[])
 {
     unsigned long udp_port = 0;
@@ -433,6 +583,9 @@ int main(int argc, char *argv[])
         goto close_log;
 
     mainloop.report_msg_statistics = opt.report_msg_statistics;
+
+    if (opt.tcp_port)
+        g_tcp_fd = tcp_open(mainloop);
 
     mainloop.loop();
 
