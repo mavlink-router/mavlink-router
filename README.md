@@ -52,6 +52,9 @@ It's also possible to route mavlinks packets from any interface using:
 
     $ mavlink-routerd -b 1500000 -e 192.168.7.1:14550 -e 127.0.0.1:14550  0.0.0.0:24550
 
+mavlink-router also listens, by default, port 5760 for TCP connections. Any
+connection there will also receive routed packets.
+
 ### Contributing ###
 
 Pull-requests are accepted on GitHub. Make sure to check coding style with the

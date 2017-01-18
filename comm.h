@@ -81,3 +81,19 @@ public:
 protected:
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
 };
+
+class TcpEndpoint : public Endpoint {
+public:
+    TcpEndpoint();
+    virtual ~TcpEndpoint();
+
+    int accept(int listener_fd);
+
+    int write_msg(const struct buffer *pbuf) override;
+    int flush_pending_msgs() override { return -ENOSYS; }
+
+    struct sockaddr_in sockaddr;
+
+protected:
+    ssize_t _read_msg(uint8_t *buf, size_t len) override;
+};

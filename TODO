@@ -2,9 +2,9 @@
    endpoint so we can transition from having a "master" endpoint to something
    allowing one endpoint talk to the other
 
- - Add TCP support: the main use is on local links, not remote links. We should
+ - TCP support: the main use is on local links, not remote links. We
    allow to receive new connection requests by listening to a known port and accepting
-   connections; initially this can be done as just creating a socket and adding
+   connections; currently, this is be done by just creating a socket and adding
    the endpoint. If necessary we can allow clients to negotiate links to use
    shm or memfd
 
