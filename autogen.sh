@@ -44,7 +44,7 @@ elif [ "x$1" = "xa" ]; then
         $topdir/configure CFLAGS='-g -O2 -Wsuggest-attribute=pure -Wsuggest-attribute=const' CXXFLAGS='-g -O2 -Wsuggest-attribute=pure -Wsuggest-attribute=const' $args
         make clean
 elif [ "x$1" = "xs" ]; then
-        scan-build $topdir/configure CFLAGS='-g -O0' $args
+        scan-build $topdir/configure CFLAGS='-g -O0 -std=gnu11' CXXFLAGS='-g -O0 -std=gnu++11' $args
         scan-build make
 else
         echo
