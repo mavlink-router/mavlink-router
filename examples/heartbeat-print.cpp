@@ -93,6 +93,7 @@ int main(int argc, char *argv[])
 
     if (bind(fd, (struct sockaddr *)&sockaddr, addrlen) == -1) {
         fprintf(stderr, "Could not bind to %s:%d (%m)", ip, port);
+        free(ip);
         return 1;
     }
 
