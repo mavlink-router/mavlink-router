@@ -134,3 +134,30 @@ heartbeat_print_SOURCES = \
 	examples/heartbeat-print.cpp
 
 noinst_SCRIPTS += examples/heartbeat-print.py
+
+# ------------------------------------------------------------------------------
+# coverity
+# ------------------------------------------------------------------------------
+
+mavlink-router-coverity-%.tar.xz:
+	rm -rf $< cov-int
+	./configure CFLAGS='-g -O2' CXXFLAGS='-g -O2' --sysconfdir=/etc --localstatedir=/var --libdir=/usr/lib
+	make clean
+	cov-build --dir cov-int make -j 4
+	tar caf $@ cov-int
+
+coverity-tar: mavlink-router-coverity-$(shell git rev-parse --short HEAD 2>/dev/null).tar.xz
+
+coverity-sync: mavlink-router-coverity-$(shell git rev-parse --short HEAD 2>/dev/null).tar.xz
+	@echo "uploading coverity tarball"
+	@echo $(COVERITY_MAVLINK_ROUTER_TOKEN)
+	@echo $(COVERITY_MAVLINK_ROUTER_USER)
+	@curl --form token=$(COVERITY_MAVLINK_ROUTER_TOKEN) \
+		--form email=$(COVERITY_MAVLINK_ROUTER_USER) \
+		--form file=@$< \
+		--form version="$(shell git rev-parse --short HEAD 2>/dev/null)" \
+		--form description="" \
+		https://scan.coverity.com/builds?project=01org%2Fmavlink-router
+
+coverity-clean:
+	rm -rf mavlink-router-coverity-*.tar.xz cov-int
