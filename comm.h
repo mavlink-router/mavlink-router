@@ -26,6 +26,8 @@
 
 #include "macro.h"
 
+#define MAX_TIMEOUT 5
+
 /*
  * mavlink 2.0 packet in its wire format
  *
@@ -150,4 +152,27 @@ public:
 
 protected:
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
+};
+
+class Mainloop {
+public:
+    int open();
+    int add_fd(int fd, void *data, int events);
+    int mod_fd(int fd, void *data, int events);
+    int remove_fd(int fd);
+    void loop();
+    void handle_read(Endpoint *e);
+    void handle_canwrite(Endpoint *e);
+    void handle_tcp_connection();
+    int write_msg(Endpoint *e, const struct buffer *buf);
+    void process_tcp_hangups();
+    Timeout *timeout_add(uint32_t timeout_ms, bool (*cb)(void *data), const void *data);
+    void timeout_del(Timeout *t);
+
+    int epollfd = -1;
+    bool should_process_tcp_hangups = false;
+
+private:
+    Timeout *_timeout_list[MAX_TIMEOUT];
+    void _timeout_process_del(bool del_all);
 };
