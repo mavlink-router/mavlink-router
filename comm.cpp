@@ -98,9 +98,12 @@ Endpoint::~Endpoint()
     free(tx_buf.data);
 }
 
-int Endpoint::read_msg(struct buffer *pbuf)
+int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compid)
 {
     bool should_read_more = true;
+    uint32_t msg_id;
+    const mavlink_msg_entry_t *msg_entry;
+    uint8_t *payload;
 
     if (fd < 0) {
         log_error("Trying to read invalid fd");
@@ -186,6 +189,21 @@ int Endpoint::read_msg(struct buffer *pbuf)
         if (rx_buf.len < sizeof(*hdr))
             return 0;
 
+        msg_id = hdr->msgid;
+        payload = rx_buf.data + sizeof(*hdr);
+
+        if (!system_id || !component_id) {
+            system_id = hdr->sysid;
+            component_id = hdr->compid;
+        }
+
+        if (system_id != hdr->sysid)
+            log_warning("Different system_id message for endpoint %d: Current: %u Read: %u", fd,
+                        system_id, hdr->sysid);
+        if (component_id != hdr->compid)
+            log_warning("Different component_id message for endpoint %d: Current: %u Read: %u", fd,
+                        component_id, hdr->compid);
+
         expected_size = sizeof(*hdr);
         expected_size += hdr->payload_len;
         expected_size += checksum_len;
@@ -197,6 +215,21 @@ int Endpoint::read_msg(struct buffer *pbuf)
 
         if (rx_buf.len < sizeof(*hdr))
             return 0;
+
+        msg_id = hdr->msgid;
+        payload = rx_buf.data + sizeof(*hdr);
+
+        if (!system_id || !component_id) {
+            system_id = hdr->sysid;
+            component_id = hdr->compid;
+        }
+
+        if (system_id != hdr->sysid)
+            log_warning("Different system_id message for endpoint %d: Current: %u Read: %u", fd,
+                        system_id, hdr->sysid);
+        if (component_id != hdr->compid)
+            log_warning("Different component_id message for endpoint %d: Current: %u Read: %u", fd,
+                        component_id, hdr->compid);
 
         expected_size = sizeof(*hdr);
         expected_size += hdr->payload_len;
@@ -215,6 +248,20 @@ int Endpoint::read_msg(struct buffer *pbuf)
 
     if (_crc_check_enabled && !_check_crc())
         return 0;
+
+    *target_sysid = -1;
+    *target_compid = -1;
+
+    msg_entry = mavlink_get_msg_entry(msg_id);
+    if (msg_entry == nullptr)
+        log_error("No message entry for %u", msg_id);
+    else {
+        if (msg_entry->flags & MAV_MSG_ENTRY_FLAG_HAVE_TARGET_SYSTEM)
+            *target_sysid = payload[msg_entry->target_system_ofs];
+
+        if (msg_entry->flags & MAV_MSG_ENTRY_FLAG_HAVE_TARGET_COMPONENT)
+            *target_compid = payload[msg_entry->target_component_ofs];
+    }
 
     pbuf->data = rx_buf.data;
     pbuf->len = expected_size;
