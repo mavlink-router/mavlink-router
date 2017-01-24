@@ -61,7 +61,6 @@ public:
     void timeout_del(Timeout *t);
 
     int epollfd = -1;
-    bool report_msg_statistics = false;
     bool should_process_tcp_hangups = false;
 
 private:
@@ -475,13 +474,6 @@ void Mainloop::loop()
             process_tcp_hangups();
         }
 
-        if (report_msg_statistics) {
-            g_master->print_statistics();
-            for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
-                (*e)->print_statistics();
-            }
-        }
-
         _timeout_process_del(false);
     }
 
@@ -650,6 +642,16 @@ static int tcp_open(Mainloop &mainloop) {
     return fd;
 }
 
+static bool _report_msg_statistics_callback(void *data)
+{
+    g_master->print_statistics();
+    for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
+        (*e)->print_statistics();
+    }
+
+    return true;
+}
+
 int main(int argc, char *argv[])
 {
     unsigned long udp_port = 0;
@@ -686,7 +688,8 @@ int main(int argc, char *argv[])
     if (!add_endpoints(mainloop))
         goto close_log;
 
-    mainloop.report_msg_statistics = opt.report_msg_statistics;
+    if (opt.report_msg_statistics)
+        mainloop.timeout_add(MSEC_PER_SEC, _report_msg_statistics_callback, NULL);
 
     if (opt.tcp_port)
         g_tcp_fd = tcp_open(mainloop);
