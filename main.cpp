@@ -19,6 +19,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <getopt.h>
+#include <memory>
 #include <poll.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -342,14 +343,14 @@ static bool add_endpoints(Mainloop &mainloop)
     g_endpoints = (Endpoint**) calloc(n_endpoints + 1, sizeof(Endpoint*));
 
     for (e = opt.ep_addrs; e; e = e->next) {
-        UdpEndpoint *udp = new UdpEndpoint{};
+        std::unique_ptr<UdpEndpoint> udp{new UdpEndpoint{}};
         if (udp->open(e->ip, e->port) < 0) {
             log_error("Could not open %s:%ld", e->ip, e->port);
             return false;
         }
 
-        g_endpoints[i++] = udp;
-        mainloop.add_fd(udp->fd, udp, EPOLLIN);
+        g_endpoints[i++] = udp.release();
+        mainloop.add_fd(udp->fd, g_endpoints[i], EPOLLIN);
     }
 
     return true;
