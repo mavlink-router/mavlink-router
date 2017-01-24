@@ -325,20 +325,87 @@ void Mainloop::handle_read(Endpoint *endpoint)
      * This logic should be replaced with a routing logic so each endpoint
      * can talk to each one without involving the flight stack.
      */
-    while (endpoint->read_msg(&buf) > 0) {
-        if (endpoint == g_master) {
-            for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
-                write_msg(*e, &buf);
+    int target_sysid, target_compid;
+    while (endpoint->read_msg(&buf, &target_sysid, &target_compid) > 0) {
+        // Forward according to target_sysid and target_compid
+        if (target_sysid > 0) {
+            // target is a match sysid and compid. weak_target is a match sysid only
+            Endpoint *target = nullptr, *weak_target = nullptr;
+            struct endpoint_entry *tcp_target = nullptr;
+
+            // First, check if master is the one
+            if (g_master->get_system_id() == target_sysid) {
+                weak_target = g_master;
+                if (g_master->get_component_id() == target_compid)
+                    target = g_master;
             }
-            for (struct endpoint_entry *e = g_tcp_endpoints; e; e = e->next) {
-                int r = write_msg(e->endpoint, &buf);
-                if (r == -EPIPE) {
-                    e->remove = true;
-                    should_process_tcp_hangups = true;
+
+            // Then, check udp endpoints
+            if (!target) {
+                for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
+                    if ((*e)->get_system_id() == target_sysid) {
+                        weak_target = *e;
+                        if ((*e)->get_component_id() == target_compid) {
+                            target = *e;
+                            break;
+                        }
+                    }
                 }
             }
+
+            // Last, check tcp endpoints
+            if (!target) {
+                for (struct endpoint_entry *e = g_tcp_endpoints; e; e = e->next) {
+                    if (e->endpoint->get_system_id() == target_sysid) {
+                        weak_target = e->endpoint;
+                        tcp_target = e;
+                        if (e->endpoint->get_component_id() == target_compid) {
+                            target = e->endpoint;
+                            tcp_target = e;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!target)
+                target = weak_target;
+
+            if (target) {
+                log_debug("Routing message from %u/%u to endpoint %u/%u(%u/%u)",
+                          endpoint->get_system_id(), endpoint->get_component_id(),
+                          target->get_system_id(), target->get_component_id(), target_sysid,
+                          target_compid);
+
+                int r = write_msg(target, &buf);
+                if (r == -EPIPE && tcp_target) {
+                    tcp_target->remove = true;
+                    should_process_tcp_hangups = true;
+                }
+            } else {
+                log_error("Message to unknown sysid/compid: %u/%u", target_sysid, target_compid);
+            }
         } else {
-            write_msg(g_master, &buf);
+            log_debug("Routing message from %u/%u to all other known endpoints",
+                      endpoint->get_system_id(), endpoint->get_component_id());
+            // No target_sysid, forward to all (taking care to not forward to source)
+            if (endpoint != g_master)
+                write_msg(g_master, &buf);
+
+            for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
+                if (endpoint != *e)
+                    write_msg(*e, &buf);
+            }
+
+            for (struct endpoint_entry *e = g_tcp_endpoints; e; e = e->next) {
+                if (endpoint != e->endpoint) {
+                    int r = write_msg(e->endpoint, &buf);
+                    if (r == -EPIPE) {
+                        e->remove = true;
+                        should_process_tcp_hangups = true;
+                    }
+                }
+            }
         }
     }
 }

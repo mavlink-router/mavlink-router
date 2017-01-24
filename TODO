@@ -1,7 +1,3 @@
- - Keep a routing table with the systemdid and componentid available on each
-   endpoint so we can transition from having a "master" endpoint to something
-   allowing one endpoint talk to the other
-
  - TCP support: the main use is on local links, not remote links. We
    allow to receive new connection requests by listening to a known port and accepting
    connections; currently, this is be done by just creating a socket and adding
