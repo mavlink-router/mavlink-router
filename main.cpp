@@ -349,8 +349,9 @@ static bool add_endpoints(Mainloop &mainloop)
             return false;
         }
 
-        g_endpoints[i++] = udp.release();
-        mainloop.add_fd(udp->fd, g_endpoints[i], EPOLLIN);
+        g_endpoints[i] = udp.release();
+        mainloop.add_fd(g_endpoints[i]->fd, g_endpoints[i], EPOLLIN);
+        i++;
     }
 
     return true;
