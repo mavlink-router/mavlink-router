@@ -1,0 +1,21 @@
+---
+BasedOnStyle:    WebKit
+
+AlignAfterOpenBracket: true
+AlignEscapedNewlinesLeft: true
+AlignTrailingComments: true
+AllowShortBlocksOnASingleLine: false
+AllowShortFunctionsOnASingleLine: Inline
+ColumnLimit: 100
+Cpp11BracedListStyle: true
+DerivePointerAlignment: false
+IndentCaseLabels: false
+Language: Cpp
+NamespaceIndentation: None
+PointerAlignment: Right
+SortIncludes: true
+SpaceAfterCStyleCast: false
+SpaceInEmptyParentheses: false
+Standard: Cpp11
+TabWidth: 4
+...
