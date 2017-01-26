@@ -371,7 +371,7 @@ UdpEndpoint::UdpEndpoint()
     bzero(&sockaddr, sizeof(sockaddr));
 }
 
-int UdpEndpoint::open(const char *ip, unsigned long port)
+int UdpEndpoint::open(const char *ip, unsigned long port, bool to_bind)
 {
     const int broadcast_val = 1;
     fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -384,9 +384,16 @@ int UdpEndpoint::open(const char *ip, unsigned long port)
     sockaddr.sin_addr.s_addr = inet_addr(ip);
     sockaddr.sin_port = htons(port);
 
-    if (setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &broadcast_val, sizeof(broadcast_val))) {
-        log_error_errno(errno, "Error enabling broadcast in socket (%m)");
-        goto fail;
+    if (to_bind) {
+        if (bind(fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) < 0) {
+            log_error_errno(errno, "Error binding socket (%m)");
+            goto fail;
+        }
+    } else {
+        if (setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &broadcast_val, sizeof(broadcast_val))) {
+            log_error_errno(errno, "Error enabling broadcast in socket (%m)");
+            goto fail;
+        }
     }
 
     if (fcntl(fd, F_SETFL, O_NONBLOCK | FASYNC) < 0) {
@@ -394,7 +401,7 @@ int UdpEndpoint::open(const char *ip, unsigned long port)
         goto fail;
     }
 
-    log_info("Open %s:%lu", ip, port);
+    log_info("Open %s:%lu %c", ip, port, to_bind ? '*' : ' ');
 
     return fd;
 
@@ -448,6 +455,73 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
     }
 
     log_debug("UDP: wrote %zd bytes", r);
+
+    return r;
+}
+
+TcpEndpoint::TcpEndpoint()
+    : Endpoint{"TCP", false}
+{
+    bzero(&sockaddr, sizeof(sockaddr));
+}
+
+TcpEndpoint::~TcpEndpoint() {
+    ::close(fd);
+}
+
+int TcpEndpoint::accept(int listener_fd)
+{
+    socklen_t addrlen = sizeof(sockaddr);
+    fd = accept4(listener_fd, (struct sockaddr *)&sockaddr, &addrlen, SOCK_NONBLOCK);
+
+    if (fd == -1)
+        return -1;
+
+    return fd;
+}
+
+ssize_t TcpEndpoint::_read_msg(uint8_t *buf, size_t len)
+{
+    socklen_t addrlen = sizeof(sockaddr);
+    ssize_t r = ::recvfrom(fd, buf, len, 0,
+                           (struct sockaddr *)&sockaddr, &addrlen);
+    if (r == -1 && errno == EAGAIN)
+        return 0;
+    if (r == -1)
+        return -errno;
+
+    return r;
+}
+
+int TcpEndpoint::write_msg(const struct buffer *pbuf)
+{
+    if (fd < 0) {
+        log_error("Trying to write invalid fd");
+        return -EINVAL;
+    }
+
+    /* TODO: send any pending data */
+    if (tx_buf.len > 0) {
+        ;
+    }
+
+    ssize_t r = ::sendto(fd, pbuf->data, pbuf->len, 0,
+                         (struct sockaddr *)&sockaddr, sizeof(sockaddr));
+    if (r == -1) {
+        if (errno != EAGAIN && errno != ECONNREFUSED)
+            log_error_errno(errno, "Error sending tcp packet (%m)");
+        return -errno;
+    };
+
+    _write_total++;
+
+    /* Incomplete packet, we warn and discard the rest */
+    if (r != (ssize_t) pbuf->len) {
+        log_warning("Discarding packet, incomplete write %zd but len=%u",
+                    r, pbuf->len);
+    }
+
+    log_debug("TCP: wrote %zd bytes", r);
 
     return r;
 }
