@@ -1,0 +1,14 @@
+---
+BasedOnStyle:    WebKit
+
+AlignAfterOpenBracket: true
+AllowShortBlocksOnASingleLine: false
+Cpp11BracedListStyle: true
+DerivePointerAlignment: false
+Language: Cpp
+PointerAlignment: Right
+Standard: Cpp11
+TabWidth: 4
+AllowShortFunctionsOnASingleLine: Inline
+NamespaceIndentation: None
+...
