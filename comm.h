@@ -74,7 +74,7 @@ public:
     int write_msg(const struct buffer *pbuf) override;
     int flush_pending_msgs() override { return -ENOSYS; }
 
-    int open(const char *ip, unsigned long port);
+    int open(const char *ip, unsigned long port, bool bind = false);
 
     struct sockaddr_in sockaddr;
 

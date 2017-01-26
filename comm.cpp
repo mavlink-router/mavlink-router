@@ -371,7 +371,7 @@ UdpEndpoint::UdpEndpoint()
     bzero(&sockaddr, sizeof(sockaddr));
 }
 
-int UdpEndpoint::open(const char *ip, unsigned long port)
+int UdpEndpoint::open(const char *ip, unsigned long port, bool to_bind)
 {
     const int broadcast_val = 1;
     fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -384,9 +384,16 @@ int UdpEndpoint::open(const char *ip, unsigned long port)
     sockaddr.sin_addr.s_addr = inet_addr(ip);
     sockaddr.sin_port = htons(port);
 
-    if (setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &broadcast_val, sizeof(broadcast_val))) {
-        log_error_errno(errno, "Error enabling broadcast in socket (%m)");
-        goto fail;
+    if (to_bind) {
+        if (bind(fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) < 0) {
+            log_error_errno(errno, "Error binding socket (%m)");
+            goto fail;
+        }
+    } else {
+        if (setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &broadcast_val, sizeof(broadcast_val))) {
+            log_error_errno(errno, "Error enabling broadcast in socket (%m)");
+            goto fail;
+        }
     }
 
     if (fcntl(fd, F_SETFL, O_NONBLOCK | FASYNC) < 0) {
@@ -394,7 +401,7 @@ int UdpEndpoint::open(const char *ip, unsigned long port)
         goto fail;
     }
 
-    log_info("Open %s:%lu", ip, port);
+    log_info("Open %s:%lu %c", ip, port, to_bind ? '*' : ' ');
 
     return fd;
 
