@@ -47,3 +47,9 @@ following:
 
 The `-b` switch above is used to set the UART baudrate. See more options with
 `mavlink-routerd --help`
+
+### Contributing ###
+
+Pull-requests are accepted on GitHub. Make sure to check coding style with the
+provided script in tools/checkpatch, check for memory leaks with valgrind and
+test on real hardware.
