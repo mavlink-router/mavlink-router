@@ -93,6 +93,9 @@ Endpoint::~Endpoint()
     if (fd >= 0) {
         ::close(fd);
     }
+
+    free(rx_buf.data);
+    free(tx_buf.data);
 }
 
 int Endpoint::read_msg(struct buffer *pbuf)
