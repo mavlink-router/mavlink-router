@@ -94,6 +94,11 @@ public:
     int write_msg(const mavlink_message_t *msg);
     virtual int flush_pending_msgs() = 0;
 
+    /*
+     * Copy message in from_buffer buffer adding back the trimmed zeros to to_buffer.
+     */
+    void untrim_msg(const struct buffer *from_buffer, struct buffer *to_buffer);
+
     struct buffer rx_buf;
     struct buffer tx_buf;
 

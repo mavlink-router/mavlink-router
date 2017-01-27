@@ -258,6 +258,48 @@ int Endpoint::write_msg(const mavlink_message_t *msg)
     return write_msg(&buffer);
 }
 
+void Endpoint::untrim_msg(const struct buffer *from, struct buffer *to)
+{
+    struct mavlink_router_mavlink2_header *msg
+        = (struct mavlink_router_mavlink2_header *)from->data;
+    const mavlink_msg_entry_t *msg_entry;
+    uint16_t index_end_payload, diff;
+
+    if (from->data[0] != MAVLINK_STX) {
+        // Only MAVLink 2 need to be untrim
+        goto simple_copy;
+    }
+
+    msg_entry = mavlink_get_msg_entry(msg->msgid);
+    if (!msg_entry) {
+        // We don't have enough information to untrim a custom message
+        goto simple_copy;
+    }
+
+    if (msg->payload_len >= msg_entry->msg_len) {
+        // Message completed
+        goto simple_copy;
+    }
+
+    index_end_payload = msg->payload_len + sizeof(struct mavlink_router_mavlink2_header);
+    diff = msg_entry->msg_len - msg->payload_len;
+
+    // Copy header and payload
+    memcpy(to->data, from->data, index_end_payload);
+    // Add back the leading zeros
+    memset(&to->data[index_end_payload], 0, diff);
+    // Copy everything after payload
+    memcpy(&to->data[index_end_payload + diff], &from->data[index_end_payload],
+           from->len - index_end_payload);
+
+    to->len = from->len + diff;
+    return;
+
+simple_copy:
+    memcpy(to->data, from->data, from->len);
+    to->len = from->len;
+}
+
 int UartEndpoint::open(const char *path, speed_t baudrate)
 {
     struct termios2 tc;
