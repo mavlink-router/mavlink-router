@@ -127,7 +127,9 @@ mavlink_routerd_SOURCES = \
 	macro.h \
 	main.cpp \
 	util.c \
-	util.h
+	util.h \
+	ulog.cpp \
+	ulog.h
 
 noinst_PROGRAMS += heartbeat-print
 heartbeat_print_SOURCES = \

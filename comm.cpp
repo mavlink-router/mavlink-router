@@ -38,42 +38,11 @@
 #define RX_BUF_MAX_SIZE (MAVLINK_MAX_PACKET_LEN * 4)
 #define TX_BUF_MAX_SIZE (8U * 1024U)
 
-/*
- * mavlink 2.0 packet in its wire format
- *
- * Packet size:
- *      sizeof(mavlink_router_mavlink2_header)
- *      + payload length
- *      + 2 (checksum)
- *      + signature (0 if not signed)
- */
-struct _packed_ mavlink_router_mavlink2_header {
-    uint8_t magic;
-    uint8_t payload_len;
-    uint8_t incompat_flags;
-    uint8_t compat_flags;
-    uint8_t seq;
-    uint8_t sysid;
-    uint8_t compid;
-    uint32_t msgid : 24;
-};
-
-/*
- * mavlink 1.0 packet in its wire format
- *
- * Packet size:
- *      sizeof(mavlink_router_mavlink1_header)
- *      + payload length
- *      + 2 (checksum)
- */
-struct _packed_ mavlink_router_mavlink1_header {
-    uint8_t magic;
-    uint8_t payload_len;
-    uint8_t seq;
-    uint8_t sysid;
-    uint8_t compid;
-    uint8_t msgid;
-};
+Pollable::~Pollable()
+{
+    if (fd > -1)
+        ::close(fd);
+}
 
 Endpoint::Endpoint(const char *name, bool crc_check_enabled)
     : _name{name}
@@ -90,9 +59,8 @@ Endpoint::Endpoint(const char *name, bool crc_check_enabled)
 
 Endpoint::~Endpoint()
 {
-    if (fd >= 0) {
-        ::close(fd);
-    }
+    free(rx_buf.data);
+    free(tx_buf.data);
 }
 
 int Endpoint::read_msg(struct buffer *pbuf)
@@ -277,6 +245,59 @@ void Endpoint::print_statistics()
            _name, _read_total, _read_crc_errors,
            (_read_crc_errors * 100.0f) / (_read_total == 0 ? 1 : _read_total),
            _write_total);
+}
+
+int Endpoint::write_msg(const mavlink_message_t *msg)
+{
+    struct buffer buffer;
+    uint8_t data[MAVLINK_MAX_PACKET_LEN];
+
+    buffer.data = data;
+    buffer.len = mavlink_msg_to_send_buffer(data, msg);
+
+    return write_msg(&buffer);
+}
+
+void Endpoint::untrim_msg(const struct buffer *from, struct buffer *to)
+{
+    struct mavlink_router_mavlink2_header *msg
+        = (struct mavlink_router_mavlink2_header *)from->data;
+    const mavlink_msg_entry_t *msg_entry;
+    uint16_t index_end_payload, diff;
+
+    if (from->data[0] != MAVLINK_STX) {
+        // Only MAVLink 2 need to be untrim
+        goto simple_copy;
+    }
+
+    msg_entry = mavlink_get_msg_entry(msg->msgid);
+    if (!msg_entry) {
+        // We don't have enough information to untrim a custom message
+        goto simple_copy;
+    }
+
+    if (msg->payload_len >= msg_entry->msg_len) {
+        // Message completed
+        goto simple_copy;
+    }
+
+    index_end_payload = msg->payload_len + sizeof(struct mavlink_router_mavlink2_header);
+    diff = msg_entry->msg_len - msg->payload_len;
+
+    // Copy header and payload
+    memcpy(to->data, from->data, index_end_payload);
+    // Add back the leading zeros
+    memset(&to->data[index_end_payload], 0, diff);
+    // Copy everything after payload
+    memcpy(&to->data[index_end_payload + diff], &from->data[index_end_payload],
+           from->len - index_end_payload);
+
+    to->len = from->len + diff;
+    return;
+
+simple_copy:
+    memcpy(to->data, from->data, from->len);
+    to->len = from->len;
 }
 
 int UartEndpoint::open(const char *path, speed_t baudrate)

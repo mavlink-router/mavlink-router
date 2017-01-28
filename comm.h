@@ -22,12 +22,68 @@
 #include <errno.h>
 #include <inttypes.h>
 
+#include <mavlink.h>
+
+#include "macro.h"
+
+#define MAX_TIMEOUT 5
+
+/*
+ * mavlink 2.0 packet in its wire format
+ *
+ * Packet size:
+ *      sizeof(mavlink_router_mavlink2_header)
+ *      + payload length
+ *      + 2 (checksum)
+ *      + signature (0 if not signed)
+ */
+struct _packed_ mavlink_router_mavlink2_header {
+    uint8_t magic;
+    uint8_t payload_len;
+    uint8_t incompat_flags;
+    uint8_t compat_flags;
+    uint8_t seq;
+    uint8_t sysid;
+    uint8_t compid;
+    uint32_t msgid : 24;
+};
+
+/*
+ * mavlink 1.0 packet in its wire format
+ *
+ * Packet size:
+ *      sizeof(mavlink_router_mavlink1_header)
+ *      + payload length
+ *      + 2 (checksum)
+ */
+struct _packed_ mavlink_router_mavlink1_header {
+    uint8_t magic;
+    uint8_t payload_len;
+    uint8_t seq;
+    uint8_t sysid;
+    uint8_t compid;
+    uint8_t msgid;
+};
+
 struct buffer {
     unsigned int len;
     uint8_t *data;
 };
 
-class Endpoint {
+class Pollable {
+public:
+    int fd = -1;
+    virtual ~Pollable();
+};
+
+class Timeout : public Pollable {
+public:
+    bool (*cb)(void *data);
+    const void *data;
+    bool remove_me = false;
+};
+
+class Endpoint : public Pollable {
 public:
     Endpoint(const char *name, bool crc_check_enabled);
     virtual ~Endpoint();
@@ -35,11 +91,16 @@ public:
     int read_msg(struct buffer *pbuf);
     void print_statistics();
     virtual int write_msg(const struct buffer *pbuf) = 0;
+    int write_msg(const mavlink_message_t *msg);
     virtual int flush_pending_msgs() = 0;
+
+    /*
+     * Copy message in from_buffer buffer adding back the trimmed zeros to to_buffer.
+     */
+    void untrim_msg(const struct buffer *from_buffer, struct buffer *to_buffer);
 
     struct buffer rx_buf;
     struct buffer tx_buf;
-    int fd = -1;
 
 protected:
     virtual ssize_t _read_msg(uint8_t *buf, size_t len) = 0;
@@ -96,4 +157,32 @@ public:
 
 protected:
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
+};
+
+class Mainloop {
+public:
+    int open();
+    int add_fd(int fd, void *data, int events);
+    int mod_fd(int fd, void *data, int events);
+    int remove_fd(int fd);
+    void loop();
+    void handle_read(Endpoint *e);
+    void handle_canwrite(Endpoint *e);
+    void handle_tcp_connection();
+    int write_msg(Endpoint *e, const struct buffer *buf);
+    void process_tcp_hangups();
+    Timeout *timeout_add(uint32_t timeout_ms, bool (*cb)(void *data), const void *data);
+    void timeout_del(Timeout *t);
+
+    bool set_on_master_msg_callback(bool (*cb)(struct buffer *buf, void *data), const void *data);
+
+    int epollfd = -1;
+    bool should_process_tcp_hangups = false;
+
+private:
+    Timeout *_timeout_list[MAX_TIMEOUT];
+    void _timeout_process_del(bool del_all);
+
+    bool (*_on_master_msg_cb)(struct buffer *buf, void *data);
+    const void *_on_master_msg_cb_data;
 };

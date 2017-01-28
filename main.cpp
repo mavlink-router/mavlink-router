@@ -27,11 +27,13 @@
 #include <string.h>
 #include <sys/epoll.h>
 #include <sys/stat.h>
+#include <sys/timerfd.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 #include "comm.h"
 #include "log.h"
+#include "ulog.h"
 #include "util.h"
 
 #define MAVLINK_TCP_PORT 5760
@@ -40,24 +42,6 @@ struct endpoint_entry {
     struct endpoint_entry *next;
     Endpoint *endpoint;
     bool remove;
-};
-
-class Mainloop {
-public:
-    int open();
-    int add_fd(int fd, void *data, int events);
-    int mod_fd(int fd, void *data, int events);
-    int remove_fd(int fd);
-    void loop();
-    void handle_read(Endpoint *e);
-    void handle_canwrite(Endpoint *e);
-    void handle_tcp_connection();
-    int write_msg(Endpoint *e, const struct buffer *buf);
-    void process_tcp_hangups();
-
-    int epollfd = -1;
-    bool report_msg_statistics = false;
-    bool should_process_tcp_hangups = false;
 };
 
 struct endpoint_address {
@@ -71,11 +55,13 @@ static struct opt {
     struct endpoint_address *ep_addrs;
     unsigned long tcp_port;
     bool report_msg_statistics;
+    char *logs_dir;
 } opt = {
     .baudrate = 115200U,
     .ep_addrs = nullptr,
     .tcp_port = MAVLINK_TCP_PORT,
     .report_msg_statistics = false,
+    .logs_dir = NULL,
 };
 
 static Endpoint *g_master;
@@ -98,6 +84,7 @@ static void help(FILE *fp) {
             "  -t --tcp-port                Port in which mavlink-router will listen for TCP\n"
             "                               connections. Pass 0 to disable TCP listening.\n"
             "                               Default port 5760\n"
+            "  -l --log [directory]         Enable Flight Stack logging\n"
             "  -h --help                    Print this message\n"
             , program_invocation_short_name);
 }
@@ -129,6 +116,7 @@ static int parse_argv(int argc, char *argv[], const char **uart, char **udp_addr
         { "endpoints",              required_argument,  NULL,   'e' },
         { "report_msg_statistics",  no_argument,        NULL,   'r' },
         { "tcp-port",               required_argument,  NULL,   't' },
+        { "log",                    optional_argument,  NULL,   'l' },
         { }
     };
     int c;
@@ -142,7 +130,7 @@ static int parse_argv(int argc, char *argv[], const char **uart, char **udp_addr
     *uart = NULL;
     *udp_port = 0;
 
-    while ((c = getopt_long(argc, argv, "hb:e:rt:", options, NULL)) >= 0) {
+    while ((c = getopt_long(argc, argv, "hb:e:rt:l", options, NULL)) >= 0) {
         switch (c) {
         case 'h':
             help(stdout);
@@ -188,6 +176,13 @@ static int parse_argv(int argc, char *argv[], const char **uart, char **udp_addr
                 help(stderr);
                 return -EINVAL;
             }
+            break;
+        }
+        case 'l': {
+            if (!optarg) {
+                optarg = (char *)".";
+            }
+            opt.logs_dir = strdup(optarg);
             break;
         }
         case '?':
@@ -327,6 +322,13 @@ void Mainloop::handle_read(Endpoint *endpoint)
      */
     while (endpoint->read_msg(&buf) > 0) {
         if (endpoint == g_master) {
+
+            if (_on_master_msg_cb) {
+                if (_on_master_msg_cb(&buf, (void *)_on_master_msg_cb_data)) {
+                    continue;
+                }
+            }
+
             for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
                 write_msg(*e, &buf);
             }
@@ -435,26 +437,122 @@ void Mainloop::loop()
                 handle_tcp_connection();
                 continue;
             }
-            Endpoint *e = static_cast<Endpoint*>(events[i].data.ptr);
+            Pollable *p = static_cast<Pollable *>(events[i].data.ptr);
 
-            if (events[i].events & EPOLLIN)
-                handle_read(e);
+            if (Endpoint *e = dynamic_cast<Endpoint *>(p)) {
+                if (events[i].events & EPOLLIN)
+                    handle_read(e);
 
-            if (events[i].events & EPOLLOUT)
-                handle_canwrite(e);
+                if (events[i].events & EPOLLOUT)
+                    handle_canwrite(e);
+
+                continue;
+            }
+
+            if (Timeout *t = dynamic_cast<Timeout *>(p)) {
+                uint64_t val = 0;
+                int ret = read(t->fd, &val, sizeof(val));
+
+                if (ret < 0 || val == 0 || t->remove_me)
+                    continue;
+
+                if (!t->cb((void *)t->data)) {
+                    timeout_del(t);
+                }
+
+                continue;
+            }
         }
 
         if (should_process_tcp_hangups) {
             process_tcp_hangups();
         }
 
-        if (report_msg_statistics) {
-            g_master->print_statistics();
-            for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
-                (*e)->print_statistics();
-            }
+        _timeout_process_del(false);
+    }
+
+    _timeout_process_del(true);
+}
+
+void Mainloop::_timeout_process_del(bool del_all)
+{
+    for (uint8_t i = 0; i < MAX_TIMEOUT; i++) {
+        Timeout *t = _timeout_list[i];
+
+        if (t == NULL) {
+            continue;
+        }
+        if (!del_all && !t->remove_me) {
+            continue;
+        }
+
+        _timeout_list[i] = NULL;
+        remove_fd(t->fd);
+        delete t;
+    }
+}
+
+Timeout *Mainloop::timeout_add(uint32_t timeout_ms, bool (*cb)(void *data), const void *data)
+{
+    struct itimerspec ts;
+    Timeout *t = new Timeout();
+    bool placed = false;
+    uint8_t index_placed;
+
+    null_check(t, NULL);
+
+    for (index_placed = 0; index_placed < MAX_TIMEOUT; index_placed++) {
+        if (_timeout_list[index_placed] == NULL) {
+            _timeout_list[index_placed] = t;
+            placed = true;
+            break;
         }
     }
+
+    if (!placed) {
+        log_error("Maximum limit of timeouts reached");
+        goto error1;
+    }
+
+    t->fd = timerfd_create(CLOCK_MONOTONIC, 0);
+    if (t->fd < 0) {
+        log_error_errno(errno, "Unable to create timerfd: %m");
+        goto error2;
+    }
+
+    ts.it_interval.tv_sec = timeout_ms / MSEC_PER_SEC;
+    ts.it_interval.tv_nsec = (timeout_ms % MSEC_PER_SEC) * NSEC_PER_MSEC;
+    ts.it_value.tv_sec = ts.it_interval.tv_sec;
+    ts.it_value.tv_nsec = ts.it_interval.tv_nsec;
+    timerfd_settime(t->fd, 0, &ts, NULL);
+
+    if (add_fd(t->fd, t, EPOLLIN) < 0) {
+        goto error2;
+    }
+
+    t->cb = cb;
+    t->data = data;
+
+    return t;
+
+error2:
+    _timeout_list[index_placed] = NULL;
+error1:
+    delete t;
+    return NULL;
+}
+
+void Mainloop::timeout_del(Timeout *t)
+{
+    t->remove_me = true;
+}
+
+bool Mainloop::set_on_master_msg_callback(bool (*cb)(struct buffer *buf, void *data),
+                                          const void *data)
+{
+    _on_master_msg_cb = cb;
+    _on_master_msg_cb_data = data;
+    return true;
 }
 
 static void exit_signal_handler(int signum)
@@ -546,12 +644,23 @@ static int tcp_open(Mainloop &mainloop) {
     return fd;
 }
 
+static bool _report_msg_statistics_callback(void *data)
+{
+    g_master->print_statistics();
+    for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
+        (*e)->print_statistics();
+    }
+
+    return true;
+}
+
 int main(int argc, char *argv[])
 {
     unsigned long udp_port = 0;
     const char *uartstr = NULL;
     char *udp_addr = NULL;
     Mainloop mainloop{};
+    ULog *ulog = NULL;
 
     setup_signal_handlers();
 
@@ -582,13 +691,25 @@ int main(int argc, char *argv[])
     if (!add_endpoints(mainloop))
         goto close_log;
 
-    mainloop.report_msg_statistics = opt.report_msg_statistics;
+    if (opt.report_msg_statistics)
+        mainloop.timeout_add(MSEC_PER_SEC, _report_msg_statistics_callback, NULL);
 
     if (opt.tcp_port)
         g_tcp_fd = tcp_open(mainloop);
 
+    if (opt.logs_dir) {
+        ulog = new ULog();
+        ulog->start(&mainloop, g_master, opt.logs_dir);
+        free(opt.logs_dir);
+        opt.logs_dir = NULL;
+    }
+
     mainloop.loop();
 
+    if (ulog) {
+        ulog->stop();
+        delete ulog;
+    }
     free_endpoints();
 
     delete g_master;
