@@ -41,7 +41,7 @@ int log_internal(int level, int error,
     ({                                                                  \
          int _level = (level), _e = (error);                            \
          (log_get_max_level() >= LOG_PRI(_level))                       \
-            ? log_internal(_level, _e, __FILE__, __LINE__, __VA_ARGS__) \
+            ? log_internal(_level, _e, __BASE_FILE__, __LINE__, __VA_ARGS__) \
             : -abs(_e);                                                 \
         })
 
