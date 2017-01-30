@@ -69,16 +69,17 @@ struct endpoint_address {
 static struct opt {
     long unsigned baudrate;
     struct endpoint_address *ep_addrs;
+    struct endpoint_address *master_addrs;
     unsigned long tcp_port;
     bool report_msg_statistics;
 } opt = {
     .baudrate = 115200U,
     .ep_addrs = nullptr,
+    .master_addrs = nullptr,
     .tcp_port = MAVLINK_TCP_PORT,
     .report_msg_statistics = false,
 };
 
-static Endpoint *g_master;
 static Endpoint **g_endpoints;
 static volatile bool g_should_exit;
 static int g_tcp_fd;
@@ -137,10 +138,8 @@ static int parse_argv(int argc, char *argv[], const char **uart, char **udp_addr
     assert(argc >= 0);
     assert(argv);
     assert(uart);
-    assert(udp_port);
 
     *uart = NULL;
-    *udp_port = 0;
 
     while ((c = getopt_long(argc, argv, "hb:e:rt:", options, NULL)) >= 0) {
         switch (c) {
@@ -198,44 +197,49 @@ static int parse_argv(int argc, char *argv[], const char **uart, char **udp_addr
     }
 
     /* positional arguments */
-    if (optind + 1 != argc) {
+    if (optind + 1 > argc) {
         log_error("Error parsing required argument %d %d", optind, argc);
         help(stderr);
         return -EINVAL;
     }
 
-    if (stat(argv[optind], &st) == -1 || !S_ISCHR(st.st_mode)) {
-        char *ip = strdup(argv[optind]);
+    while (optind < argc) {
+        if (stat(argv[optind], &st) == -1 || !S_ISCHR(st.st_mode)) {
+            unsigned long port;
+            char *ip = strdup(argv[optind]);
 
-        char *portstr = strchrnul(ip, ':');
-        if (*portstr == '\0') {
-            log_error("Invalid argument for UDP address = %s. Please inform <address>:<port>", argv[optind]);
-            help(stderr);
-            free(ip);
-            return -EINVAL;
-        } else {
-            *portstr = '\0';
-            if (safe_atoul(portstr + 1, udp_port) < 0) {
-                log_error("Invalid argument for UDP port = %s", argv[optind]);
+            char *portstr = strchrnul(ip, ':');
+            if (*portstr == '\0') {
+                log_error("Invalid argument for UDP address = %s. Please inform <address>:<port>",
+                          argv[optind]);
                 help(stderr);
                 free(ip);
                 return -EINVAL;
+            } else {
+                *portstr = '\0';
+                if (safe_atoul(portstr + 1, &port) < 0) {
+                    log_error("Invalid argument for UDP port = %s", argv[optind]);
+                    help(stderr);
+                    free(ip);
+                    return -EINVAL;
+                }
+            }
+
+            struct endpoint_address *e = (struct endpoint_address *)malloc(sizeof(*e));
+            e->next = opt.master_addrs;
+            e->ip = ip;
+            e->port = port;
+            opt.master_addrs = e;
+            log_error("add master %s %lu", ip, port);
+        } else {
+            if (!*uart)
+                *uart = argv[optind];
+            else {
+                log_error("Cannot route from more than one UART!");
+                return -EINVAL;
             }
         }
-        *udp_addr = ip;
-    } else {
-        *uart = argv[optind];
-    }
-
-    /* Will route from UART xor UDP */
-    if (*uart && *udp_port) {
-        log_error("Cannot route from UART and UDP at same time!");
-        help(stderr);
-        return -EINVAL;
-    } else if (!*uart && !*udp_port) {
-        log_error("Please, inform a UART device or UDP port to route!");
-        help(stderr);
-        return -EINVAL;
+        optind++;
     }
 
     return 2;
@@ -333,14 +337,7 @@ void Mainloop::handle_read(Endpoint *endpoint)
             Endpoint *target = nullptr, *weak_target = nullptr;
             struct endpoint_entry *tcp_target = nullptr;
 
-            // First, check if master is the one
-            if (g_master->get_system_id() == target_sysid) {
-                weak_target = g_master;
-                if (g_master->get_component_id() == target_compid)
-                    target = g_master;
-            }
-
-            // Then, check udp endpoints
+            // First, check udp endpoints
             if (!target) {
                 for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
                     if ((*e)->get_system_id() == target_sysid) {
@@ -372,10 +369,10 @@ void Mainloop::handle_read(Endpoint *endpoint)
                 target = weak_target;
 
             if (target) {
-                log_debug("Routing message from %u/%u to endpoint %u/%u(%u/%u)",
-                          endpoint->get_system_id(), endpoint->get_component_id(),
-                          target->get_system_id(), target->get_component_id(), target_sysid,
-                          target_compid);
+                log_info("Routing message from %u/%u[%d] to endpoint %u/%u(%u/%u)[%d]",
+                         endpoint->get_system_id(), endpoint->get_component_id(), endpoint->fd,
+                         target->get_system_id(), target->get_component_id(), target_sysid,
+                         target_compid, target->fd);
 
                 int r = write_msg(target, &buf);
                 if (r == -EPIPE && tcp_target) {
@@ -386,12 +383,9 @@ void Mainloop::handle_read(Endpoint *endpoint)
                 log_error("Message to unknown sysid/compid: %u/%u", target_sysid, target_compid);
             }
         } else {
-            log_debug("Routing message from %u/%u to all other known endpoints",
-                      endpoint->get_system_id(), endpoint->get_component_id());
+            log_info("Routing message from %u/%u[%d] to all other known endpoints",
+                     endpoint->get_system_id(), endpoint->get_component_id(), endpoint->fd);
             // No target_sysid, forward to all (taking care to not forward to source)
-            if (endpoint != g_master)
-                write_msg(g_master, &buf);
-
             for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
                 if (endpoint != *e)
                     write_msg(*e, &buf);
@@ -516,7 +510,6 @@ void Mainloop::loop()
         }
 
         if (report_msg_statistics) {
-            g_master->print_statistics();
             for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
                 (*e)->print_statistics();
             }
@@ -555,15 +548,43 @@ static void free_endpoints()
     }
 }
 
-static bool add_endpoints(Mainloop &mainloop)
+static bool add_endpoints(Mainloop &mainloop, const char *uartstr)
 {
     unsigned n_endpoints = 0, i = 0;
     struct endpoint_address *e;
+
+    if (uartstr)
+        n_endpoints++;
+
+    for (e = opt.master_addrs; e; e = e->next)
+        n_endpoints++;
 
     for (e = opt.ep_addrs; e; e = e->next)
         n_endpoints++;
 
     g_endpoints = (Endpoint**) calloc(n_endpoints + 1, sizeof(Endpoint*));
+
+    if (uartstr) {
+        std::unique_ptr<UartEndpoint> uart{new UartEndpoint{}};
+        if (uart->open(uartstr, opt.baudrate) < 0)
+            return false;
+
+        g_endpoints[i] = uart.release();
+        mainloop.add_fd(g_endpoints[i]->fd, g_endpoints[i], EPOLLIN);
+        i++;
+    }
+
+    for (e = opt.master_addrs; e; e = e->next) {
+        std::unique_ptr<UdpEndpoint> udp{new UdpEndpoint{}};
+        if (udp->open(e->ip, e->port, true) < 0) {
+            log_error("Could not open %s:%ld", e->ip, e->port);
+            return false;
+        }
+
+        g_endpoints[i] = udp.release();
+        mainloop.add_fd(g_endpoints[i]->fd, g_endpoints[i], EPOLLIN);
+        i++;
+    }
 
     for (e = opt.ep_addrs; e; e = e->next) {
         std::unique_ptr<UdpEndpoint> udp{new UdpEndpoint{}};
@@ -630,23 +651,7 @@ int main(int argc, char *argv[])
     if (mainloop.open() < 0)
         goto close_log;
 
-    if (uartstr) {
-        UartEndpoint *uart = new UartEndpoint{};
-        if (uart->open(uartstr, opt.baudrate) < 0)
-            goto close_log;
-
-        g_master = uart;
-        mainloop.add_fd(uart->fd, uart, EPOLLIN);
-    } else {
-        UdpEndpoint *udp = new UdpEndpoint{};
-        if (udp->open(udp_addr, udp_port, true) < 0)
-            goto close_log;
-
-        g_master = udp;
-        mainloop.add_fd(udp->fd, udp, EPOLLIN);
-    }
-
-    if (!add_endpoints(mainloop))
+    if (!add_endpoints(mainloop, uartstr))
         goto close_log;
 
     mainloop.report_msg_statistics = opt.report_msg_statistics;
@@ -658,7 +663,6 @@ int main(int argc, char *argv[])
 
     free_endpoints();
 
-    delete g_master;
     free(udp_addr);
 
     log_close();
@@ -666,7 +670,6 @@ int main(int argc, char *argv[])
     return 0;
 
 close_log:
-    delete g_master;
     free(udp_addr);
     log_close();
     return EXIT_FAILURE;
