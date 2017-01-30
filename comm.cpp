@@ -448,7 +448,9 @@ int UdpEndpoint::open(const char *ip, unsigned long port, bool to_bind)
         goto fail;
     }
 
-    log_info("Open %s:%lu %c", ip, port, to_bind ? '*' : ' ');
+    if (to_bind)
+        sockaddr.sin_port = 0;
+    log_info("Open [%d] %s:%lu %c", fd, ip, port, to_bind ? '*' : ' ');
 
     return fd;
 
@@ -483,6 +485,11 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
     /* TODO: send any pending data */
     if (tx_buf.len > 0) {
         ;
+    }
+
+    if (!sockaddr.sin_port) {
+        log_debug("No one ever connected to %d. No one to write for", fd);
+        return 0;
     }
 
     ssize_t r = ::sendto(fd, pbuf->data, pbuf->len, 0,
