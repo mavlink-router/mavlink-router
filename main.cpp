@@ -489,6 +489,7 @@ static void free_endpoints()
 
     for (auto e = opt.ep_addrs; e;) {
         auto next = e->next;
+        free((void *)e->ip);
         free(e);
         e = next;
     }
