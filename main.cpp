@@ -391,19 +391,16 @@ void Mainloop::handle_tcp_connection()
     struct endpoint_entry *tcp_entry;
     TcpEndpoint *tcp = new TcpEndpoint{};
     int fd;
+    int errno_copy;
 
     fd = tcp->accept(g_tcp_fd);
 
-    if (fd == -1) {
-        log_error_errno(errno, "Could not accept tcp connection (%m)");
-        delete tcp;
-    }
+    if (fd == -1)
+        goto accept_error;
 
     tcp_entry = (struct endpoint_entry*)calloc(1, sizeof(struct endpoint_entry));
-    if (!tcp_entry) {
-        log_error_errno(errno, "Could not accept tcp connection (%m)");
-        delete tcp;
-    }
+    if (!tcp_entry)
+        goto calloc_error;
 
     tcp_entry->next = g_tcp_endpoints;
     tcp_entry->endpoint = tcp;
@@ -412,6 +409,15 @@ void Mainloop::handle_tcp_connection()
     add_fd(fd, tcp, EPOLLIN);
 
     log_debug("Received tcp connection on fd %d", fd);
+    return;
+
+calloc_error:
+    errno_copy = errno;
+    close(fd);
+    errno = errno_copy;
+accept_error:
+    log_error_errno(errno, "Could not accept tcp connection (%m)");
+    delete tcp;
 }
 
 void Mainloop::loop()
