@@ -63,6 +63,10 @@ test on real hardware.
 
 ### Samples ###
 
+Directory examples has some samples that can be used to test mavlink-router.
+Those are Python scripts, and [pymavlink](https://github.com/ArduPilot/pymavlink)
+is required.
+
 #### Sender & receiver ####
 
 One can test mavlink-router by using `examples/sender.py` and
@@ -71,13 +75,13 @@ First script send mavlink *ping* messages to a target mavlink system-id, and
 second receives and respond them.
 For instance:
 
-    $ PYTHONPATH=<path-to-pymavlink> python examples/sender.py 127.0.0.1:3000 100 0
+    $ python examples/sender.py 127.0.0.1:3000 100 0
 
 Will send mavlink *pings* to UDP port 300. Those pings will have `100` as
 source system and will have `0` as target-system (`0` as target means broadcast).
 Receiver could be set as:
 
-    $ PYTHONPATH=<path-to-pymavlink> python examples/receiver.py 127.0.0.1:4000 50
+    $ python examples/receiver.py 127.0.0.1:4000 50
 
 Where `50` is receiver system id. Then, to route between those:
 
