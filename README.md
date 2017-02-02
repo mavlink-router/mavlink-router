@@ -60,3 +60,28 @@ connection there will also receive routed packets.
 Pull-requests are accepted on GitHub. Make sure to check coding style with the
 provided script in tools/checkpatch, check for memory leaks with valgrind and
 test on real hardware.
+
+### Samples ###
+
+#### Sender & receiver ####
+
+One can test mavlink-router by using `examples/sender.py` and
+`examples/receiver.py` to simulate traffic of mavlink messages.
+First script send mavlink *ping* messages to a target mavlink system-id, and
+second receives and respond them.
+For instance:
+
+    $ PYTHONPATH=<path-to-pymavlink> python examples/sender.py 127.0.0.1:3000 100 0
+
+Will send mavlink *pings* to UDP port 300. Those pings will have `100` as
+source system and will have `0` as target-system (`0` as target means broadcast).
+Receiver could be set as:
+
+    $ PYTHONPATH=<path-to-pymavlink> python examples/receiver.py 127.0.0.1:4000 50
+
+Where `50` is receiver system id. Then, to route between those:
+
+    $ mavlink-routerd -e 127.0.0.1:4000 0.0.0.0:3000
+
+Note that it's possible to setup multiple senders and receivers to see
+mavlink-router in action.
