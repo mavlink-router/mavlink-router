@@ -30,8 +30,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include <mavlink.h>
-
 #include "log.h"
 #include "util.h"
 
@@ -246,13 +244,21 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
     _last_packet_len = expected_size;
     _read_total++;
 
-    if (_crc_check_enabled && !_check_crc())
-        return 0;
+    msg_entry = mavlink_get_msg_entry(msg_id);
+    if (_crc_check_enabled && msg_entry) {
+        /*
+         * It is accepting and forwarding unknown messages ids because
+         * it can be a new MAVLink message implemented only in
+         * Ground Station and Flight Stack. Although it can also be a
+         * corrupted message is better forward than silent drop it.
+         */
+        if (!_check_crc(msg_entry))
+            return 0;
+    }
 
     *target_sysid = -1;
     *target_compid = -1;
 
-    msg_entry = mavlink_get_msg_entry(msg_id);
     if (msg_entry == nullptr)
         log_error("No message entry for %u", msg_id);
     else {
@@ -269,39 +275,24 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
     return 1;
 }
 
-bool Endpoint::_check_crc()
+bool Endpoint::_check_crc(const mavlink_msg_entry_t *msg_entry)
 {
     const bool mavlink2 = rx_buf.data[0] == MAVLINK_STX;
-    uint32_t msg_id;
     uint16_t crc_msg, crc_calc;
     uint8_t payload_len, header_len, *payload;
-    const mavlink_msg_entry_t *msg_entry;
 
     if (mavlink2) {
         struct mavlink_router_mavlink2_header *hdr =
                     (struct mavlink_router_mavlink2_header *)rx_buf.data;
         payload = rx_buf.data + sizeof(*hdr);
-        msg_id = hdr->msgid;
         header_len = sizeof(*hdr);
         payload_len = hdr->payload_len;
     } else {
         struct mavlink_router_mavlink1_header *hdr =
                     (struct mavlink_router_mavlink1_header *)rx_buf.data;
         payload = rx_buf.data + sizeof(*hdr);
-        msg_id = hdr->msgid;
         header_len = sizeof(*hdr);
         payload_len = hdr->payload_len;
-    }
-
-    msg_entry = mavlink_get_msg_entry(msg_id);
-    if (!msg_entry) {
-        /*
-         * It is accepting and forwarding unknown messages ids because
-         * it can be a new MAVLink message implemented only in
-         * Ground Station and Flight Stack. Although it can also be a
-         * corrupted message is better forward than silent drop it.
-         */
-        return true;
     }
 
     crc_msg = payload[payload_len] | (payload[payload_len + 1] << 8);

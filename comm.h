@@ -22,6 +22,8 @@
 #include <errno.h>
 #include <inttypes.h>
 
+#include <mavlink.h>
+
 struct buffer {
     unsigned int len;
     uint8_t *data;
@@ -46,7 +48,7 @@ public:
 
 protected:
     virtual ssize_t _read_msg(uint8_t *buf, size_t len) = 0;
-    bool _check_crc();
+    bool _check_crc(const mavlink_msg_entry_t *msg_entry);
 
     const char *_name;
     size_t _last_packet_len = 0;
