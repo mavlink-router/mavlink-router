@@ -24,7 +24,5 @@ import sys
 mav = mavutil.mavlink_connection('udpin:' + sys.argv[1])
 mav.wait_heartbeat()
 mav.mav.command_long_send(mav.target_system, mav.target_component,
-                          mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
-                          0,
-                          1,
+                          mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM, 0, 1,
                           0, 0, 0, 0, 0, 0)

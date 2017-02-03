@@ -25,13 +25,15 @@ import time
 
 if len(sys.argv) != 3:
     print("Usage: %s <ip:udp_port> <system-id>" % (sys.argv[0]))
-    print("Receive mavlink heartbeats on specified interface. Respond with a ping message")
+    print("Receive mavlink heartbeats on specified interface. "
+          "Respond with a ping message")
     quit()
 
 srcSystem = int(sys.argv[2])
-mav = mavutil.mavlink_connection('udpin:' + sys.argv[1], source_system = srcSystem)
+mav = mavutil.mavlink_connection(
+    'udpin:' + sys.argv[1], source_system=srcSystem)
 
-while(True):
+while (True):
     msg = mav.recv_match(blocking=True)
     print("Message from %d: %s" % (msg.get_srcSystem(), msg))
     if msg.target_system == 0:
@@ -40,5 +42,6 @@ while(True):
         print("\tMessage sent to me")
     else:
         print("\tMessage sent to other")
-    mav.mav.ping_send(int(time.time() * 1000), msg.seq, msg.get_srcSystem(), msg.get_srcComponent())
-
+    mav.mav.ping_send(
+        int(time.time() * 1000), msg.seq,
+        msg.get_srcSystem(), msg.get_srcComponent())
