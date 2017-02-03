@@ -58,8 +58,8 @@ connection there will also receive routed packets.
 ### Contributing ###
 
 Pull-requests are accepted on GitHub. Make sure to check coding style with the
-provided script in tools/checkpatch, check for memory leaks with valgrind and
-test on real hardware.
+provided script in tools/checkpatch and tools/checkpython, check for memory leaks
+with valgrind and test on real hardware.
 
 ### Samples ###
 
