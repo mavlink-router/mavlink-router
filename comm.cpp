@@ -358,6 +358,8 @@ int UartEndpoint::open(const char *path, speed_t baudrate)
         goto fail;
     }
 
+    log_info("Open UART [%d] %s *", fd, path);
+
     return fd;
 
 fail:
@@ -401,7 +403,7 @@ int UartEndpoint::write_msg(const struct buffer *pbuf)
                     r, pbuf->len);
     }
 
-    log_debug("UART: wrote %zd bytes", r);
+    log_debug("UART: [%d] wrote %zd bytes", fd, r);
 
     return r;
 }
@@ -444,7 +446,7 @@ int UdpEndpoint::open(const char *ip, unsigned long port, bool to_bind)
 
     if (to_bind)
         sockaddr.sin_port = 0;
-    log_info("Open [%d] %s:%lu %c", fd, ip, port, to_bind ? '*' : ' ');
+    log_info("Open UDP [%d] %s:%lu %c", fd, ip, port, to_bind ? '*' : ' ');
 
     return fd;
 
@@ -502,7 +504,7 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
                     r, pbuf->len);
     }
 
-    log_debug("UDP: wrote %zd bytes", r);
+    log_debug("UDP: [%d] wrote %zd bytes", fd, r);
 
     return r;
 }
@@ -569,7 +571,7 @@ int TcpEndpoint::write_msg(const struct buffer *pbuf)
                     r, pbuf->len);
     }
 
-    log_debug("TCP: wrote %zd bytes", r);
+    log_debug("TCP: [%d] wrote %zd bytes", fd, r);
 
     return r;
 }
