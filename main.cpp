@@ -475,7 +475,7 @@ void Mainloop::handle_tcp_connection()
 
     add_fd(fd, tcp, EPOLLIN);
 
-    log_debug("Received tcp connection on fd %d", fd);
+    log_debug("Accepted TCP connection on [%d]", fd);
     return;
 
 calloc_error:
@@ -483,7 +483,7 @@ calloc_error:
     close(fd);
     errno = errno_copy;
 accept_error:
-    log_error_errno(errno, "Could not accept tcp connection (%m)");
+    log_error_errno(errno, "Could not accept TCP connection (%m)");
     delete tcp;
 }
 
@@ -642,7 +642,7 @@ static int tcp_open(Mainloop &mainloop) {
 
     mainloop.add_fd(fd, &g_tcp_fd, EPOLLIN);
 
-    log_info("Open TCP 0.0.0.0:%lu", opt.tcp_port);
+    log_info("Open TCP [%d] 0.0.0.0:%lu", fd, opt.tcp_port);
 
     return fd;
 }
