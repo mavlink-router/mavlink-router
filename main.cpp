@@ -123,6 +123,21 @@ static unsigned long find_next_endpoint_port(const char *ip)
     return port;
 }
 
+static void add_endpoint_address(struct endpoint_address **list, char *ip, long int port)
+{
+    struct endpoint_address *e = (struct endpoint_address *)malloc(sizeof(*e));
+
+    if (!e) {
+        log_error_errno(errno, "Could not parse endpoint address: %m");
+        return;
+    }
+
+    e->next = *list;
+    e->ip = ip;
+    e->port = port;
+    *list = e;
+}
+
 static int parse_argv(int argc, char *argv[], const char **uart, char **udp_addr, unsigned long *udp_port)
 {
     static const struct option options[] = {
@@ -170,11 +185,7 @@ static int parse_argv(int argc, char *argv[], const char **uart, char **udp_addr
                 }
             }
 
-            struct endpoint_address *e = (struct endpoint_address*) malloc(sizeof(*e));
-            e->next = opt.ep_addrs;
-            e->ip = ip;
-            e->port = port;
-            opt.ep_addrs = e;
+            add_endpoint_address(&opt.ep_addrs, ip, port);
             break;
         }
         case 'r': {
@@ -225,12 +236,7 @@ static int parse_argv(int argc, char *argv[], const char **uart, char **udp_addr
                 }
             }
 
-            struct endpoint_address *e = (struct endpoint_address *)malloc(sizeof(*e));
-            e->next = opt.master_addrs;
-            e->ip = ip;
-            e->port = port;
-            opt.master_addrs = e;
-            log_error("add master %s %lu", ip, port);
+            add_endpoint_address(&opt.master_addrs, ip, port);
         } else {
             if (!*uart)
                 *uart = argv[optind];
