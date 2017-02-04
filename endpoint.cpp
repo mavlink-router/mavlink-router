@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "comm.h"
+#include "endpoint.h"
 
 #include <arpa/inet.h>
 #include <assert.h>
@@ -31,7 +31,6 @@
 #include <unistd.h>
 
 #include "log.h"
-#include "util.h"
 
 #define RX_BUF_MAX_SIZE (MAVLINK_MAX_PACKET_LEN * 4)
 #define TX_BUF_MAX_SIZE (8U * 1024U)
