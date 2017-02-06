@@ -114,7 +114,7 @@ int Mainloop::write_msg(Endpoint *e, const struct buffer *buf)
     return r;
 }
 
-void Mainloop::router_msg(Endpoint *sender, struct buffer *buf, int target_sysid)
+void Mainloop::route_msg(struct buffer *buf, int target_sysid, int sender_sysid)
 {
     if (target_sysid > 0) {
         Endpoint *target = nullptr;
@@ -142,8 +142,8 @@ void Mainloop::router_msg(Endpoint *sender, struct buffer *buf, int target_sysid
         }
 
         if (target) {
-            log_info("Routing message from %u[%d] to endpoint %u[%d]", sender->get_system_id(),
-                     sender->fd, target_sysid, target->fd);
+            log_info("Routing message from %u to endpoint %u[%d]", sender_sysid, target_sysid,
+                     target->fd);
 
             int r = write_msg(target, buf);
             if (r == -EPIPE && tcp_target) {
@@ -154,16 +154,15 @@ void Mainloop::router_msg(Endpoint *sender, struct buffer *buf, int target_sysid
             log_error("Message to unknown sysid: %u", target_sysid);
         }
     } else {
-        log_info("Routing message from %uu[%d] to all other known endpoints",
-                 sender->get_system_id(), sender->fd);
+        log_info("Routing message from %u to all other known endpoints", sender_sysid);
         // No target_sysid, forward to all (taking care to not forward to source)
         for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
-            if (sender != *e)
+            if (sender_sysid != (*e)->get_system_id())
                 write_msg(*e, buf);
         }
 
         for (struct endpoint_entry *e = g_tcp_endpoints; e; e = e->next) {
-            if (sender != e->endpoint) {
+            if (sender_sysid != e->endpoint->get_system_id()) {
                 int r = write_msg(e->endpoint, buf);
                 if (r == -EPIPE) {
                     e->remove = true;
@@ -172,29 +171,6 @@ void Mainloop::router_msg(Endpoint *sender, struct buffer *buf, int target_sysid
             }
         }
     }
-}
-
-void Mainloop::handle_read(Endpoint *endpoint)
-{
-    assert(endpoint);
-
-    struct buffer buf{};
-
-    int target_sysid;
-    while (endpoint->read_msg(&buf, &target_sysid) > 0)
-        router_msg(endpoint, &buf, target_sysid);
-}
-
-void Mainloop::handle_canwrite(Endpoint *e)
-{
-    int r = e->flush_pending_msgs();
-
-    /*
-     * If we could flush everything without triggering another block write,
-     * remove EPOLLOUT from flags so we don't get called again
-     */
-    if (r != -EAGAIN)
-        mod_fd(e->fd, e, EPOLLIN);
 }
 
 void Mainloop::process_tcp_hangups()
@@ -275,6 +251,7 @@ void Mainloop::loop()
         return;
 
     setup_signal_handlers();
+    Endpoint::set_router(this);
 
     while (!should_exit) {
         int i;
@@ -288,13 +265,16 @@ void Mainloop::loop()
                 handle_tcp_connection();
                 continue;
             }
-            Endpoint *e = static_cast<Endpoint*>(events[i].data.ptr);
+            Pollable *p = static_cast<Pollable *>(events[i].data.ptr);
 
             if (events[i].events & EPOLLIN)
-                handle_read(e);
+                p->handle_read();
 
-            if (events[i].events & EPOLLOUT)
-                handle_canwrite(e);
+            if (events[i].events & EPOLLOUT) {
+                if (!p->handle_canwrite()) {
+                    mod_fd(p->fd, p, EPOLLIN);
+                }
+            }
         }
 
         if (should_process_tcp_hangups) {

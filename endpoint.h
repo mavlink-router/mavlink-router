@@ -20,24 +20,30 @@
 #include <mavlink.h>
 
 #include "comm.h"
+#include "pollable.h"
+#include "router.h"
 
-class Endpoint {
+class Endpoint : public Pollable {
 public:
     Endpoint(const char *name, bool crc_check_enabled);
     virtual ~Endpoint();
 
-    int read_msg(struct buffer *pbuf, int *target_system);
+    void handle_read() override;
+    bool handle_canwrite() override;
+
     void print_statistics();
     virtual int write_msg(const struct buffer *pbuf) = 0;
     virtual int flush_pending_msgs() = 0;
 
     uint8_t get_system_id() { return _system_id; }
 
+    static void set_router(Router *router) { _router = router; }
+
     struct buffer rx_buf;
     struct buffer tx_buf;
-    int fd = -1;
 
 protected:
+    int read_msg(struct buffer *pbuf, int *target_system);
     virtual ssize_t _read_msg(uint8_t *buf, size_t len) = 0;
     bool _check_crc(const mavlink_msg_entry_t *msg_entry);
 
@@ -50,6 +56,8 @@ protected:
     const bool _crc_check_enabled;
 
     uint8_t _system_id = 0;
+
+    static Router *_router;
 };
 
 class UartEndpoint : public Endpoint {

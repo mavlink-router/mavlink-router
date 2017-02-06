@@ -72,6 +72,8 @@ struct _packed_ mavlink_router_mavlink1_header {
     uint8_t msgid;
 };
 
+Router *Endpoint::_router = nullptr;
+
 Endpoint::Endpoint(const char *name, bool crc_check_enabled)
     : _name{name}
     , _crc_check_enabled{crc_check_enabled}
@@ -87,12 +89,25 @@ Endpoint::Endpoint(const char *name, bool crc_check_enabled)
 
 Endpoint::~Endpoint()
 {
-    if (fd >= 0) {
-        ::close(fd);
-    }
-
     free(rx_buf.data);
     free(tx_buf.data);
+}
+
+bool Endpoint::handle_canwrite()
+{
+    int r = flush_pending_msgs();
+    return r == -EAGAIN;
+}
+
+void Endpoint::handle_read()
+{
+    assert(_router);
+
+    int target_sysid;
+    struct buffer buf{};
+
+    while (read_msg(&buf, &target_sysid) > 0)
+        _router->route_msg(&buf, target_sysid, _system_id);
 }
 
 int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid)

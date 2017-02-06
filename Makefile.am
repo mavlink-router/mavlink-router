@@ -129,6 +129,9 @@ mavlink_routerd_SOURCES = \
 	main.cpp \
 	mainloop.cpp \
 	mainloop.h \
+	pollable.h \
+	pollable.cpp \
+	router.h \
 	util.c \
 	util.h
 
