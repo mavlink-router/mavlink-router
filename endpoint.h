@@ -26,13 +26,12 @@ public:
     Endpoint(const char *name, bool crc_check_enabled);
     virtual ~Endpoint();
 
-    int read_msg(struct buffer *pbuf, int *target_system, int *target_component);
+    int read_msg(struct buffer *pbuf, int *target_system);
     void print_statistics();
     virtual int write_msg(const struct buffer *pbuf) = 0;
     virtual int flush_pending_msgs() = 0;
 
-    uint8_t get_system_id() { return system_id; }
-    uint8_t get_component_id() { return component_id; }
+    uint8_t get_system_id() { return _system_id; }
 
     struct buffer rx_buf;
     struct buffer tx_buf;
@@ -50,8 +49,7 @@ protected:
     uint32_t _write_total = 0;
     const bool _crc_check_enabled;
 
-    uint8_t system_id = 0;
-    uint8_t component_id = 0;
+    uint8_t _system_id = 0;
 };
 
 class UartEndpoint : public Endpoint {

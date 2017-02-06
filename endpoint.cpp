@@ -95,7 +95,7 @@ Endpoint::~Endpoint()
     free(tx_buf.data);
 }
 
-int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compid)
+int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid)
 {
     bool should_read_more = true;
     uint32_t msg_id;
@@ -189,17 +189,12 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
         msg_id = hdr->msgid;
         payload = rx_buf.data + sizeof(*hdr);
 
-        if (!system_id || !component_id) {
-            system_id = hdr->sysid;
-            component_id = hdr->compid;
-        }
+        if (!_system_id)
+            _system_id = hdr->sysid;
 
-        if (system_id != hdr->sysid)
+        if (_system_id != hdr->sysid)
             log_warning("Different system_id message for endpoint %d: Current: %u Read: %u", fd,
-                        system_id, hdr->sysid);
-        if (component_id != hdr->compid)
-            log_warning("Different component_id message for endpoint %d: Current: %u Read: %u", fd,
-                        component_id, hdr->compid);
+                        _system_id, hdr->sysid);
 
         expected_size = sizeof(*hdr);
         expected_size += hdr->payload_len;
@@ -216,17 +211,12 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
         msg_id = hdr->msgid;
         payload = rx_buf.data + sizeof(*hdr);
 
-        if (!system_id || !component_id) {
-            system_id = hdr->sysid;
-            component_id = hdr->compid;
-        }
+        if (!_system_id)
+            _system_id = hdr->sysid;
 
-        if (system_id != hdr->sysid)
+        if (_system_id != hdr->sysid)
             log_warning("Different system_id message for endpoint %d: Current: %u Read: %u", fd,
-                        system_id, hdr->sysid);
-        if (component_id != hdr->compid)
-            log_warning("Different component_id message for endpoint %d: Current: %u Read: %u", fd,
-                        component_id, hdr->compid);
+                        _system_id, hdr->sysid);
 
         expected_size = sizeof(*hdr);
         expected_size += hdr->payload_len;
@@ -256,16 +246,12 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
     }
 
     *target_sysid = -1;
-    *target_compid = -1;
 
     if (msg_entry == nullptr)
         log_error("No message entry for %u", msg_id);
     else {
         if (msg_entry->flags & MAV_MSG_ENTRY_FLAG_HAVE_TARGET_SYSTEM)
             *target_sysid = payload[msg_entry->target_system_ofs];
-
-        if (msg_entry->flags & MAV_MSG_ENTRY_FLAG_HAVE_TARGET_COMPONENT)
-            *target_compid = payload[msg_entry->target_component_ofs];
     }
 
     pbuf->data = rx_buf.data;
