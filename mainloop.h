@@ -33,6 +33,7 @@ public:
     int mod_fd(int fd, void *data, int events);
     int remove_fd(int fd);
     void loop();
+    void router_msg(Endpoint *sender, struct buffer *buf, int target_sysid, int target_compid);
     void handle_read(Endpoint *e);
     void handle_canwrite(Endpoint *e);
     void handle_tcp_connection();
