@@ -19,6 +19,7 @@
 
 #include "comm.h"
 #include "endpoint.h"
+#include "router.h"
 
 struct endpoint_entry {
     struct endpoint_entry *next;
@@ -26,14 +27,14 @@ struct endpoint_entry {
     bool remove;
 };
 
-class Mainloop {
+class Mainloop : public Router {
 public:
     int open();
     int add_fd(int fd, void *data, int events);
     int mod_fd(int fd, void *data, int events);
     int remove_fd(int fd);
     void loop();
-    void router_msg(Endpoint *sender, struct buffer *buf, int target_sysid);
+    void route_msg(struct buffer *buf, int target_sysid, int sender_sysid) override;
     void handle_read(Endpoint *e);
     void handle_canwrite(Endpoint *e);
     void handle_tcp_connection();
