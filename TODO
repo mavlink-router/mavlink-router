@@ -19,3 +19,6 @@
  - Add .ulog (PX4) and .bin (ArduPilot) support for logging
 
  - Allow to save logs (.ulog and .bin) to disk with proper rotation
+
+ - Tests: make them more abrangent (maybe even unit tests?) and integrate on some
+   CI platform.
