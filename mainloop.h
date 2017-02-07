@@ -47,8 +47,9 @@ public:
     void free_endpoints(struct opt *opt);
     bool add_endpoints(Mainloop &mainloop, const char *uartstr, struct opt *opt);
 
+    void print_statistics();
+
     int epollfd = -1;
-    bool report_msg_statistics = false;
     bool should_process_tcp_hangups = false;
 
 private:

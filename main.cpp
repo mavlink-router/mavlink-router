@@ -221,8 +221,6 @@ int main(int argc, char *argv[])
     if (!mainloop.add_endpoints(mainloop, uartstr, &opt))
         goto close_log;
 
-    mainloop.report_msg_statistics = opt.report_msg_statistics;
-
     mainloop.loop();
 
     mainloop.free_endpoints(&opt);
