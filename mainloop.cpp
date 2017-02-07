@@ -295,6 +295,19 @@ void Mainloop::loop()
     }
 }
 
+void Mainloop::print_statistics()
+{
+    for (Endpoint **e = g_endpoints; *e != nullptr; e++)
+        (*e)->print_statistics();
+}
+
+static bool _print_statistics_timeout_cb(void *data)
+{
+    Mainloop *mainloop = static_cast<Mainloop *>(data);
+    mainloop->print_statistics();
+    return true;
+}
+
 bool Mainloop::add_endpoints(Mainloop &mainloop, const char *uartstr, struct opt *opt)
 {
     unsigned n_endpoints = 0, i = 0;
@@ -347,6 +360,9 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, const char *uartstr, struct opt
 
     if (opt->tcp_port)
         g_tcp_fd = tcp_open(opt->tcp_port);
+
+    if (opt->report_msg_statistics)
+        add_timeout(MSEC_PER_SEC, _print_statistics_timeout_cb, this);
 
     return true;
 }
