@@ -115,7 +115,7 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid)
     bool should_read_more = true;
     uint32_t msg_id;
     const mavlink_msg_entry_t *msg_entry;
-    uint8_t *payload, seq;
+    uint8_t *payload, seq, sysid;
 
     if (fd < 0) {
         log_error("Trying to read invalid fd");
@@ -204,13 +204,7 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid)
         msg_id = hdr->msgid;
         payload = rx_buf.data + sizeof(*hdr);
         seq = hdr->seq;
-
-        if (!_system_id)
-            _system_id = hdr->sysid;
-
-        if (_system_id != hdr->sysid)
-            log_warning("Different system_id message for endpoint %d: Current: %u Read: %u", fd,
-                        _system_id, hdr->sysid);
+        sysid = hdr->sysid;
 
         expected_size = sizeof(*hdr);
         expected_size += hdr->payload_len;
@@ -227,13 +221,7 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid)
         msg_id = hdr->msgid;
         payload = rx_buf.data + sizeof(*hdr);
         seq = hdr->seq;
-
-        if (!_system_id)
-            _system_id = hdr->sysid;
-
-        if (_system_id != hdr->sysid)
-            log_warning("Different system_id message for endpoint %d: Current: %u Read: %u", fd,
-                        _system_id, hdr->sysid);
+        sysid = hdr->sysid;
 
         expected_size = sizeof(*hdr);
         expected_size += hdr->payload_len;
@@ -267,6 +255,13 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid)
 
     _stat.read.handled++;
     _stat.read.handled_bytes += expected_size;
+
+    if (!_system_id && (!_crc_check_enabled || msg_entry))
+        _system_id = sysid;
+
+    if (_system_id && _system_id != sysid)
+        log_warning("Different system_id message for endpoint %d: Current: %u Read: %u", fd,
+                    _system_id, sysid);
 
     *target_sysid = -1;
 
