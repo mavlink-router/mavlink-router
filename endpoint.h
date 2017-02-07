@@ -50,9 +50,23 @@ protected:
     const char *_name;
     size_t _last_packet_len = 0;
 
-    uint32_t _read_crc_errors = 0;
-    uint32_t _read_total = 0;
-    uint32_t _write_total = 0;
+    // Statistics
+    struct {
+        struct {
+            uint64_t crc_error_bytes = 0;
+            uint64_t handled_bytes = 0;
+            uint32_t total = 0; // handled + crc error + seq lost
+            uint32_t crc_error = 0;
+            uint32_t handled = 0;
+            uint32_t drop_seq_total = 0;
+            uint8_t expected_seq = 0;
+        } read;
+        struct {
+            uint64_t bytes = 0;
+            uint32_t total = 0;
+        } write;
+    } _stat;
+
     const bool _crc_check_enabled;
 
     uint8_t _system_id = 0;

@@ -115,7 +115,7 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid)
     bool should_read_more = true;
     uint32_t msg_id;
     const mavlink_msg_entry_t *msg_entry;
-    uint8_t *payload;
+    uint8_t *payload, seq;
 
     if (fd < 0) {
         log_error("Trying to read invalid fd");
@@ -203,6 +203,7 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid)
 
         msg_id = hdr->msgid;
         payload = rx_buf.data + sizeof(*hdr);
+        seq = hdr->seq;
 
         if (!_system_id)
             _system_id = hdr->sysid;
@@ -225,6 +226,7 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid)
 
         msg_id = hdr->msgid;
         payload = rx_buf.data + sizeof(*hdr);
+        seq = hdr->seq;
 
         if (!_system_id)
             _system_id = hdr->sysid;
@@ -246,7 +248,7 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid)
      * of bytes read in addition to the expected size and leave them for
      * the next iteration */
     _last_packet_len = expected_size;
-    _read_total++;
+    _stat.read.total++;
 
     msg_entry = mavlink_get_msg_entry(msg_id);
     if (_crc_check_enabled && msg_entry) {
@@ -256,9 +258,15 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid)
          * Ground Station and Flight Stack. Although it can also be a
          * corrupted message is better forward than silent drop it.
          */
-        if (!_check_crc(msg_entry))
+        if (!_check_crc(msg_entry)) {
+            _stat.read.crc_error++;
+            _stat.read.crc_error_bytes += expected_size;
             return 0;
+        }
     }
+
+    _stat.read.handled++;
+    _stat.read.handled_bytes += expected_size;
 
     *target_sysid = -1;
 
@@ -268,6 +276,23 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid)
         if (msg_entry->flags & MAV_MSG_ENTRY_FLAG_HAVE_TARGET_SYSTEM)
             *target_sysid = payload[msg_entry->target_system_ofs];
     }
+
+    // Check for sequence drops
+    if (_stat.read.expected_seq != seq) {
+        if (_stat.read.total > 1) {
+            uint8_t diff;
+
+            if (seq > _stat.read.expected_seq)
+                diff = (seq - _stat.read.expected_seq);
+            else
+                diff = (UINT8_MAX - _stat.read.expected_seq) + seq;
+
+            _stat.read.drop_seq_total += diff;
+            _stat.read.total += diff;
+        }
+        _stat.read.expected_seq = seq;
+    }
+    _stat.read.expected_seq++;
 
     pbuf->data = rx_buf.data;
     pbuf->len = expected_size;
@@ -299,7 +324,6 @@ bool Endpoint::_check_crc(const mavlink_msg_entry_t *msg_entry)
     crc_calc = crc_calculate(&rx_buf.data[1], header_len + payload_len - 1);
     crc_accumulate(msg_entry->crc_extra, &crc_calc);
     if (crc_calc != crc_msg) {
-        _read_crc_errors++;
         return false;
     }
 
@@ -308,16 +332,21 @@ bool Endpoint::_check_crc(const mavlink_msg_entry_t *msg_entry)
 
 void Endpoint::print_statistics()
 {
-    printf("Endpoint {"
-           "\n\tname: %s" \
-           "\n\tmessages read: %u" \
-           "\n\tmessages read with CRC error: %u %f%%" \
-           "\n\tmessages written: %u" \
-           "\n}" \
-           "\n",
-           _name, _read_total, _read_crc_errors,
-           (_read_crc_errors * 100.0f) / (_read_total == 0 ? 1 : _read_total),
-           _write_total);
+    const uint32_t read_total = _stat.read.total == 0 ? 1 : _stat.read.total;
+
+    printf("Endpoint %s sysid: %u {", _name, _system_id);
+    printf("\n\tReceived messages {");
+    printf("\n\t\tCRC error: %u %u%% %luKBytes", _stat.read.crc_error,
+           (_stat.read.crc_error * 100) / read_total, _stat.read.crc_error_bytes / 1000);
+    printf("\n\t\tSequence lost: %u %u%%", _stat.read.drop_seq_total,
+           (_stat.read.drop_seq_total * 100) / read_total);
+    printf("\n\t\tHandled: %u %luKBytes", _stat.read.handled, _stat.read.handled_bytes / 1000);
+    printf("\n\t\tTotal: %u", _stat.read.total);
+    printf("\n\t}");
+    printf("\n\tTransmitted messages {");
+    printf("\n\t\tTotal: %u %luKBytes", _stat.write.total, _stat.write.bytes / 1000);
+    printf("\n\t}");
+    printf("\n}\n");
 }
 
 int UartEndpoint::open(const char *path, speed_t baudrate)
@@ -395,7 +424,8 @@ int UartEndpoint::write_msg(const struct buffer *pbuf)
     if (r == -1 && errno == EAGAIN)
         return -EAGAIN;
 
-    _write_total++;
+    _stat.write.total++;
+    _stat.write.bytes += pbuf->len;
 
     /* Incomplete packet, we warn and discard the rest */
     if (r != (ssize_t) pbuf->len) {
@@ -496,7 +526,8 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
         return -errno;
     };
 
-    _write_total++;
+    _stat.write.total++;
+    _stat.write.bytes += pbuf->len;
 
     /* Incomplete packet, we warn and discard the rest */
     if (r != (ssize_t) pbuf->len) {
@@ -563,7 +594,8 @@ int TcpEndpoint::write_msg(const struct buffer *pbuf)
         return -errno;
     };
 
-    _write_total++;
+    _stat.write.total++;
+    _stat.write.bytes += pbuf->len;
 
     /* Incomplete packet, we warn and discard the rest */
     if (r != (ssize_t) pbuf->len) {
