@@ -144,8 +144,8 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int sender_sysid)
         }
 
         if (target) {
-            log_info("Routing message from %u to endpoint %u[%d]", sender_sysid, target_sysid,
-                     target->fd);
+            log_debug("Routing message from %u to endpoint %u[%d]", sender_sysid, target_sysid,
+                      target->fd);
 
             int r = write_msg(target, buf);
             if (r == -EPIPE && tcp_target) {
@@ -156,7 +156,7 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int sender_sysid)
             log_error("Message to unknown sysid: %u", target_sysid);
         }
     } else {
-        log_info("Routing message from %u to all other known endpoints", sender_sysid);
+        log_debug("Routing message from %u to all other known endpoints", sender_sysid);
         // No target_sysid, forward to all (taking care to not forward to source)
         for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
             if (sender_sysid != (*e)->get_system_id())
