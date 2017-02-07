@@ -21,9 +21,11 @@
 #include <memory>
 #include <signal.h>
 #include <sys/epoll.h>
+#include <sys/timerfd.h>
 #include <unistd.h>
 
 #include "log.h"
+#include "util.h"
 
 static volatile bool should_exit = false;
 
@@ -281,11 +283,15 @@ void Mainloop::loop()
             process_tcp_hangups();
         }
 
-        if (report_msg_statistics) {
-            for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
-                (*e)->print_statistics();
-            }
-        }
+        _del_timeouts();
+    }
+
+    // free all remaning Timeouts
+    while (_timeouts) {
+        Timeout *current = _timeouts;
+        _timeouts = current->next;
+        remove_fd(current->fd);
+        delete current;
     }
 }
 
@@ -392,4 +398,69 @@ int Mainloop::tcp_open(unsigned long tcp_port)
     log_info("Open TCP [%d] 0.0.0.0:%lu", fd, tcp_port);
 
     return fd;
+}
+
+Timeout *Mainloop::add_timeout(uint32_t timeout_msec, bool (*cb)(void *data), const void *data)
+{
+    struct itimerspec ts;
+    Timeout *t = new Timeout(cb, data);
+
+    null_check(t, NULL);
+
+    t->fd = timerfd_create(CLOCK_MONOTONIC, 0);
+    if (t->fd < 0) {
+        log_error_errno(errno, "Unable to create timerfd: %m");
+        goto error;
+    }
+
+    ts.it_interval.tv_sec = timeout_msec / MSEC_PER_SEC;
+    ts.it_interval.tv_nsec = (timeout_msec % MSEC_PER_SEC) * NSEC_PER_MSEC;
+    ts.it_value.tv_sec = ts.it_interval.tv_sec;
+    ts.it_value.tv_nsec = ts.it_interval.tv_nsec;
+    timerfd_settime(t->fd, 0, &ts, NULL);
+
+    if (add_fd(t->fd, t, EPOLLIN) < 0)
+        goto error;
+
+    t->next = _timeouts;
+    _timeouts = t;
+
+    return t;
+
+error:
+    delete t;
+    return NULL;
+}
+
+void Mainloop::del_timeout(Timeout *t)
+{
+    t->remove_me = true;
+}
+
+void Mainloop::_del_timeouts()
+{
+    // Guarantee one valid Timeout on the beginning of the list
+    while (_timeouts && _timeouts->remove_me) {
+        Timeout *next = _timeouts->next;
+        remove_fd(_timeouts->fd);
+        delete _timeouts;
+        _timeouts = next;
+    }
+
+    // Remove all other Timeouts
+    if (_timeouts) {
+        Timeout *prev = _timeouts;
+        Timeout *current = _timeouts->next;
+        while (current) {
+            if (current->remove_me) {
+                prev->next = current->next;
+                remove_fd(_timeouts->fd);
+                delete current;
+                current = prev->next;
+            } else {
+                prev = current;
+                current = current->next;
+            }
+        }
+    }
 }
