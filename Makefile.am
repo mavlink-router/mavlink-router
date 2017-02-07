@@ -132,6 +132,8 @@ mavlink_routerd_SOURCES = \
 	pollable.h \
 	pollable.cpp \
 	router.h \
+	timeout.h \
+	timeout.cpp \
 	util.c \
 	util.h
 

@@ -20,6 +20,7 @@
 #include "comm.h"
 #include "endpoint.h"
 #include "router.h"
+#include "timeout.h"
 
 struct endpoint_entry {
     struct endpoint_entry *next;
@@ -40,6 +41,8 @@ public:
     void handle_tcp_connection();
     int write_msg(Endpoint *e, const struct buffer *buf);
     void process_tcp_hangups();
+    Timeout *add_timeout(uint32_t timeout_msec, bool (*cb)(void *data), const void *data);
+    void del_timeout(Timeout *t);
 
     void free_endpoints(struct opt *opt);
     bool add_endpoints(Mainloop &mainloop, const char *uartstr, struct opt *opt);
@@ -53,7 +56,10 @@ private:
     Endpoint **g_endpoints;
     int g_tcp_fd;
 
+    Timeout *_timeouts = nullptr;
+
     int tcp_open(unsigned long tcp_port);
+    void _del_timeouts();
 };
 
 struct endpoint_address {
