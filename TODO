@@ -10,9 +10,7 @@
 
  - Eavesdrop vs normal endpoints (to bypass the routing restrictions)
 
- - Allow endpoints to filter messages without receiving them
-
- - Add .ulog (PX4) and .bin (ArduPilot) support for logging
+ - Add .bin (ArduPilot) support for logging
 
  - Allow to save logs (.ulog and .bin) to disk with proper rotation
 

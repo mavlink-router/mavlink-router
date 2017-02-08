@@ -20,6 +20,7 @@
 #include "comm.h"
 #include "endpoint.h"
 #include "timeout.h"
+#include "ulog.h"
 
 struct endpoint_entry {
     struct endpoint_entry *next;
@@ -55,6 +56,7 @@ private:
     endpoint_entry *g_tcp_endpoints;
     Endpoint **g_endpoints;
     int g_tcp_fd;
+    ULog *_ulog = nullptr;
 
     Timeout *_timeouts = nullptr;
 
@@ -87,4 +89,5 @@ struct opt {
     const char *conf_dir;
     unsigned long tcp_port;
     bool report_msg_statistics;
+    const char *logs_dir;
 };

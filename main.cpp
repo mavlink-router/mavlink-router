@@ -40,7 +40,8 @@ static struct opt opt = {
         .conf_file_name = nullptr,
         .conf_dir = nullptr,
         .tcp_port = ULONG_MAX,
-        .report_msg_statistics = false
+        .report_msg_statistics = false,
+        .logs_dir = nullptr
 };
 
 static void help(FILE *fp) {
@@ -59,6 +60,7 @@ static void help(FILE *fp) {
             "  -c --conf-file               .conf file with configurations for mavlink-router.\n"
             "  -d --conf-dir                Directory were to look for .conf files overriding\n"
             "                               default conf file.\n"
+            "  -l --log <directory>         Enable Flight Stack logging\n"
             "  -h --help                    Print this message\n"
             , program_invocation_short_name);
 }
@@ -202,6 +204,7 @@ static int parse_argv(int argc, char *argv[])
         { "dir-file" ,              required_argument,  NULL,   'd' },
         { "report_msg_statistics",  no_argument,        NULL,   'r' },
         { "tcp-port",               required_argument,  NULL,   't' },
+        { "log",                    required_argument,  NULL,   'l' },
         { }
     };
     int c;
@@ -210,7 +213,7 @@ static int parse_argv(int argc, char *argv[])
     assert(argc >= 0);
     assert(argv);
 
-    while ((c = getopt_long(argc, argv, "he:rt:c:d:", options, NULL)) >= 0) {
+    while ((c = getopt_long(argc, argv, "he:rt:c:d:l:", options, NULL)) >= 0) {
         switch (c) {
         case 'h':
             help(stdout);
@@ -247,6 +250,10 @@ static int parse_argv(int argc, char *argv[])
         }
         case 'd': {
             opt.conf_dir = optarg;
+            break;
+        }
+        case 'l': {
+            opt.logs_dir = optarg;
             break;
         }
         case '?':
@@ -355,6 +362,11 @@ static int parse_conf(const char *conf_file_name)
         } else {
             opt.report_msg_statistics = false;
         }
+    }
+
+    value = conf.next_from_section("General", "log");
+    if (value) {
+        opt.logs_dir = value;
     }
 
     section = conf.first_section();
