@@ -120,12 +120,15 @@ AM_LDFLAGS = \
 
 bin_PROGRAMS += mavlink-routerd
 mavlink_routerd_SOURCES = \
-	comm.cpp \
 	comm.h \
+	endpoint.cpp \
+	endpoint.h \
 	log.c \
 	log.h \
 	macro.h \
 	main.cpp \
+	mainloop.cpp \
+	mainloop.h \
 	util.c \
 	util.h
 
