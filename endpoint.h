@@ -24,6 +24,43 @@
 
 class Mainloop;
 
+/*
+ * mavlink 2.0 packet in its wire format
+ *
+ * Packet size:
+ *      sizeof(mavlink_router_mavlink2_header)
+ *      + payload length
+ *      + 2 (checksum)
+ *      + signature (0 if not signed)
+ */
+struct _packed_ mavlink_router_mavlink2_header {
+    uint8_t magic;
+    uint8_t payload_len;
+    uint8_t incompat_flags;
+    uint8_t compat_flags;
+    uint8_t seq;
+    uint8_t sysid;
+    uint8_t compid;
+    uint32_t msgid : 24;
+};
+
+/*
+ * mavlink 1.0 packet in its wire format
+ *
+ * Packet size:
+ *      sizeof(mavlink_router_mavlink1_header)
+ *      + payload length
+ *      + 2 (checksum)
+ */
+struct _packed_ mavlink_router_mavlink1_header {
+    uint8_t magic;
+    uint8_t payload_len;
+    uint8_t seq;
+    uint8_t sysid;
+    uint8_t compid;
+    uint8_t msgid;
+};
+
 class Endpoint : public Pollable {
 public:
     Endpoint(const char *name, bool crc_check_enabled);
