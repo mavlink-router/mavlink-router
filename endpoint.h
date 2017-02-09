@@ -20,38 +20,58 @@
 #include <mavlink.h>
 
 #include "comm.h"
+#include "pollable.h"
+#include "router.h"
 
-class Endpoint {
+class Endpoint : public Pollable {
 public:
     Endpoint(const char *name, bool crc_check_enabled);
     virtual ~Endpoint();
 
-    int read_msg(struct buffer *pbuf, int *target_system, int *target_component);
+    void handle_read() override;
+    bool handle_canwrite() override;
+
     void print_statistics();
     virtual int write_msg(const struct buffer *pbuf) = 0;
     virtual int flush_pending_msgs() = 0;
 
-    uint8_t get_system_id() { return system_id; }
-    uint8_t get_component_id() { return component_id; }
+    uint8_t get_system_id() { return _system_id; }
+
+    static void set_router(Router *router) { _router = router; }
 
     struct buffer rx_buf;
     struct buffer tx_buf;
-    int fd = -1;
 
 protected:
+    int read_msg(struct buffer *pbuf, int *target_system);
     virtual ssize_t _read_msg(uint8_t *buf, size_t len) = 0;
     bool _check_crc(const mavlink_msg_entry_t *msg_entry);
 
     const char *_name;
     size_t _last_packet_len = 0;
 
-    uint32_t _read_crc_errors = 0;
-    uint32_t _read_total = 0;
-    uint32_t _write_total = 0;
+    // Statistics
+    struct {
+        struct {
+            uint64_t crc_error_bytes = 0;
+            uint64_t handled_bytes = 0;
+            uint32_t total = 0; // handled + crc error + seq lost
+            uint32_t crc_error = 0;
+            uint32_t handled = 0;
+            uint32_t drop_seq_total = 0;
+            uint8_t expected_seq = 0;
+        } read;
+        struct {
+            uint64_t bytes = 0;
+            uint32_t total = 0;
+        } write;
+    } _stat;
+
     const bool _crc_check_enabled;
 
-    uint8_t system_id = 0;
-    uint8_t component_id = 0;
+    uint8_t _system_id = 0;
+
+    static Router *_router;
 };
 
 class UartEndpoint : public Endpoint {

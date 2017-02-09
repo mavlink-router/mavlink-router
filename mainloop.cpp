@@ -21,9 +21,11 @@
 #include <memory>
 #include <signal.h>
 #include <sys/epoll.h>
+#include <sys/timerfd.h>
 #include <unistd.h>
 
 #include "log.h"
+#include "util.h"
 
 static bool should_exit = false;
 
@@ -114,107 +116,63 @@ int Mainloop::write_msg(Endpoint *e, const struct buffer *buf)
     return r;
 }
 
-void Mainloop::handle_read(Endpoint *endpoint)
+void Mainloop::route_msg(struct buffer *buf, int target_sysid, int sender_sysid)
 {
-    assert(endpoint);
+    if (target_sysid > 0) {
+        Endpoint *target = nullptr;
+        struct endpoint_entry *tcp_target = nullptr;
 
-    struct buffer buf{};
-    should_process_tcp_hangups = false;
-
-    /*
-     * We read from this endpoint and forward to the other endpoints.
-     * Currently this makes the flight stack endpoint (master) as a special
-     * one: packets from master goes to the other connected endpoints and
-     * packets from endpoints go to master.
-     *
-     * This logic should be replaced with a routing logic so each endpoint
-     * can talk to each one without involving the flight stack.
-     */
-    int target_sysid, target_compid;
-    while (endpoint->read_msg(&buf, &target_sysid, &target_compid) > 0) {
-        // Forward according to target_sysid and target_compid
-        if (target_sysid > 0) {
-            // target is a match sysid and compid. weak_target is a match sysid only
-            Endpoint *target = nullptr, *weak_target = nullptr;
-            struct endpoint_entry *tcp_target = nullptr;
-
-            // First, check udp endpoints
-            if (!target) {
-                for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
-                    if ((*e)->get_system_id() == target_sysid) {
-                        weak_target = *e;
-                        if ((*e)->get_component_id() == target_compid) {
-                            target = *e;
-                            break;
-                        }
-                    }
+        // First, check UART and UDP endpoints
+        if (!target) {
+            for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
+                if ((*e)->get_system_id() == target_sysid) {
+                    target = *e;
+                    break;
                 }
             }
+        }
 
-            // Last, check tcp endpoints
-            if (!target) {
-                for (struct endpoint_entry *e = g_tcp_endpoints; e; e = e->next) {
-                    if (e->endpoint->get_system_id() == target_sysid) {
-                        weak_target = e->endpoint;
-                        tcp_target = e;
-                        if (e->endpoint->get_component_id() == target_compid) {
-                            target = e->endpoint;
-                            tcp_target = e;
-                            break;
-                        }
-                    }
+        // Last, check TCP endpoints
+        if (!target) {
+            for (struct endpoint_entry *e = g_tcp_endpoints; e; e = e->next) {
+                if (e->endpoint->get_system_id() == target_sysid) {
+                    target = e->endpoint;
+                    tcp_target = e;
+                    break;
                 }
             }
+        }
 
-            if (!target)
-                target = weak_target;
+        if (target) {
+            log_debug("Routing message from %u to endpoint %u[%d]", sender_sysid, target_sysid,
+                      target->fd);
 
-            if (target) {
-                log_info("Routing message from %u/%u[%d] to endpoint %u/%u(%u/%u)[%d]",
-                         endpoint->get_system_id(), endpoint->get_component_id(), endpoint->fd,
-                         target->get_system_id(), target->get_component_id(), target_sysid,
-                         target_compid, target->fd);
-
-                int r = write_msg(target, &buf);
-                if (r == -EPIPE && tcp_target) {
-                    tcp_target->remove = true;
-                    should_process_tcp_hangups = true;
-                }
-            } else {
-                log_error("Message to unknown sysid/compid: %u/%u", target_sysid, target_compid);
+            int r = write_msg(target, buf);
+            if (r == -EPIPE && tcp_target) {
+                tcp_target->remove = true;
+                should_process_tcp_hangups = true;
             }
         } else {
-            log_info("Routing message from %u/%u[%d] to all other known endpoints",
-                     endpoint->get_system_id(), endpoint->get_component_id(), endpoint->fd);
-            // No target_sysid, forward to all (taking care to not forward to source)
-            for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
-                if (endpoint != *e)
-                    write_msg(*e, &buf);
-            }
+            log_error("Message to unknown sysid: %u", target_sysid);
+        }
+    } else {
+        log_debug("Routing message from %u to all other known endpoints", sender_sysid);
+        // No target_sysid, forward to all (taking care to not forward to source)
+        for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
+            if (sender_sysid != (*e)->get_system_id())
+                write_msg(*e, buf);
+        }
 
-            for (struct endpoint_entry *e = g_tcp_endpoints; e; e = e->next) {
-                if (endpoint != e->endpoint) {
-                    int r = write_msg(e->endpoint, &buf);
-                    if (r == -EPIPE) {
-                        e->remove = true;
-                        should_process_tcp_hangups = true;
-                    }
+        for (struct endpoint_entry *e = g_tcp_endpoints; e; e = e->next) {
+            if (sender_sysid != e->endpoint->get_system_id()) {
+                int r = write_msg(e->endpoint, buf);
+                if (r == -EPIPE) {
+                    e->remove = true;
+                    should_process_tcp_hangups = true;
                 }
             }
         }
     }
-}
-
-void Mainloop::handle_canwrite(Endpoint *e)
-{
-    int r = e->flush_pending_msgs();
-
-    /*
-     * If we could flush everything without triggering another block write,
-     * remove EPOLLOUT from flags so we don't get called again
-     */
-    if (r != -EAGAIN)
-        mod_fd(e->fd, e, EPOLLIN);
 }
 
 void Mainloop::process_tcp_hangups()
@@ -247,6 +205,8 @@ void Mainloop::process_tcp_hangups()
             }
         }
     }
+
+    should_process_tcp_hangups = false;
 }
 
 void Mainloop::handle_tcp_connection()
@@ -293,6 +253,7 @@ void Mainloop::loop()
         return;
 
     setup_signal_handlers();
+    Endpoint::set_router(this);
 
     while (!should_exit) {
         int i;
@@ -306,25 +267,45 @@ void Mainloop::loop()
                 handle_tcp_connection();
                 continue;
             }
-            Endpoint *e = static_cast<Endpoint*>(events[i].data.ptr);
+            Pollable *p = static_cast<Pollable *>(events[i].data.ptr);
 
             if (events[i].events & EPOLLIN)
-                handle_read(e);
+                p->handle_read();
 
-            if (events[i].events & EPOLLOUT)
-                handle_canwrite(e);
+            if (events[i].events & EPOLLOUT) {
+                if (!p->handle_canwrite()) {
+                    mod_fd(p->fd, p, EPOLLIN);
+                }
+            }
         }
 
         if (should_process_tcp_hangups) {
             process_tcp_hangups();
         }
 
-        if (report_msg_statistics) {
-            for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
-                (*e)->print_statistics();
-            }
-        }
+        _del_timeouts();
     }
+
+    // free all remaning Timeouts
+    while (_timeouts) {
+        Timeout *current = _timeouts;
+        _timeouts = current->next;
+        remove_fd(current->fd);
+        delete current;
+    }
+}
+
+void Mainloop::print_statistics()
+{
+    for (Endpoint **e = g_endpoints; *e != nullptr; e++)
+        (*e)->print_statistics();
+}
+
+static bool _print_statistics_timeout_cb(void *data)
+{
+    Mainloop *mainloop = static_cast<Mainloop *>(data);
+    mainloop->print_statistics();
+    return true;
 }
 
 bool Mainloop::add_endpoints(Mainloop &mainloop, const char *uartstr, struct opt *opt)
@@ -380,6 +361,9 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, const char *uartstr, struct opt
     if (opt->tcp_port)
         g_tcp_fd = tcp_open(opt->tcp_port);
 
+    if (opt->report_msg_statistics)
+        add_timeout(MSEC_PER_SEC, _print_statistics_timeout_cb, this);
+
     return true;
 }
 
@@ -430,4 +414,69 @@ int Mainloop::tcp_open(unsigned long tcp_port)
     log_info("Open TCP [%d] 0.0.0.0:%lu", fd, tcp_port);
 
     return fd;
+}
+
+Timeout *Mainloop::add_timeout(uint32_t timeout_msec, bool (*cb)(void *data), const void *data)
+{
+    struct itimerspec ts;
+    Timeout *t = new Timeout(cb, data);
+
+    null_check(t, NULL);
+
+    t->fd = timerfd_create(CLOCK_MONOTONIC, 0);
+    if (t->fd < 0) {
+        log_error_errno(errno, "Unable to create timerfd: %m");
+        goto error;
+    }
+
+    ts.it_interval.tv_sec = timeout_msec / MSEC_PER_SEC;
+    ts.it_interval.tv_nsec = (timeout_msec % MSEC_PER_SEC) * NSEC_PER_MSEC;
+    ts.it_value.tv_sec = ts.it_interval.tv_sec;
+    ts.it_value.tv_nsec = ts.it_interval.tv_nsec;
+    timerfd_settime(t->fd, 0, &ts, NULL);
+
+    if (add_fd(t->fd, t, EPOLLIN) < 0)
+        goto error;
+
+    t->next = _timeouts;
+    _timeouts = t;
+
+    return t;
+
+error:
+    delete t;
+    return NULL;
+}
+
+void Mainloop::del_timeout(Timeout *t)
+{
+    t->remove_me = true;
+}
+
+void Mainloop::_del_timeouts()
+{
+    // Guarantee one valid Timeout on the beginning of the list
+    while (_timeouts && _timeouts->remove_me) {
+        Timeout *next = _timeouts->next;
+        remove_fd(_timeouts->fd);
+        delete _timeouts;
+        _timeouts = next;
+    }
+
+    // Remove all other Timeouts
+    if (_timeouts) {
+        Timeout *prev = _timeouts;
+        Timeout *current = _timeouts->next;
+        while (current) {
+            if (current->remove_me) {
+                prev->next = current->next;
+                remove_fd(_timeouts->fd);
+                delete current;
+                current = prev->next;
+            } else {
+                prev = current;
+                current = current->next;
+            }
+        }
+    }
 }
