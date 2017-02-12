@@ -43,17 +43,52 @@ Install:
 To route mavlink packets from master `ttyS1` to 2 other UDP endpoints, do as
 following:
 
-    $ mavlink-routerd -b 1500000 -e 192.168.7.1:14550 -e 127.0.0.1:14550 /dev/ttyS1
+    $ mavlink-routerd -e 192.168.7.1:14550 -e 127.0.0.1:14550 /dev/ttyS1:1500000
 
-The `-b` switch above is used to set the UART baudrate. See more options with
-`mavlink-routerd --help`
+The `1500000` after colon above on `/dev/ttyS1:1500000` is used to set the
+UART baudrate. See more options with `mavlink-routerd --help`
 
 It's also possible to route mavlinks packets from any interface using:
 
-    $ mavlink-routerd -b 1500000 -e 192.168.7.1:14550 -e 127.0.0.1:14550  0.0.0.0:24550
+    $ mavlink-routerd -e 192.168.7.1:14550 -e 127.0.0.1:14550  0.0.0.0:24550
 
 mavlink-router also listens, by default, port 5760 for TCP connections. Any
 connection there will also receive routed packets.
+
+### Conf file ###
+
+It's also possible to use a .conf file to set options for mavlink-routerd.
+By default, mavlink-routerd looks for a file
+`/etc/mavlink-router/main.conf`. File location can be overriden via
+`MAVLINK_ROUTER_CONF_FILE` environment variable, or via `-c` switch when running
+mavlink-routerd.
+An example of conf file would be:
+
+```ini
+[General]
+tcp=5790
+report-stats=false
+
+[Endpoint alfa]
+Type = UDP
+Mode = Eavesdropping
+Address = 0.0.0.0
+Port = 10000
+
+[Endpoint bravo]
+Type = UART
+Device = /dev/tty0
+Baud = 52000
+
+[Endpoint charlie]
+Type = UDP
+Mode = Normal
+Address = 127.0.0.1
+Port = 11000
+```
+
+Note that `Port` is optional for endpoints whose `mode` is `normal`, as
+well as `baud` for UART endpoints.
 
 ### Contributing ###
 
