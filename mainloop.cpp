@@ -308,12 +308,13 @@ static bool _print_statistics_timeout_cb(void *data)
     return true;
 }
 
-bool Mainloop::add_endpoints(Mainloop &mainloop, const char *uartstr, struct opt *opt)
+bool Mainloop::add_endpoints(Mainloop &mainloop, struct opt *opt)
 {
     unsigned n_endpoints = 0, i = 0;
     struct endpoint_address *e;
+    struct uart_endpoint_device *d;
 
-    if (uartstr)
+    for (d = opt->uart_devices; d; d = d->next)
         n_endpoints++;
 
     for (e = opt->master_addrs; e; e = e->next)
@@ -324,9 +325,9 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, const char *uartstr, struct opt
 
     g_endpoints = (Endpoint**) calloc(n_endpoints + 1, sizeof(Endpoint*));
 
-    if (uartstr) {
+    for (d = opt->uart_devices; d; d = d->next) {
         std::unique_ptr<UartEndpoint> uart{new UartEndpoint{}};
-        if (uart->open(uartstr, opt->baudrate) < 0)
+        if (uart->open(d->device, d->baudrate) < 0)
             return false;
 
         g_endpoints[i] = uart.release();
@@ -379,6 +380,20 @@ void Mainloop::free_endpoints(struct opt *opt)
         free((void *)e->ip);
         free(e);
         e = next;
+    }
+
+    for (auto e = opt->master_addrs; e;) {
+        auto next = e->next;
+        free((void *)e->ip);
+        free(e);
+        e = next;
+    }
+
+    for (auto d = opt->uart_devices; d;) {
+        auto next = d->next;
+        free((void *)d->device);
+        free(d);
+        d = next;
     }
 }
 

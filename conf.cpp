@@ -114,7 +114,7 @@ end:
     return ret;
 }
 
-const char* ConfFile::next_section(bool reset)
+const char *ConfFile::next_section(bool reset)
 {
     if (reset) {
         _current_section = _sections;
@@ -233,7 +233,8 @@ const char *ConfFile::next_from_section(const char *section_name, const char *ke
         }
     }
 
-    if (!_current_section->current_config || strcasecmp(_current_section->current_config->key, key)) {
+    if (!_current_section->current_config
+        || strcasecmp(_current_section->current_config->key, key)) {
         config = _current_section->configs;
     } else {
         config = _current_section->current_config->next;
