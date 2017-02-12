@@ -45,7 +45,7 @@ public:
     void del_timeout(Timeout *t);
 
     void free_endpoints(struct opt *opt);
-    bool add_endpoints(Mainloop &mainloop, const char *uartstr, struct opt *opt);
+    bool add_endpoints(Mainloop &mainloop, struct opt *opt);
 
     void print_statistics();
 
@@ -69,10 +69,17 @@ struct endpoint_address {
     unsigned long port;
 };
 
-struct opt {
+struct uart_endpoint_device {
+    struct uart_endpoint_device *next;
+    const char *device;
     long unsigned baudrate;
+};
+
+struct opt {
     struct endpoint_address *ep_addrs;
     struct endpoint_address *master_addrs;
+    struct uart_endpoint_device *uart_devices;
+    const char *conf_file_name;
     unsigned long tcp_port;
     bool report_msg_statistics;
 };
