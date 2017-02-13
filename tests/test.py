@@ -63,6 +63,8 @@ class MavlinkSender(Thread):
         while (True):
             msg = self.mav.recv_match(blocking=True, timeout=5)
             if msg is not None:
+                if msg.target_system == 0:
+                    continue  # Just discard any broadcast ping we may receive
                 if self.targetSysId != 0 and msg.get_srcSystem(
                 ) != self.targetSysId:
                     log("Received unexpected response from %d/%d - current target: %d/%d"
@@ -125,14 +127,14 @@ if __name__ == "__main__":
     proc = subprocess.Popen(
         [
             sys.argv[1], "-e", "127.0.0.1:10100", "-e", "127.0.0.1:10101",
-            "127.0.0.1:10000"
+            "127.0.0.1:10000", "127.0.0.1:10001"
         ],
         stderr=log_file.fileno(),
         stdout=log_file.fileno())
 
     # Two senders: one send to all (target 0). The other sends to target 100
     sender0 = MavlinkSender("sender0", 10000, 1, 1, 0, 0)
-    sender100 = MavlinkSender("sender100", 10000, 2, 1, 100, 1)
+    sender100 = MavlinkSender("sender100", 10001, 2, 1, 100, 1)
 
     # Two receivers.
     receiver100 = MavlinkReceiver("receiver100", 10100, 100, 0)
