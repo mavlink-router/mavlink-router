@@ -73,6 +73,8 @@ public:
     virtual int write_msg(const struct buffer *pbuf) = 0;
     virtual int flush_pending_msgs() = 0;
 
+    uint8_t get_trimmed_zeros(const struct buffer *buffer);
+
     uint8_t get_system_id() { return _system_id; }
 
     static void set_Mainloop(Mainloop *mainloop) { _mainloop = mainloop; }
