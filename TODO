@@ -4,11 +4,7 @@
    the endpoint. If necessary we can allow clients to negotiate links to use
    shm or memfd
 
- - Add configuration file (INI format): mandating each endpoint to be written
-   to the command-line was an "easy to bootstrap" way for mavlink-router. However
-   it's not ideal since changing the endpoints involves changing the init scripts.
-   
-   We need to add a simple INI parser that has the configuration for the endpoints
+ - Allow drop-in override of configuration files
 
  - Add systemd service file
 
