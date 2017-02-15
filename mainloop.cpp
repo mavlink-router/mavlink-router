@@ -253,7 +253,7 @@ void Mainloop::loop()
         return;
 
     setup_signal_handlers();
-    Endpoint::set_router(this);
+    Endpoint::set_Mainloop(this);
 
     while (!should_exit) {
         int i;

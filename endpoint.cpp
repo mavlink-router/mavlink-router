@@ -31,6 +31,7 @@
 #include <unistd.h>
 
 #include "log.h"
+#include "mainloop.h"
 
 #define RX_BUF_MAX_SIZE (MAVLINK_MAX_PACKET_LEN * 4)
 #define TX_BUF_MAX_SIZE (8U * 1024U)
@@ -72,7 +73,7 @@ struct _packed_ mavlink_router_mavlink1_header {
     uint8_t msgid;
 };
 
-Router *Endpoint::_router = nullptr;
+Mainloop *Endpoint::_mainloop = nullptr;
 
 Endpoint::Endpoint(const char *name, bool crc_check_enabled)
     : _name{name}
@@ -101,13 +102,13 @@ bool Endpoint::handle_canwrite()
 
 void Endpoint::handle_read()
 {
-    assert(_router);
+    assert(_mainloop);
 
     int target_sysid;
     struct buffer buf{};
 
     while (read_msg(&buf, &target_sysid) > 0)
-        _router->route_msg(&buf, target_sysid, _system_id);
+        _mainloop->route_msg(&buf, target_sysid, _system_id);
 }
 
 int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid)
