@@ -21,7 +21,8 @@
 
 #include "comm.h"
 #include "pollable.h"
-#include "router.h"
+
+class Mainloop;
 
 class Endpoint : public Pollable {
 public:
@@ -37,7 +38,7 @@ public:
 
     uint8_t get_system_id() { return _system_id; }
 
-    static void set_router(Router *router) { _router = router; }
+    static void set_Mainloop(Mainloop *mainloop) { _mainloop = mainloop; }
 
     struct buffer rx_buf;
     struct buffer tx_buf;
@@ -71,7 +72,7 @@ protected:
 
     uint8_t _system_id = 0;
 
-    static Router *_router;
+    static Mainloop *_mainloop;
 };
 
 class UartEndpoint : public Endpoint {
