@@ -311,52 +311,42 @@ static bool _print_statistics_timeout_cb(void *data)
 bool Mainloop::add_endpoints(Mainloop &mainloop, struct opt *opt)
 {
     unsigned n_endpoints = 0, i = 0;
-    struct endpoint_address *e;
-    struct uart_endpoint_device *d;
+    struct endpoint_config *conf;
 
-    for (d = opt->uart_devices; d; d = d->next)
-        n_endpoints++;
-
-    for (e = opt->master_addrs; e; e = e->next)
-        n_endpoints++;
-
-    for (e = opt->ep_addrs; e; e = e->next)
+    for (conf = opt->endpoints; conf; conf = conf->next)
         n_endpoints++;
 
     g_endpoints = (Endpoint**) calloc(n_endpoints + 1, sizeof(Endpoint*));
+    assert_or_return(g_endpoints, false);
 
-    for (d = opt->uart_devices; d; d = d->next) {
-        std::unique_ptr<UartEndpoint> uart{new UartEndpoint{}};
-        if (uart->open(d->device, d->baudrate) < 0)
-            return false;
+    for (conf = opt->endpoints; conf; conf = conf->next) {
+        switch (conf->type) {
+        case Uart: {
+            std::unique_ptr<UartEndpoint> uart{new UartEndpoint{}};
+            if (uart->open(conf->device, conf->baud) < 0)
+                return false;
 
-        g_endpoints[i] = uart.release();
-        mainloop.add_fd(g_endpoints[i]->fd, g_endpoints[i], EPOLLIN);
-        i++;
-    }
+            g_endpoints[i] = uart.release();
+            mainloop.add_fd(g_endpoints[i]->fd, g_endpoints[i], EPOLLIN);
+            i++;
+            break;
+        }
+        case Udp: {
+            std::unique_ptr<UdpEndpoint> udp{new UdpEndpoint{}};
+            if (udp->open(conf->address, conf->port, conf->eavesdropping) < 0) {
+                log_error("Could not open %s:%ld", conf->address, conf->port);
+                return false;
+            }
 
-    for (e = opt->master_addrs; e; e = e->next) {
-        std::unique_ptr<UdpEndpoint> udp{new UdpEndpoint{}};
-        if (udp->open(e->ip, e->port, true) < 0) {
-            log_error("Could not open %s:%ld", e->ip, e->port);
+            g_endpoints[i] = udp.release();
+            mainloop.add_fd(g_endpoints[i]->fd, g_endpoints[i], EPOLLIN);
+            i++;
+            break;
+        }
+        default:
+            log_error("Unknow endpoint type!");
             return false;
         }
-
-        g_endpoints[i] = udp.release();
-        mainloop.add_fd(g_endpoints[i]->fd, g_endpoints[i], EPOLLIN);
-        i++;
-    }
-
-    for (e = opt->ep_addrs; e; e = e->next) {
-        std::unique_ptr<UdpEndpoint> udp{new UdpEndpoint{}};
-        if (udp->open(e->ip, e->port) < 0) {
-            log_error("Could not open %s:%ld", e->ip, e->port);
-            return false;
-        }
-
-        g_endpoints[i] = udp.release();
-        mainloop.add_fd(g_endpoints[i]->fd, g_endpoints[i], EPOLLIN);
-        i++;
     }
 
     if (opt->tcp_port)
@@ -375,25 +365,16 @@ void Mainloop::free_endpoints(struct opt *opt)
     }
     free(g_endpoints);
 
-    for (auto e = opt->ep_addrs; e;) {
+    for (auto e = opt->endpoints; e;) {
         auto next = e->next;
-        free((void *)e->ip);
+        if (e->type == Udp) {
+            free(e->address);
+        } else {
+            free(e->device);
+        }
+        free(e->name);
         free(e);
         e = next;
-    }
-
-    for (auto e = opt->master_addrs; e;) {
-        auto next = e->next;
-        free((void *)e->ip);
-        free(e);
-        e = next;
-    }
-
-    for (auto d = opt->uart_devices; d;) {
-        auto next = d->next;
-        free((void *)d->device);
-        free(d);
-        d = next;
     }
 }
 

@@ -17,6 +17,7 @@
  */
 
 #include <assert.h>
+#include <dirent.h>
 #include <getopt.h>
 #include <limits.h>
 #include <stdio.h>
@@ -32,12 +33,12 @@
 #define MAVLINK_TCP_PORT 5760
 #define DEFAULT_BAUDRATE 115200U
 #define DEFAULT_CONFFILE "/etc/mavlink-router/main.conf"
+#define DEFAULT_CONF_DIR "/etc/mavlink-router/config.d"
 
 static struct opt opt = {
-        .ep_addrs = nullptr,
-        .master_addrs = nullptr,
-        .uart_devices = nullptr,
+        .endpoints = nullptr,
         .conf_file_name = nullptr,
+        .conf_dir = nullptr,
         .tcp_port = ULONG_MAX,
         .report_msg_statistics = false
 };
@@ -56,6 +57,8 @@ static void help(FILE *fp) {
             "                               connections. Pass 0 to disable TCP listening.\n"
             "                               Default port 5760\n"
             "  -c --conf-file               .conf file with configurations for mavlink-router.\n"
+            "  -d --conf-dir                Directory were to look for .conf files overriding\n"
+            "                               default conf file.\n"
             "  -h --help                    Print this message\n"
             , program_invocation_short_name);
 }
@@ -65,15 +68,15 @@ static unsigned long find_next_endpoint_port(const char *ip)
     unsigned long port = 14550U;
 
     while (true) {
-        endpoint_address *e;
+        struct endpoint_config *conf;
 
-        for (e = opt.ep_addrs; e; e = e->next) {
-            if (streq(e->ip, ip) && e->port == port) {
+        for (conf = opt.endpoints; conf; conf = conf->next) {
+            if (conf->type == Udp && streq(conf->address, ip) && conf->port == port) {
                 port++;
                 break;
             }
         }
-        if (!e)
+        if (!conf)
             break;
     }
 
@@ -99,35 +102,79 @@ static int split_on_colon(const char *str, char **base, unsigned long *number)
     return 0;
 }
 
-static void add_endpoint_address(struct endpoint_address **list, char *ip, long int port)
+static int add_endpoint_address(struct endpoint_config *conf, const char *name, const char *ip,
+                                long unsigned port, bool eavesdropping)
 {
-    struct endpoint_address *e = (struct endpoint_address *)malloc(sizeof(*e));
+    bool new_conf = false;
 
-    if (!e) {
-        log_error_errno(errno, "Could not parse endpoint address: %m");
-        return;
+    if (!conf) {
+        conf = (struct endpoint_config *)calloc(1, sizeof(struct endpoint_config));
+        assert_or_return(conf, -ENOMEM);
+        conf->type = Udp;
+        new_conf = true;
     }
 
-    e->next = *list;
-    e->ip = ip;
-    e->port = port;
-    *list = e;
+    if (!conf->name && name) {
+        conf->name = strdup(name);
+        assert_or_return(conf->name, -ENOMEM);
+    }
+
+    if (ip) {
+        free(conf->address);
+        conf->address = strdup(ip);
+        assert_or_return(conf->address, -ENOMEM);
+    }
+
+    if (port != ULONG_MAX) {
+        conf->port = port;
+    }
+
+    conf->eavesdropping = eavesdropping;
+
+    if (new_conf) {
+        conf->next = opt.endpoints;
+        opt.endpoints = conf;
+    }
+
+    return 0;
 }
 
-static int add_uart_endpoint(struct uart_endpoint_device **list, char *uart_device,
-                             unsigned long baudrate)
+static int add_uart_endpoint(struct endpoint_config *conf, const char *name,
+                             const char *uart_device, unsigned long baudrate)
 {
-    struct uart_endpoint_device *d = (struct uart_endpoint_device *)malloc(sizeof(*d));
+    bool new_conf = false;
 
-    if (!d) {
-        log_error_errno(errno, "Could not parse endpoint device: %m");
-        return -ENOMEM;
+    if (!conf) {
+        conf = (struct endpoint_config *)calloc(1, sizeof(struct endpoint_config));
+        assert_or_return(conf, -ENOMEM);
+        conf->type = Uart;
+        new_conf = true;
     }
 
-    d->device = uart_device;
-    d->baudrate = baudrate;
-    d->next = *list;
-    *list = d;
+    // As name doesn't change, only update if there's no name yet
+    if (!conf->name && name) {
+        conf->name = strdup(name);
+        assert_or_return(conf->name, -ENOMEM);
+    }
+
+    if (uart_device) {
+        free(conf->device);
+        conf->device = strdup(uart_device);
+        assert_or_return(conf->device, -ENOMEM);
+    }
+
+    if (baudrate != ULONG_MAX) {
+        conf->baud = baudrate;
+    }
+
+    if (conf->baud == ULONG_MAX) {
+        conf->baud = DEFAULT_BAUDRATE;
+    }
+
+    if (new_conf) {
+        conf->next = opt.endpoints;
+        opt.endpoints = conf;
+    }
 
     return 0;
 }
@@ -137,7 +184,8 @@ static int parse_argv(int argc, char *argv[])
     static const struct option options[] = {
         { "baudrate",               required_argument,  NULL,   'b' },
         { "endpoints",              required_argument,  NULL,   'e' },
-        { "conf-file",               required_argument,  NULL,   'i' },
+        { "conf-file",              required_argument,  NULL,   'i' },
+        { "dir-file" ,              required_argument,  NULL,   'd' },
         { "report_msg_statistics",  no_argument,        NULL,   'r' },
         { "tcp-port",               required_argument,  NULL,   't' },
         { }
@@ -148,7 +196,7 @@ static int parse_argv(int argc, char *argv[])
     assert(argc >= 0);
     assert(argv);
 
-    while ((c = getopt_long(argc, argv, "he:rt:c:", options, NULL)) >= 0) {
+    while ((c = getopt_long(argc, argv, "he:rt:c:d:", options, NULL)) >= 0) {
         switch (c) {
         case 'h':
             help(stdout);
@@ -162,11 +210,9 @@ static int parse_argv(int argc, char *argv[])
                 help(stderr);
                 return -EINVAL;
             }
-            if (port == ULONG_MAX) {
-                port = find_next_endpoint_port(ip);
-            }
 
-            add_endpoint_address(&opt.ep_addrs, ip, port);
+            add_endpoint_address(NULL, NULL, ip, port, false);
+            free(ip);
             break;
         }
         case 'r': {
@@ -183,6 +229,10 @@ static int parse_argv(int argc, char *argv[])
         }
         case 'c': {
             opt.conf_file_name = optarg;
+            break;
+        }
+        case 'd': {
+            opt.conf_dir = optarg;
             break;
         }
         case '?':
@@ -213,12 +263,13 @@ static int parse_argv(int argc, char *argv[])
                 return -EINVAL;
             }
 
-            add_endpoint_address(&opt.master_addrs, base, number);
+            add_endpoint_address(NULL, NULL, base, number, true);
         } else {
-            int ret = add_uart_endpoint(&opt.uart_devices, base, number);
+            int ret = add_uart_endpoint(NULL, NULL, base, number);
             if (ret < 0)
                 return ret;
         }
+        free(base);
         optind++;
     }
 
@@ -239,9 +290,33 @@ static const char *get_conf_file_name()
     return DEFAULT_CONFFILE;
 }
 
-static int parse_conf()
+static const char *get_conf_dir()
 {
-    const char *conf_file_name = get_conf_file_name();
+    char *s;
+
+    if (opt.conf_dir)
+        return opt.conf_dir;
+
+    s = getenv("MAVLINK_ROUTERD_CONF_DIR");
+    if (s)
+        return s;
+
+    return DEFAULT_CONF_DIR;
+}
+
+static struct endpoint_config *search_endpoints(const char *name)
+{
+    for (struct endpoint_config *conf = opt.endpoints; conf; conf = conf->next) {
+        if (conf->name && strcaseeq(conf->name, name)) {
+            return conf;
+        }
+    }
+
+    return nullptr;
+}
+
+static int parse_conf(const char *conf_file_name)
+{
     const char *value, *section;
     int ret;
 
@@ -250,87 +325,96 @@ static int parse_conf()
     ret = conf.parse_file();
 
     if (ret < 0) {
-        // If there's no default conf file, everything is good
-        if (ret == -EIO && !strcmp(conf_file_name, DEFAULT_CONFFILE))
-            return 0;
         return ret;
     }
 
-    // This conflicting option is resolved by using command line one
     value = conf.next_from_section("General", "tcp");
-    if (value && opt.tcp_port == ULONG_MAX && (safe_atoul(value, &opt.tcp_port) < 0)) {
+    if (value && (safe_atoul(value, &opt.tcp_port) < 0)) {
         log_error("On file %s: invalid argument for tcp-port = '%s'", conf_file_name, value);
         return -EINVAL;
     }
 
     value = conf.next_from_section("General", "report-stats");
     if (value) {
-        if (!strcasecmp(value, "true") || !strcmp(value, "1"))
+        if (strcaseeq(value, "true") || !strcmp(value, "1")) {
             opt.report_msg_statistics = true;
+        } else {
+            opt.report_msg_statistics = false;
+        }
     }
 
     section = conf.first_section();
     while (section) {
-        const char *type;
+        const char *typestr;
+        struct endpoint_config *endpoint = nullptr;
+        enum endpoint_type type = Unknown;
 
         if (strncasecmp(section, "endpoint ", strlen("endpoint "))) {
             section = conf.next_section();
             continue;
         }
 
-        type = conf.next_from_section(section, "type");
-        if (!type) {
+        // If we've seen this endpoint, keep it here
+        endpoint = search_endpoints(section);
+
+        typestr = conf.next_from_section(section, "type");
+        if (!typestr && !endpoint) {
             log_error("On file %s: expected 'type' key for %s", conf_file_name, section);
             return -EINVAL;
         }
 
-        if (!strcasecmp(type, "uart")) {
-            // ********************* UART type ***********************
+        if (!typestr) {
+            type = endpoint->type;
+        } else {
+            if (strcaseeq(typestr, "uart")) {
+                type = Uart;
+            } else if (strcaseeq(typestr, "udp")) {
+                type = Udp;
+            }
+
+            if (endpoint && endpoint->type != type) {
+                log_error("On file %s: redefining type for %s", conf_file_name, section);
+                return -EINVAL;
+            }
+        }
+
+        switch (type) {
+        case Uart: {
             const char *baudstr, *device;
-            char *d;
-            unsigned long baud;
+            unsigned long baud = ULONG_MAX;
 
             device = conf.next_from_section(section, "device");
-            if (!device) {
+            if (!device && !endpoint) {
                 log_error("On file %s: expected 'device' key for %s", conf_file_name, section);
                 return -EINVAL;
             }
 
             baudstr = conf.next_from_section(section, "baud");
-            if (!baudstr) {
-                baud = DEFAULT_BAUDRATE;
-            } else if (safe_atoul(baudstr, &baud)) {
+            if (baudstr && safe_atoul(baudstr, &baud) < 0) {
                 log_error("On file %s: invalid baudrate for %s", conf_file_name, section);
                 return -EINVAL;
             }
 
-            // As mainloop frees this char*, we need to use something that can be freed
-            d = strdup(device);
-            if (!d) {
-                log_error_errno(errno, "On file %s: could not parse %s (%m)", conf_file_name,
-                                section);
-                return -ENOMEM;
-            }
-            ret = add_uart_endpoint(&opt.uart_devices, d, baud);
+            ret = add_uart_endpoint(endpoint, section, device, baud);
             if (ret < 0) {
                 return ret;
             }
-        } else if (!strcasecmp(type, "udp")) {
-            // ********************* UDP type ***********************
+            break;
+        }
+        case Udp: {
             const char *addr, *portstr, *mode;
             unsigned long port = ULONG_MAX;
-            struct endpoint_address **list;
-            char *c;
+            bool eavesdropping;
 
             addr = conf.next_from_section(section, "address");
-            if (!addr) {
-                log_error("On file %s: expected 'address' key for %s", conf_file_name, section);
+            if (!addr && !endpoint) {
+                log_error("On file %s: expected key 'address' for %s", conf_file_name, section);
                 return -EINVAL;
             }
 
             mode = conf.next_from_section(section, "mode");
-            if (!mode) {
-                log_error("On file %s: expected 'mode' key for %s", conf_file_name, section);
+            if (!mode && !endpoint) {
+                log_error("On file %s: expected key 'mode' for %s", conf_file_name, section);
                 return -EINVAL;
             }
 
@@ -340,38 +424,103 @@ static int parse_conf()
                 return -EINVAL;
             }
 
-            if (!strcasecmp(mode, "normal")) {
-                list = &opt.ep_addrs;
-            } else if (!strcasecmp(mode, "eavesdropping")) {
-                list = &opt.master_addrs;
+            if (mode) {
+                if (strcaseeq(mode, "normal")) {
+                    eavesdropping = false;
+                } else if (strcaseeq(mode, "eavesdropping")) {
+                    eavesdropping = true;
+                } else {
+                    log_error("On file %s: unknown 'mode' key for %s", conf_file_name, section);
+                    return -EINVAL;
+                }
             } else {
-                log_error("On file %s: unknown 'mode' key for %s", conf_file_name, section);
-                return -EINVAL;
+                eavesdropping = endpoint->eavesdropping;
             }
 
             // Eavesdroppoing (or master) udp endpoints need an explicit port
-            if (port == ULONG_MAX) {
-                if (list == &opt.master_addrs) {
+            if (port == ULONG_MAX && !endpoint) {
+                if (eavesdropping) {
                     log_error("On file %s: expected 'port' key for %s", conf_file_name, section);
                     return -EINVAL;
                 }
                 port = find_next_endpoint_port(addr);
             }
 
-            // As mainloop frees this char*, we need to use something that can be freed
-            c = strdup(addr);
-            if (!c) {
-                log_error_errno(errno, "On file %s: could not parse %s (%m)", conf_file_name,
-                                section);
-                return -ENOMEM;
+            ret = add_endpoint_address(endpoint, section, addr, port, eavesdropping);
+            if (ret < 0) {
+                return ret;
             }
-            add_endpoint_address(list, c, port);
-        } else {
+            break;
+        }
+        default:
             log_info("On file %s: Unknown type for %s", conf_file_name, section);
+            return -EINVAL;
         }
 
         section = conf.next_section();
     }
+
+    return 0;
+}
+
+static int cmpstr(const void *s1, const void *s2)
+{
+    return strcmp(*(const char **)s1, *(const char **)s2);
+}
+
+static int parse_conf_files()
+{
+    DIR *dir;
+    struct dirent *ent;
+    const char *filename, *dirname;
+    int ret;
+    char *files[128];
+    int i = 0;
+
+    // First, open default conf file
+    filename = get_conf_file_name();
+    ret = parse_conf(filename);
+
+    // If there's no default conf file, everything is good
+    if (ret < 0 && ret != -EIO) {
+        return ret;
+    }
+
+    dirname = get_conf_dir();
+    // Then, parse all files on configuration directory
+    dir = opendir(dirname);
+    if (!dir) {
+        return 0;
+    }
+
+    while ((ent = readdir(dir))) {
+        char path[PATH_MAX];
+        struct stat st;
+
+        ret = snprintf(path, sizeof(path), "%s/%s", dirname, ent->d_name);
+        if (ret >= (int)sizeof(path)) {
+            log_error("Couldn't open directory %s", dirname);
+            return -EINVAL;
+        }
+        if (stat(path, &st) < 0 || !S_ISREG(st.st_mode)) {
+            continue;
+        }
+        files[i] = strdup(path);
+        assert_or_return(files[i], -ENOMEM);
+        i++;
+    }
+
+    qsort(files, (size_t)i, sizeof(char *), cmpstr);
+
+    for (int j = 0; j < i; j++) {
+        ret = parse_conf(files[j]);
+        if (ret < 0) {
+            return ret;
+        }
+        free(files[j]);
+    }
+
+    closedir(dir);
 
     return 0;
 }
@@ -385,7 +534,7 @@ int main(int argc, char *argv[])
     if (parse_argv(argc, argv) != 2)
         goto close_log;
 
-    if (parse_conf() < 0)
+    if (parse_conf_files() < 0)
         goto close_log;
 
     if (mainloop.open() < 0)

@@ -63,23 +63,29 @@ private:
     void _del_timeouts();
 };
 
-struct endpoint_address {
-    struct endpoint_address *next;
-    const char *ip;
-    unsigned long port;
-};
+enum endpoint_type { Uart, Udp, Unknown };
 
-struct uart_endpoint_device {
-    struct uart_endpoint_device *next;
-    const char *device;
-    long unsigned baudrate;
+struct endpoint_config {
+    struct endpoint_config *next;
+    char *name;
+    enum endpoint_type type;
+    union {
+        struct {
+            char *address;
+            long unsigned port;
+            bool eavesdropping;
+        };
+        struct {
+            char *device;
+            long unsigned baud;
+        };
+    };
 };
 
 struct opt {
-    struct endpoint_address *ep_addrs;
-    struct endpoint_address *master_addrs;
-    struct uart_endpoint_device *uart_devices;
+    struct endpoint_config *endpoints;
     const char *conf_file_name;
+    const char *conf_dir;
     unsigned long tcp_port;
     bool report_msg_statistics;
 };
