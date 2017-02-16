@@ -41,6 +41,7 @@ typedef uint64_t nsec_t;
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 #define streq(a,b) (strcmp((a),(b)) == 0)
+#define strcaseeq(a, b) (strcasecmp((a), (b)) == 0)
 
 int safe_atoull(const char *s, unsigned long long *ret);
 int safe_atoul(const char *s, unsigned long *ret);
