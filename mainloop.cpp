@@ -421,7 +421,7 @@ Timeout *Mainloop::add_timeout(uint32_t timeout_msec, bool (*cb)(void *data), co
     struct itimerspec ts;
     Timeout *t = new Timeout(cb, data);
 
-    null_check(t, NULL);
+    assert_or_return(t, NULL);
 
     t->fd = timerfd_create(CLOCK_MONOTONIC, 0);
     if (t->fd < 0) {

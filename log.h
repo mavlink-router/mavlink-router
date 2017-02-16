@@ -61,7 +61,7 @@ int log_internal(int level, int error,
 #define log_warning_errno(error, ...)   log_full_errno(LOG_WARNING, error, __VA_ARGS__)
 #define log_error_errno(error, ...)     log_full_errno(LOG_ERR,     error, __VA_ARGS__)
 
-#define null_check(ptr, ...)                 \
+#define assert_or_return(ptr, ...)           \
     do {                                     \
         if (__builtin_expect(!(ptr), 0)) {   \
             log_warning("%s == NULL", #ptr); \
