@@ -90,6 +90,27 @@ Port = 11000
 Note that `Port` is optional for endpoints whose `mode` is `normal`, as
 well as `baud` for UART endpoints.
 
+#### Conf dirs ####
+
+Besides default conf file, it's also possible to use a directory in where to
+put some extra configuration files. Files on such directory will be read in
+alphabetical order, and can add or override configurations found on previous
+files.
+
+By default, `/etc/mavlink-router/config.d` is the directory, but it can be
+overriden via `MAVLINK_ROUTER_CONF_DIR` environment variable, or via `-d`
+switch when running mavlink-routerd.
+
+Suppose default configuration file contents are the same of section above,
+an example of overriding configuration would be:
+
+```ini
+[Endpoint bravo]
+Baud = 115200
+```
+
+That would change `Endpoint bravo` baudrate to `115200`.
+
 ### Contributing ###
 
 Pull-requests are accepted on GitHub. Make sure to check coding style with the
