@@ -61,12 +61,12 @@ int log_internal(int level, int error,
 #define log_warning_errno(error, ...)   log_full_errno(LOG_WARNING, error, __VA_ARGS__)
 #define log_error_errno(error, ...)     log_full_errno(LOG_ERR,     error, __VA_ARGS__)
 
-#define assert_or_return(ptr, ...)           \
-    do {                                     \
-        if (__builtin_expect(!(ptr), 0)) {   \
-            log_warning("%s == NULL", #ptr); \
-            return __VA_ARGS__;              \
-        }                                    \
+#define assert_or_return(exp, ...)                          \
+    do {                                                    \
+        if (__builtin_expect(!(exp), 0)) {                  \
+            log_warning("Expresssion `" #exp "` is false"); \
+            return __VA_ARGS__;                             \
+        }                                                   \
     } while (0)
 
 #ifdef __cplusplus
