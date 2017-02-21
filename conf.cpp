@@ -111,6 +111,7 @@ int ConfFile::parse_file()
     _current_section = nullptr;
 
     if (!_sections || !_sections->configs) {
+        free(entry);
         log_error("Invalid conf file %s", _filename);
         return -EINVAL;
     }

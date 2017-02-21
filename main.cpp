@@ -473,9 +473,9 @@ static int parse_conf_files()
     DIR *dir;
     struct dirent *ent;
     const char *filename, *dirname;
-    int ret;
-    char *files[128];
-    int i = 0;
+    int ret = 0;
+    char *files[128] = {};
+    int i = 0, j = 0;
 
     // First, open default conf file
     filename = get_conf_file_name();
@@ -500,22 +500,31 @@ static int parse_conf_files()
         ret = snprintf(path, sizeof(path), "%s/%s", dirname, ent->d_name);
         if (ret >= (int)sizeof(path)) {
             log_error("Couldn't open directory %s", dirname);
-            return -EINVAL;
+            ret = -EINVAL;
+            goto fail;
         }
         if (stat(path, &st) < 0 || !S_ISREG(st.st_mode)) {
             continue;
         }
         files[i] = strdup(path);
-        assert_or_return(files[i], -ENOMEM);
+        if (!files[i]) {
+            ret = -ENOMEM;
+            goto fail;
+        }
         i++;
+
+        if ((size_t)i > sizeof(files) / sizeof(*files)) {
+            log_warning("Too many files on %s. Not all of them will be considered", dirname);
+            break;
+        }
     }
 
     qsort(files, (size_t)i, sizeof(char *), cmpstr);
 
-    for (int j = 0; j < i; j++) {
+    for (j = 0; j < i; j++) {
         ret = parse_conf(files[j]);
         if (ret < 0) {
-            return ret;
+            goto fail;
         }
         free(files[j]);
     }
@@ -523,6 +532,15 @@ static int parse_conf_files()
     closedir(dir);
 
     return 0;
+
+fail:
+    while (j < i) {
+        free(files[j++]);
+    }
+
+    closedir(dir);
+
+    return ret;
 }
 
 int main(int argc, char *argv[])
