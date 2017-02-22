@@ -111,6 +111,7 @@ static int add_endpoint_address(struct endpoint_config *conf, const char *name, 
         conf = (struct endpoint_config *)calloc(1, sizeof(struct endpoint_config));
         assert_or_return(conf, -ENOMEM);
         conf->type = Udp;
+        conf->port = ULONG_MAX;
         new_conf = true;
     }
 
@@ -125,8 +126,16 @@ static int add_endpoint_address(struct endpoint_config *conf, const char *name, 
         assert_or_return(conf->address, -ENOMEM);
     }
 
+    if (!conf->address) {
+        return -EINVAL;
+    }
+
     if (port != ULONG_MAX) {
         conf->port = port;
+    }
+
+    if (conf->port == ULONG_MAX) {
+        conf->port = find_next_endpoint_port(conf->address);
     }
 
     conf->eavesdropping = eavesdropping;
@@ -148,6 +157,7 @@ static int add_uart_endpoint(struct endpoint_config *conf, const char *name,
         conf = (struct endpoint_config *)calloc(1, sizeof(struct endpoint_config));
         assert_or_return(conf, -ENOMEM);
         conf->type = Uart;
+        conf->baud = ULONG_MAX;
         new_conf = true;
     }
 
@@ -161,6 +171,10 @@ static int add_uart_endpoint(struct endpoint_config *conf, const char *name,
         free(conf->device);
         conf->device = strdup(uart_device);
         assert_or_return(conf->device, -ENOMEM);
+    }
+
+    if (!conf->device) {
+        return -EINVAL;
     }
 
     if (baudrate != ULONG_MAX) {
