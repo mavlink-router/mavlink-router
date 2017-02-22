@@ -125,7 +125,9 @@ static int add_endpoint_address(struct endpoint_config *conf, const char *name, 
         assert_or_return(conf->address, -ENOMEM);
     }
 
-    if (port != ULONG_MAX) {
+    if (port == ULONG_MAX) {
+        conf->port = find_next_endpoint_port(ip);
+    } else {
         conf->port = port;
     }
 
