@@ -145,7 +145,6 @@ protected:
 class TcpEndpoint : public Endpoint {
 public:
     TcpEndpoint();
-    virtual ~TcpEndpoint();
 
     int accept(int listener_fd);
 
