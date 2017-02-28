@@ -229,9 +229,9 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid)
 
     *target_sysid = -1;
 
-    if (msg_entry == nullptr)
-        log_error("No message entry for %u", msg_id);
-    else {
+    if (msg_entry == nullptr) {
+        log_debug("No message entry for %u", msg_id);
+    } else {
         if (msg_entry->flags & MAV_MSG_ENTRY_FLAG_HAVE_TARGET_SYSTEM)
             *target_sysid = payload[msg_entry->target_system_ofs];
     }
