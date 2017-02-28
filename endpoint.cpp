@@ -526,10 +526,6 @@ TcpEndpoint::TcpEndpoint()
     bzero(&sockaddr, sizeof(sockaddr));
 }
 
-TcpEndpoint::~TcpEndpoint() {
-    ::close(fd);
-}
-
 int TcpEndpoint::accept(int listener_fd)
 {
     socklen_t addrlen = sizeof(sockaddr);
