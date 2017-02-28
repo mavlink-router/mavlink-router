@@ -41,7 +41,8 @@ static struct opt opt = {
         .conf_dir = nullptr,
         .tcp_port = ULONG_MAX,
         .report_msg_statistics = false,
-        .logs_dir = nullptr
+        .logs_dir = nullptr,
+        .debug_log_level = LOG_INFO
 };
 
 static void help(FILE *fp) {
@@ -54,13 +55,16 @@ static void help(FILE *fp) {
             "                               continues increasing not to collide with previous\n"
             "                               ports\n"
             "  -r --report_msg_statistics   Report message statistics\n"
-            "  -t --tcp-port                Port in which mavlink-router will listen for TCP\n"
+            "  -t --tcp-port <port>         Port in which mavlink-router will listen for TCP\n"
             "                               connections. Pass 0 to disable TCP listening.\n"
             "                               Default port 5760\n"
-            "  -c --conf-file               .conf file with configurations for mavlink-router.\n"
-            "  -d --conf-dir                Directory were to look for .conf files overriding\n"
+            "  -c --conf-file <file>        .conf file with configurations for mavlink-router.\n"
+            "  -d --conf-dir <dir>          Directory were to look for .conf files overriding\n"
             "                               default conf file.\n"
             "  -l --log <directory>         Enable Flight Stack logging\n"
+            "  -g --debug-log-level <level> Set debug log level. Levels are\n"
+            "                               <error|warning|info|debug>\n"
+            "  -v --verbose                 Verbose. Same as --debug-log-level=debug"
             "  -h --help                    Print this message\n"
             , program_invocation_short_name);
 }
@@ -102,6 +106,20 @@ static int split_on_colon(const char *str, char **base, unsigned long *number)
     }
 
     return 0;
+}
+
+static int log_level_from_str(const char *str)
+{
+    if (strcaseeq(str, "error"))
+        return LOG_ERR;
+    if (strcaseeq(str, "warning"))
+        return LOG_WARNING;
+    if (strcaseeq(str, "info"))
+        return LOG_INFO;
+    if (strcaseeq(str, "debug"))
+        return LOG_DEBUG;
+
+    return -EINVAL;
 }
 
 static int add_endpoint_address(struct endpoint_config *conf, const char *name, const char *ip,
@@ -235,6 +253,8 @@ static int parse_argv(int argc, char *argv[])
         { "report_msg_statistics",  no_argument,        NULL,   'r' },
         { "tcp-port",               required_argument,  NULL,   't' },
         { "log",                    required_argument,  NULL,   'l' },
+        { "debug-log-level",        required_argument,  NULL,   'g' },
+        { "verbose",                no_argument,        NULL,   'v' },
         { }
     };
     int c;
@@ -243,7 +263,7 @@ static int parse_argv(int argc, char *argv[])
     assert(argc >= 0);
     assert(argv);
 
-    while ((c = getopt_long(argc, argv, "he:rt:c:d:l:", options, NULL)) >= 0) {
+    while ((c = getopt_long(argc, argv, "he:rt:c:d:l:g:v", options, NULL)) >= 0) {
         switch (c) {
         case 'h':
             help(stdout);
@@ -284,6 +304,20 @@ static int parse_argv(int argc, char *argv[])
         }
         case 'l': {
             opt.logs_dir = optarg;
+            break;
+        }
+        case 'g': {
+            int lvl = log_level_from_str(optarg);
+            if (lvl == -EINVAL) {
+                log_error("Invalid argument for debug-log-level = %s", optarg);
+                help(stderr);
+                return -EINVAL;
+            }
+            opt.debug_log_level = lvl;
+            break;
+        }
+        case 'v': {
+            opt.debug_log_level = LOG_DEBUG;
             break;
         }
         case '?':
@@ -397,6 +431,17 @@ static int parse_conf(const char *conf_file_name)
     value = conf.next_from_section("General", "log");
     if (value) {
         opt.logs_dir = value;
+    }
+
+    value = conf.next_from_section("General", "log-debug-level");
+    if (value) {
+        int lvl = log_level_from_str(value);
+        if (lvl == -EINVAL) {
+            log_error("On file %s: invalid argument for debug-log-level = %s", conf_file_name,
+                      value);
+            return -EINVAL;
+        }
+        opt.debug_log_level = lvl;
     }
 
     section = conf.first_section();
@@ -610,6 +655,8 @@ int main(int argc, char *argv[])
 
     if (parse_conf_files() < 0)
         goto close_log;
+
+    log_set_max_level(opt.debug_log_level);
 
     if (mainloop.open() < 0)
         goto close_log;
