@@ -1,5 +1,7 @@
 ## MAVLink Router ##
 
+[![Coverity Scan Build Status](https://scan.coverity.com/projects/11557/badge.svg)](https://scan.coverity.com/projects/11557)
+
 Route mavlink packets between endpoints (WIP)
 
 In its current state it acts as a bridge between one "master" endpoint on UART
