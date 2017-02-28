@@ -108,6 +108,7 @@ static int add_endpoint_address(struct endpoint_config *conf, const char *name, 
                                 long unsigned port, bool eavesdropping)
 {
     bool new_conf = false;
+    int ret;
 
     if (!conf) {
         conf = (struct endpoint_config *)calloc(1, sizeof(struct endpoint_config));
@@ -119,17 +120,24 @@ static int add_endpoint_address(struct endpoint_config *conf, const char *name, 
 
     if (!conf->name && name) {
         conf->name = strdup(name);
-        assert_or_return(conf->name, -ENOMEM);
+        if (!conf->name) {
+            ret = -ENOMEM;
+            goto fail;
+        }
     }
 
     if (ip) {
         free(conf->address);
         conf->address = strdup(ip);
-        assert_or_return(conf->address, -ENOMEM);
+        if (!conf->address) {
+            ret = -ENOMEM;
+            goto fail;
+        }
     }
 
     if (!conf->address) {
-        return -EINVAL;
+        ret = -EINVAL;
+        goto fail;
     }
 
     if (port != ULONG_MAX) {
@@ -148,12 +156,20 @@ static int add_endpoint_address(struct endpoint_config *conf, const char *name, 
     }
 
     return 0;
+
+fail:
+    free(conf->address);
+    free(conf->name);
+    free(conf);
+
+    return ret;
 }
 
 static int add_uart_endpoint(struct endpoint_config *conf, const char *name,
                              const char *uart_device, unsigned long baudrate)
 {
     bool new_conf = false;
+    int ret;
 
     if (!conf) {
         conf = (struct endpoint_config *)calloc(1, sizeof(struct endpoint_config));
@@ -166,17 +182,24 @@ static int add_uart_endpoint(struct endpoint_config *conf, const char *name,
     // As name doesn't change, only update if there's no name yet
     if (!conf->name && name) {
         conf->name = strdup(name);
-        assert_or_return(conf->name, -ENOMEM);
+        if (!conf->name) {
+            ret = -ENOMEM;
+            goto fail;
+        }
     }
 
     if (uart_device) {
         free(conf->device);
         conf->device = strdup(uart_device);
-        assert_or_return(conf->device, -ENOMEM);
+        if (!conf->device) {
+            ret = -ENOMEM;
+            goto fail;
+        }
     }
 
     if (!conf->device) {
-        return -EINVAL;
+        ret = -EINVAL;
+        goto fail;
     }
 
     if (baudrate != ULONG_MAX) {
@@ -193,6 +216,13 @@ static int add_uart_endpoint(struct endpoint_config *conf, const char *name,
     }
 
     return 0;
+
+fail:
+    free(conf->device);
+    free(conf->name);
+    free(conf);
+
+    return ret;
 }
 
 static int parse_argv(int argc, char *argv[])
