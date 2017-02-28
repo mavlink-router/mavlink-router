@@ -40,6 +40,14 @@ Install:
     $ # or... to another root directory:
     $ make DESTDIR=/tmp/root/dir install
 
+#### Mavlink dialect ####
+
+By default, MAVlink Router uses `common` mavlink dialect.
+Optionally, it's possible to use `ardupilotmega` mavlink dialect. To do so,
+one needs to inform `ardupilotmega` to configure option `--with-dialect`:
+
+    $ ./configure --with-dialect=ardupilotmega
+
 ### Running ###
 
 To route mavlink packets from master `ttyS1` to 2 other UDP endpoints, do as
