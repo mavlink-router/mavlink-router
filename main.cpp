@@ -446,37 +446,26 @@ static int parse_conf(const char *conf_file_name)
 
     section = conf.first_section();
     while (section) {
-        const char *typestr;
+        const char *name = nullptr;
         struct endpoint_config *endpoint = nullptr;
         enum endpoint_type type = Unknown;
 
-        if (strncasecmp(section, "endpoint ", strlen("endpoint "))) {
+        if (!strncasecmp(section, "udpendpoint ", strlen("udpendpoint "))) {
+            type = Udp;
+            name = section + strlen("udpendpoint");
+        } else if (!strncasecmp(section, "uartendpoint ", strlen("uartendpoint "))) {
+            type = Uart;
+            name = section + strlen("uartendpoint");
+        } else {
             section = conf.next_section();
             continue;
         }
 
         // If we've seen this endpoint, keep it here
-        endpoint = search_endpoints(section);
-
-        typestr = conf.next_from_section(section, "type");
-        if (!typestr && !endpoint) {
-            log_error("On file %s: expected 'type' key for %s", conf_file_name, section);
+        endpoint = search_endpoints(name);
+        if (endpoint && endpoint->type != type) {
+            log_error("On file %s: redefining type for %s", conf_file_name, section);
             return -EINVAL;
-        }
-
-        if (!typestr) {
-            type = endpoint->type;
-        } else {
-            if (strcaseeq(typestr, "uart")) {
-                type = Uart;
-            } else if (strcaseeq(typestr, "udp")) {
-                type = Udp;
-            }
-
-            if (endpoint && endpoint->type != type) {
-                log_error("On file %s: redefining type for %s", conf_file_name, section);
-                return -EINVAL;
-            }
         }
 
         switch (type) {
@@ -496,7 +485,7 @@ static int parse_conf(const char *conf_file_name)
                 return -EINVAL;
             }
 
-            ret = add_uart_endpoint(endpoint, section, device, baud);
+            ret = add_uart_endpoint(endpoint, name, device, baud);
             if (ret < 0) {
                 return ret;
             }
@@ -547,7 +536,7 @@ static int parse_conf(const char *conf_file_name)
                 port = find_next_endpoint_port(addr);
             }
 
-            ret = add_endpoint_address(endpoint, section, addr, port, eavesdropping);
+            ret = add_endpoint_address(endpoint, name, addr, port, eavesdropping);
             if (ret < 0) {
                 return ret;
             }

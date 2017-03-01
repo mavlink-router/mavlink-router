@@ -79,18 +79,16 @@ An example of conf file would be:
 tcp=5790
 report-stats=false
 
-[Endpoint alfa]
-Type = UDP
+[UdpEndpoint alfa]
 Mode = Eavesdropping
 Address = 0.0.0.0
 Port = 10000
 
-[Endpoint bravo]
-Type = UART
+[UartEndpoint bravo]
 Device = /dev/tty0
 Baud = 52000
 
-[Endpoint charlie]
+[UdpEndpoint charlie]
 Type = UDP
 Mode = Normal
 Address = 127.0.0.1
@@ -115,7 +113,7 @@ Suppose default configuration file contents are the same of section above,
 an example of overriding configuration would be:
 
 ```ini
-[Endpoint bravo]
+[UartEndpoint bravo]
 Baud = 115200
 ```
 
