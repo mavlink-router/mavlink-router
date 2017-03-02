@@ -537,6 +537,37 @@ int TcpEndpoint::accept(int listener_fd)
     return fd;
 }
 
+int TcpEndpoint::open(const char *ip, unsigned long port)
+{
+    fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd == -1) {
+        log_error_errno(errno, "Could not create socket (%m)");
+        return -1;
+    }
+
+    sockaddr.sin_family = AF_INET;
+    sockaddr.sin_addr.s_addr = inet_addr(ip);
+    sockaddr.sin_port = htons(port);
+
+    if (connect(fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) < 0) {
+        log_error_errno(errno, "Error connecting to socket (%m)");
+        goto fail;
+    }
+
+    if (fcntl(fd, F_SETFL, O_NONBLOCK | FASYNC) < 0) {
+        log_error_errno(errno, "Error setting socket fd as non-blocking (%m)");
+        goto fail;
+    }
+
+    log_info("Open TCP [%d] %s:%lu", fd, ip, port);
+
+    return fd;
+
+fail:
+    close(fd);
+    return -1;
+}
+
 ssize_t TcpEndpoint::_read_msg(uint8_t *buf, size_t len)
 {
     socklen_t addrlen = sizeof(sockaddr);

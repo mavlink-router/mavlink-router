@@ -76,7 +76,8 @@ An example of conf file would be:
 
 ```ini
 [General]
-tcp=5790
+#Mavlink-router serves on this TCP port
+tcp-server-port=5790
 report-stats=false
 
 [UdpEndpoint alfa]
@@ -93,6 +94,11 @@ Type = UDP
 Mode = Normal
 Address = 127.0.0.1
 Port = 11000
+
+#Mavlink-router will connect to this TCP address
+[TcpEndpoint delta]
+Address = 127.0.0.1
+Port = 25790
 ```
 
 Note that `Port` is optional for endpoints whose `mode` is `normal`, as

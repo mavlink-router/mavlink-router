@@ -209,32 +209,40 @@ void Mainloop::process_tcp_hangups()
     should_process_tcp_hangups = false;
 }
 
-void Mainloop::handle_tcp_connection()
+int Mainloop::_add_tcp_endpoint(TcpEndpoint *tcp)
 {
     struct endpoint_entry *tcp_entry;
+
+    tcp_entry = (struct endpoint_entry *)calloc(1, sizeof(struct endpoint_entry));
+    if (!tcp_entry)
+        return -ENOMEM;
+
+    tcp_entry->next = g_tcp_endpoints;
+    tcp_entry->endpoint = tcp;
+    g_tcp_endpoints = tcp_entry;
+
+    return 0;
+}
+
+void Mainloop::handle_tcp_connection()
+{
     TcpEndpoint *tcp = new TcpEndpoint{};
     int fd;
     int errno_copy;
 
     fd = tcp->accept(g_tcp_fd);
-
     if (fd == -1)
         goto accept_error;
 
-    tcp_entry = (struct endpoint_entry*)calloc(1, sizeof(struct endpoint_entry));
-    if (!tcp_entry)
-        goto calloc_error;
-
-    tcp_entry->next = g_tcp_endpoints;
-    tcp_entry->endpoint = tcp;
-    g_tcp_endpoints = tcp_entry;
+    if (_add_tcp_endpoint(tcp) < 0)
+        goto add_error;
 
     add_fd(fd, tcp, EPOLLIN);
 
     log_debug("Accepted TCP connection on [%d]", fd);
     return;
 
-calloc_error:
+add_error:
     errno_copy = errno;
     close(fd);
     errno = errno_copy;
@@ -319,8 +327,13 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct opt *opt)
     unsigned n_endpoints = 0, i = 0;
     struct endpoint_config *conf;
 
-    for (conf = opt->endpoints; conf; conf = conf->next)
-        n_endpoints++;
+    for (conf = opt->endpoints; conf; conf = conf->next) {
+        if (conf->type != Tcp) {
+            // TCP endpoints are efemeral, that's why they don't
+            // live on `g_endpoints` array, but on `g_tcp_endpoints` list
+            n_endpoints++;
+        }
+    }
 
     if (opt->logs_dir)
         n_endpoints++;
@@ -352,6 +365,21 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct opt *opt)
             i++;
             break;
         }
+        case Tcp: {
+            std::unique_ptr<TcpEndpoint> tcp{new TcpEndpoint{}};
+            if (tcp->open(conf->address, conf->port) < 0) {
+                log_error("Could not open %s:%ld", conf->address, conf->port);
+                return false;
+            }
+
+            if (_add_tcp_endpoint(tcp.get()) < 0) {
+                log_error("Could not open %s:%ld", conf->address, conf->port);
+                return false;
+            }
+            mainloop.add_fd(tcp->fd, tcp.get(), EPOLLIN);
+            tcp.release();
+            break;
+        }
         default:
             log_error("Unknow endpoint type!");
             return false;
@@ -379,9 +407,16 @@ void Mainloop::free_endpoints(struct opt *opt)
     }
     free(g_endpoints);
 
+    for (auto *t = g_tcp_endpoints; t;) {
+        auto next = t->next;
+        delete t->endpoint;
+        free(t);
+        t = next;
+    }
+
     for (auto e = opt->endpoints; e;) {
         auto next = e->next;
-        if (e->type == Udp) {
+        if (e->type == Udp || e->type == Tcp) {
             free(e->address);
         } else {
             free(e->device);
@@ -421,7 +456,7 @@ int Mainloop::tcp_open(unsigned long tcp_port)
 
     add_fd(fd, &g_tcp_fd, EPOLLIN);
 
-    log_info("Open TCP [%d] 0.0.0.0:%lu", fd, tcp_port);
+    log_info("Open TCP [%d] 0.0.0.0:%lu *", fd, tcp_port);
 
     return fd;
 }

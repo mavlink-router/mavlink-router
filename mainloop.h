@@ -62,9 +62,10 @@ private:
 
     int tcp_open(unsigned long tcp_port);
     void _del_timeouts();
+    int _add_tcp_endpoint(TcpEndpoint *tcp);
 };
 
-enum endpoint_type { Uart, Udp, Unknown };
+enum endpoint_type { Tcp, Uart, Udp, Unknown };
 
 struct endpoint_config {
     struct endpoint_config *next;

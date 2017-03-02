@@ -54,6 +54,8 @@ static void help(FILE *fp) {
             "                               and in case it's not given it starts in 14550 and\n"
             "                               continues increasing not to collide with previous\n"
             "                               ports\n"
+            "  -p --tcp-endpoint <ip:port>  Add TCP endpoint client, which will connect to given\n"
+            "                               address\n"
             "  -r --report_msg_statistics   Report message statistics\n"
             "  -t --tcp-port <port>         Port in which mavlink-router will listen for TCP\n"
             "                               connections. Pass 0 to disable TCP listening.\n"
@@ -120,6 +122,66 @@ static int log_level_from_str(const char *str)
         return LOG_DEBUG;
 
     return -EINVAL;
+}
+
+static int add_tcp_endpoint_address(struct endpoint_config *conf, const char *name, const char *ip,
+                                    long unsigned port)
+{
+    bool new_conf = false;
+    int ret;
+
+    if (!conf) {
+        conf = (struct endpoint_config *)calloc(1, sizeof(struct endpoint_config));
+        assert_or_return(conf, -ENOMEM);
+        conf->type = Tcp;
+        conf->port = ULONG_MAX;
+        new_conf = true;
+    }
+
+    if (!conf->name && name) {
+        conf->name = strdup(name);
+        if (!conf->name) {
+            ret = -ENOMEM;
+            goto fail;
+        }
+    }
+
+    if (ip) {
+        free(conf->address);
+        conf->address = strdup(ip);
+        if (!conf->address) {
+            ret = -ENOMEM;
+            goto fail;
+        }
+    }
+
+    if (!conf->address) {
+        ret = -EINVAL;
+        goto fail;
+    }
+
+    if (port != ULONG_MAX) {
+        conf->port = port;
+    }
+
+    if (conf->port == ULONG_MAX) {
+        ret = -EINVAL;
+        goto fail;
+    }
+
+    if (new_conf) {
+        conf->next = opt.endpoints;
+        opt.endpoints = conf;
+    }
+
+    return 0;
+
+fail:
+    free(conf->address);
+    free(conf->name);
+    free(conf);
+
+    return ret;
 }
 
 static int add_endpoint_address(struct endpoint_config *conf, const char *name, const char *ip,
@@ -252,6 +314,7 @@ static int parse_argv(int argc, char *argv[])
         { "dir-file" ,              required_argument,  NULL,   'd' },
         { "report_msg_statistics",  no_argument,        NULL,   'r' },
         { "tcp-port",               required_argument,  NULL,   't' },
+        { "tcp-endpoint",           required_argument,  NULL,   'p' },
         { "log",                    required_argument,  NULL,   'l' },
         { "debug-log-level",        required_argument,  NULL,   'g' },
         { "verbose",                no_argument,        NULL,   'v' },
@@ -263,7 +326,7 @@ static int parse_argv(int argc, char *argv[])
     assert(argc >= 0);
     assert(argv);
 
-    while ((c = getopt_long(argc, argv, "he:rt:c:d:l:g:v", options, NULL)) >= 0) {
+    while ((c = getopt_long(argc, argv, "he:rt:c:d:l:p:g:v", options, NULL)) >= 0) {
         switch (c) {
         case 'h':
             help(stdout);
@@ -318,6 +381,25 @@ static int parse_argv(int argc, char *argv[])
         }
         case 'v': {
             opt.debug_log_level = LOG_DEBUG;
+            break;
+        }
+        case 'p': {
+            char *ip;
+            unsigned long port;
+
+            if (split_on_colon(optarg, &ip, &port) < 0) {
+                log_error("Invalid port in argument: %s", optarg);
+                help(stderr);
+                return -EINVAL;
+            }
+            if (port == ULONG_MAX) {
+                log_error("Missing port in argument: %s", optarg);
+                help(stderr);
+                return -EINVAL;
+            }
+
+            add_tcp_endpoint_address(NULL, NULL, ip, port);
+            free(ip);
             break;
         }
         case '?':
@@ -413,9 +495,9 @@ static int parse_conf(const char *conf_file_name)
         return ret;
     }
 
-    value = conf.next_from_section("General", "tcp");
+    value = conf.next_from_section("General", "tcp-server-port");
     if (value && (safe_atoul(value, &opt.tcp_port) < 0)) {
-        log_error("On file %s: invalid argument for tcp-port = '%s'", conf_file_name, value);
+        log_error("On file %s: invalid argument for tcp-server-port = '%s'", conf_file_name, value);
         return -EINVAL;
     }
 
@@ -450,7 +532,10 @@ static int parse_conf(const char *conf_file_name)
         struct endpoint_config *endpoint = nullptr;
         enum endpoint_type type = Unknown;
 
-        if (!strncasecmp(section, "udpendpoint ", strlen("udpendpoint "))) {
+        if (!strncasecmp(section, "tcpendpoint ", strlen("tcpendpoint "))) {
+            type = Tcp;
+            name = section + strlen("tcpendpoint");
+        } else if (!strncasecmp(section, "udpendpoint ", strlen("udpendpoint "))) {
             type = Udp;
             name = section + strlen("udpendpoint");
         } else if (!strncasecmp(section, "uartendpoint ", strlen("uartendpoint "))) {
@@ -540,6 +625,29 @@ static int parse_conf(const char *conf_file_name)
             if (ret < 0) {
                 return ret;
             }
+            break;
+        }
+        case Tcp: {
+            const char *addr, *portstr;
+            unsigned long port = ULONG_MAX;
+
+            addr = conf.next_from_section(section, "address");
+            if (!addr && !endpoint) {
+                log_error("On file %s: expected key 'address' for %s", conf_file_name, section);
+                return -EINVAL;
+            }
+
+            portstr = conf.next_from_section(section, "port");
+            if (portstr && safe_atoul(portstr, &port) < 0) {
+                log_error("On file %s: invalid port for %s", conf_file_name, section);
+                return -EINVAL;
+            }
+
+            ret = add_tcp_endpoint_address(endpoint, name, addr, port);
+            if (ret < 0) {
+                return ret;
+            }
+
             break;
         }
         default:
