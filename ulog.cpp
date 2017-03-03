@@ -35,6 +35,8 @@
 
 #define NO_FIRST_MSG_OFFSET 255
 
+#define ALIVE_TIMEOUT 5
+
 struct _packed_ ulog_msg_header {
     uint16_t msg_size;
     uint8_t msg_type;
@@ -47,7 +49,7 @@ ULog::ULog(const char *logs_dir)
     _logs_dir = logs_dir;
 }
 
-static bool _ulog_timeout_cb(void *data)
+static bool _ulog_logging_start_timeout_cb(void *data)
 {
     ULog *ulog = static_cast<ULog *>(data);
     return ulog->logging_start_timeout();
@@ -118,8 +120,8 @@ bool ULog::start()
         goto open_error;
     }
 
-    _timeout = _mainloop->add_timeout(MSEC_PER_SEC, _ulog_timeout_cb, this);
-    if (!_timeout) {
+    _logging_start_timeout = _mainloop->add_timeout(MSEC_PER_SEC, _ulog_logging_start_timeout_cb, this);
+    if (!_logging_start_timeout) {
         log_error("Unable to add timeout");
         goto timeout_error;
     }
@@ -163,9 +165,14 @@ void ULog::stop()
     mavlink_msg_command_long_encode(_system_id, MAV_COMP_ID_ALL, &msg, &cmd);
     _send_msg(&msg, _target_system_id);
 
-    if (_timeout) {
-        _mainloop->del_timeout(_timeout);
-        _timeout = nullptr;
+    if (_logging_start_timeout) {
+        _mainloop->del_timeout(_logging_start_timeout);
+        _logging_start_timeout = nullptr;
+    }
+
+    if (_alive_check_timeout) {
+        _mainloop->del_timeout(_alive_check_timeout);
+        _alive_check_timeout = nullptr;
     }
 
     _buffer_len = 0;
@@ -179,6 +186,24 @@ void ULog::stop()
     close(_file);
     _file = -1;
     _system_id = 0;
+}
+
+static bool _ulog_alive_timeout_cb(void *data)
+{
+    ULog *ulog = static_cast<ULog *>(data);
+    return ulog->alive_check_timeout();
+}
+
+bool ULog::alive_check_timeout()
+{
+    if (_timeout_write_total == _stat.write.total) {
+        log_warning("No ULog messages received in %u seconds restarting ULog...", ALIVE_TIMEOUT);
+        stop();
+        start();
+    }
+
+    _timeout_write_total = _stat.write.total;
+    return true;
 }
 
 int ULog::write_msg(const struct buffer *buffer)
@@ -225,12 +250,15 @@ int ULog::write_msg(const struct buffer *buffer)
         if (trimmed_zeros)
             memset(((uint8_t *)&cmd) + payload_len, 0, trimmed_zeros);
 
-        if (!_timeout || cmd.command != MAV_CMD_LOGGING_START)
-            break;
+        if (!_logging_start_timeout || cmd.command != MAV_CMD_LOGGING_START)
+            return buffer->len;
 
         if (cmd.result == MAV_RESULT_ACCEPTED) {
-            _mainloop->del_timeout(_timeout);
-            _timeout = NULL;
+            _mainloop->del_timeout(_logging_start_timeout);
+            _logging_start_timeout = nullptr;
+
+            _alive_check_timeout = _mainloop->add_timeout(MSEC_PER_SEC * ALIVE_TIMEOUT,
+                                                          _ulog_alive_timeout_cb, this);
         } else
             log_error("MAV_CMD_LOGGING_START result(%u) is different than accepted", cmd.result);
         break;

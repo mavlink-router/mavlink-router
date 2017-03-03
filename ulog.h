@@ -31,6 +31,7 @@ public:
 
     bool start();
     bool logging_start_timeout();
+    bool alive_check_timeout();
 
     void stop();
 
@@ -44,7 +45,10 @@ protected:
 private:
     const char *_logs_dir;
     int _file = -1;
-    Timeout *_timeout = nullptr;
+    Timeout *_logging_start_timeout = nullptr;
+
+    Timeout *_alive_check_timeout = nullptr;
+    uint32_t _timeout_write_total = 0;
 
     uint16_t _expected_seq;
     bool _waiting_header;
