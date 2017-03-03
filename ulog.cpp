@@ -188,9 +188,6 @@ int ULog::write_msg(const struct buffer *buffer)
     uint16_t payload_len;
     uint8_t trimmed_zeros;
 
-    _stat.write.total++;
-    _stat.write.bytes += buffer->len;
-
     if (mavlink2) {
         struct mavlink_router_mavlink2_header *msg
             = (struct mavlink_router_mavlink2_header *)buffer->data;
@@ -263,6 +260,9 @@ int ULog::write_msg(const struct buffer *buffer)
         break;
     }
     }
+
+    _stat.write.total++;
+    _stat.write.bytes += buffer->len;
 
     return buffer->len;
 }
