@@ -59,7 +59,7 @@ static void help(FILE *fp) {
             "                               connections. Pass 0 to disable TCP listening.\n"
             "                               Default port 5760\n"
             "  -c --conf-file <file>        .conf file with configurations for mavlink-router.\n"
-            "  -d --conf-dir <dir>          Directory were to look for .conf files overriding\n"
+            "  -d --conf-dir <dir>          Directory where to look for .conf files overriding\n"
             "                               default conf file.\n"
             "  -l --log <directory>         Enable Flight Stack logging\n"
             "  -g --debug-log-level <level> Set debug log level. Levels are\n"
