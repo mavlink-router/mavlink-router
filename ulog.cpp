@@ -73,7 +73,7 @@ bool ULog::start()
 {
     time_t t = time(NULL);
     struct tm *timeinfo = localtime(&t);
-    char *filename;
+    char *filename = NULL;
     int r;
 
     if (_file != -1) {
@@ -81,11 +81,33 @@ bool ULog::start()
         return false;
     }
 
-    r = asprintf(&filename, "%s/%i-%02i-%02i_%02i-%02i-%02i.ulg", _logs_dir,
-                 timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday,
-                 timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
-    if (r < 1) {
-        log_error_errno(errno, "Error formatting ULog file name: (%m)");
+    for (uint16_t i = 0; i < UINT16_MAX; i++) {
+        if (i) {
+            r = asprintf(&filename, "%s/%i-%02i-%02i_%02i-%02i-%02i_%u.ulg", _logs_dir,
+                         timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday,
+                         timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec, i);
+        } else {
+            r = asprintf(&filename, "%s/%i-%02i-%02i_%02i-%02i-%02i.ulg", _logs_dir,
+                         timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday,
+                         timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+        }
+
+        if (r < 1) {
+            log_error_errno(errno, "Error formatting ULog file name: (%m)");
+            return false;
+        }
+
+        if (access(filename, F_OK)) {
+            /* file not found */
+            break;
+        }
+
+        free(filename);
+        filename = NULL;
+    }
+
+    if (!filename) {
+        log_error("Unable to create a ULog file without override another file.");
         return false;
     }
 
