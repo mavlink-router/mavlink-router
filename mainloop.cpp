@@ -515,7 +515,7 @@ void Mainloop::_del_timeouts()
         while (current) {
             if (current->remove_me) {
                 prev->next = current->next;
-                remove_fd(_timeouts->fd);
+                remove_fd(current->fd);
                 delete current;
                 current = prev->next;
             } else {
