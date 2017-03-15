@@ -17,39 +17,29 @@
  */
 #pragma once
 
-#include "endpoint.h"
-#include "timeout.h"
-
-#define TARGET_SYSTEM_ID 1
-#define SYSTEM_ID 2
+#include "logendpoint.h"
 
 #define BUFFER_LEN 2048
 
-class ULog : public Endpoint {
+class ULog : public LogEndpoint {
 public:
-    ULog(const char *logs_dir);
+    ULog(const char *logs_dir)
+        : LogEndpoint{logs_dir}
+    {
+    }
 
-    bool start();
-    bool logging_start_timeout();
-    bool alive_check_timeout();
-
-    void stop();
+    bool start() override;
+    void stop() override;
 
     int write_msg(const struct buffer *pbuf) override;
     int flush_pending_msgs() override { return -ENOSYS; }
 
 protected:
     ssize_t _read_msg(uint8_t *buf, size_t len) { return 0; };
-    const int _target_system_id = TARGET_SYSTEM_ID;
+    bool _start_timeout() override;
 
+    const char *_get_logfile_extension() { return "ulg"; };
 private:
-    const char *_logs_dir;
-    int _file = -1;
-    Timeout *_logging_start_timeout = nullptr;
-
-    Timeout *_alive_check_timeout = nullptr;
-    uint32_t _timeout_write_total = 0;
-
     uint16_t _expected_seq;
     bool _waiting_header;
     bool _waiting_first_msg_offset;
@@ -63,6 +53,4 @@ private:
     bool _logging_seq(uint16_t seq, bool *drop);
     void _logging_data_process(mavlink_logging_data_t *msg);
     bool _logging_flush();
-
-    void _send_msg(const mavlink_message_t *msg, int target_sysid);
 };
