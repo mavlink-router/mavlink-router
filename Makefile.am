@@ -131,6 +131,8 @@ mavlink_routerd_SOURCES = \
 	endpoint.h \
 	log.c \
 	log.h \
+	logendpoint.cpp \
+	logendpoint.h \
 	macro.h \
 	main.cpp \
 	mainloop.cpp \
