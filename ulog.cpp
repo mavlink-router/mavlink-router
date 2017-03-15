@@ -24,7 +24,6 @@
 #include <unistd.h>
 
 #include "log.h"
-#include "mainloop.h"
 #include "util.h"
 
 #define ULOG_HEADER_SIZE 16
@@ -35,27 +34,12 @@
 
 #define NO_FIRST_MSG_OFFSET 255
 
-#define ALIVE_TIMEOUT 5
-
 struct _packed_ ulog_msg_header {
     uint16_t msg_size;
     uint8_t msg_type;
 };
 
-ULog::ULog(const char *logs_dir)
-    : Endpoint{"ULog", false}
-{
-    assert(logs_dir);
-    _logs_dir = logs_dir;
-}
-
-static bool _ulog_logging_start_timeout_cb(void *data)
-{
-    ULog *ulog = static_cast<ULog *>(data);
-    return ulog->logging_start_timeout();
-}
-
-bool ULog::logging_start_timeout()
+bool ULog::_start_timeout()
 {
     mavlink_message_t msg;
     mavlink_command_long_t cmd;
@@ -73,57 +57,8 @@ bool ULog::logging_start_timeout()
 
 bool ULog::start()
 {
-    time_t t = time(NULL);
-    struct tm *timeinfo = localtime(&t);
-    char *filename = NULL;
-    int r;
-
-    if (_file != -1) {
-        log_warning("ULog already started");
+    if (!LogEndpoint::start()) {
         return false;
-    }
-
-    for (uint16_t i = 0; i < UINT16_MAX; i++) {
-        if (i) {
-            r = asprintf(&filename, "%s/%i-%02i-%02i_%02i-%02i-%02i_%u.ulg", _logs_dir,
-                         timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday,
-                         timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec, i);
-        } else {
-            r = asprintf(&filename, "%s/%i-%02i-%02i_%02i-%02i-%02i.ulg", _logs_dir,
-                         timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday,
-                         timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
-        }
-
-        if (r < 1) {
-            log_error_errno(errno, "Error formatting ULog file name: (%m)");
-            return false;
-        }
-
-        if (access(filename, F_OK)) {
-            /* file not found */
-            break;
-        }
-
-        free(filename);
-        filename = NULL;
-    }
-
-    if (!filename) {
-        log_error("Unable to create a ULog file without override another file.");
-        return false;
-    }
-
-    _file = open(filename, O_WRONLY | O_CLOEXEC | O_CREAT | O_NONBLOCK | O_TRUNC,
-                 S_IRUSR | S_IROTH | S_IRGRP);
-    if (_file < 0) {
-        log_error_errno(errno, "Unable to open ULog file(%s): (%m)", filename);
-        goto open_error;
-    }
-
-    _logging_start_timeout = _mainloop->add_timeout(MSEC_PER_SEC, _ulog_logging_start_timeout_cb, this);
-    if (!_logging_start_timeout) {
-        log_error("Unable to add timeout");
-        goto timeout_error;
     }
 
     _waiting_header = true;
@@ -134,17 +69,7 @@ bool ULog::start()
     _buffer_partial_len = 0;
     _system_id = SYSTEM_ID;
 
-    log_info("Logging target system_id=%u on %s", _target_system_id, filename);
-    free(filename);
-
     return true;
-
-timeout_error:
-    close(_file);
-    _file = -1;
-open_error:
-    free(filename);
-    return false;
 }
 
 void ULog::stop()
@@ -165,16 +90,6 @@ void ULog::stop()
     mavlink_msg_command_long_encode(_system_id, MAV_COMP_ID_ALL, &msg, &cmd);
     _send_msg(&msg, _target_system_id);
 
-    if (_logging_start_timeout) {
-        _mainloop->del_timeout(_logging_start_timeout);
-        _logging_start_timeout = nullptr;
-    }
-
-    if (_alive_check_timeout) {
-        _mainloop->del_timeout(_alive_check_timeout);
-        _alive_check_timeout = nullptr;
-    }
-
     _buffer_len = 0;
     /* Write the last partial message to avoid corrupt the end of the file */
     while (_buffer_partial_len) {
@@ -182,28 +97,7 @@ void ULog::stop()
             break;
     }
 
-    fsync(_file);
-    close(_file);
-    _file = -1;
-    _system_id = 0;
-}
-
-static bool _ulog_alive_timeout_cb(void *data)
-{
-    ULog *ulog = static_cast<ULog *>(data);
-    return ulog->alive_check_timeout();
-}
-
-bool ULog::alive_check_timeout()
-{
-    if (_timeout_write_total == _stat.write.total) {
-        log_warning("No ULog messages received in %u seconds restarting ULog...", ALIVE_TIMEOUT);
-        stop();
-        start();
-    }
-
-    _timeout_write_total = _stat.write.total;
-    return true;
+    LogEndpoint::stop();
 }
 
 int ULog::write_msg(const struct buffer *buffer)
@@ -254,11 +148,10 @@ int ULog::write_msg(const struct buffer *buffer)
             return buffer->len;
 
         if (cmd.result == MAV_RESULT_ACCEPTED) {
-            _mainloop->del_timeout(_logging_start_timeout);
-            _logging_start_timeout = nullptr;
-
-            _alive_check_timeout = _mainloop->add_timeout(MSEC_PER_SEC * ALIVE_TIMEOUT,
-                                                          _ulog_alive_timeout_cb, this);
+            _remove_start_timeout();
+            if (!_start_alive_timeout()) {
+                log_warning("Could not start liveness timeout - mavlink router log won't be able to detect if flight stack stopped");
+            }
         } else
             log_error("MAV_CMD_LOGGING_START result(%u) is different than accepted", cmd.result);
         break;
@@ -459,21 +352,4 @@ bool ULog::_logging_flush()
     }
 
     return true;
-}
-
-void ULog::_send_msg(const mavlink_message_t *msg, int target_sysid)
-{
-    uint8_t data[MAVLINK_MAX_PACKET_LEN];
-    struct buffer buffer { 0, data };
-
-    buffer.len = mavlink_msg_to_send_buffer(data, msg);
-    _mainloop->route_msg(&buffer, target_sysid, msg->sysid);
-
-    _stat.read.total++;
-    _stat.read.handled++;
-    _stat.read.handled_bytes += msg->len;
-    if (msg->magic == MAVLINK_STX)
-        _stat.read.handled_bytes += sizeof(struct mavlink_router_mavlink2_header);
-    else
-        _stat.read.handled_bytes += sizeof(struct mavlink_router_mavlink1_header);
 }
