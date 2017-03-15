@@ -271,8 +271,8 @@ void Mainloop::loop()
     setup_signal_handlers();
     Endpoint::set_Mainloop(this);
 
-    if (_ulog)
-        _ulog->start();
+    if (_log_endpoint)
+        _log_endpoint->start();
 
     while (!should_exit) {
         int i;
@@ -305,8 +305,8 @@ void Mainloop::loop()
         _del_timeouts();
     }
 
-    if (_ulog)
-        _ulog->stop();
+    if (_log_endpoint)
+        _log_endpoint->stop();
 
     // free all remaning Timeouts
     while (_timeouts) {
@@ -401,8 +401,12 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct opt *opt)
         g_tcp_fd = tcp_open(opt->tcp_port);
 
     if (opt->logs_dir) {
-        _ulog = new ULog(opt->logs_dir);
-        g_endpoints[i] = _ulog;
+        if (opt->mavlink_dialect == Common) {
+            _log_endpoint = new ULog(opt->logs_dir);
+        } else {
+            _log_endpoint = new BinLog(opt->logs_dir);
+        }
+        g_endpoints[i] = _log_endpoint;
     }
 
     if (opt->report_msg_statistics)
