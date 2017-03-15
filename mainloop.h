@@ -17,6 +17,7 @@
  */
 #pragma once
 
+#include "binlog.h"
 #include "comm.h"
 #include "endpoint.h"
 #include "timeout.h"
@@ -56,7 +57,7 @@ private:
     endpoint_entry *g_tcp_endpoints;
     Endpoint **g_endpoints;
     int g_tcp_fd;
-    ULog *_ulog = nullptr;
+    LogEndpoint *_log_endpoint = nullptr;
 
     Timeout *_timeouts = nullptr;
 
