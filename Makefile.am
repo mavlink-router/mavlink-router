@@ -36,7 +36,8 @@ AM_CPPFLAGS = \
 	-I$(top_srcdir) \
 	-I$(top_builddir)/include/mavlink \
 	-I$(top_builddir)/include/mavlink/$(DIALECT) \
-	-DSYSCONFDIR=\""$(sysconfdir)"\"
+	-DSYSCONFDIR=\""$(sysconfdir)"\" \
+	-DDIALECT=\"$(DIALECT)\"
 
 AM_CFLAGS = \
 	-pipe \
@@ -124,6 +125,8 @@ AM_LDFLAGS = \
 
 bin_PROGRAMS += mavlink-routerd
 mavlink_routerd_SOURCES = \
+	binlog.cpp \
+	binlog.h \
 	comm.h \
 	conf.cpp \
 	conf.h \
