@@ -145,15 +145,30 @@ protected:
 class TcpEndpoint : public Endpoint {
 public:
     TcpEndpoint();
+    ~TcpEndpoint();
 
     int accept(int listener_fd);
     int open(const char *ip, unsigned long port);
+    void close();
 
     int write_msg(const struct buffer *pbuf) override;
     int flush_pending_msgs() override { return -ENOSYS; }
 
     struct sockaddr_in sockaddr;
+    int retry_timeout = 0;
+
+    inline const char *get_ip() {
+        return _ip;
+    }
+
+    inline unsigned long get_port() {
+        return _port;
+    }
 
 protected:
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
+
+private:
+    char *_ip = nullptr;
+    unsigned long _port = 0;
 };

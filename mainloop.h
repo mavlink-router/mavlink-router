@@ -24,7 +24,7 @@
 
 struct endpoint_entry {
     struct endpoint_entry *next;
-    Endpoint *endpoint;
+    TcpEndpoint *endpoint;
     bool remove;
 };
 
@@ -63,6 +63,8 @@ private:
     int tcp_open(unsigned long tcp_port);
     void _del_timeouts();
     int _add_tcp_endpoint(TcpEndpoint *tcp);
+    void _add_tcp_retry(TcpEndpoint *tcp);
+    bool _retry_timeout_cb(void *data);
 };
 
 enum endpoint_type { Tcp, Uart, Udp, Unknown };
@@ -75,6 +77,7 @@ struct endpoint_config {
         struct {
             char *address;
             long unsigned port;
+            int retry_timeout;
             bool eavesdropping;
         };
         struct {

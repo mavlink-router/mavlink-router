@@ -183,7 +183,11 @@ void Mainloop::process_tcp_hangups()
     while (*first && (*first)->remove) {
         struct endpoint_entry *next = (*first)->next;
         remove_fd((*first)->endpoint->fd);
-        delete (*first)->endpoint;
+        if ((*first)->endpoint->retry_timeout > 0) {
+            _add_tcp_retry((*first)->endpoint);
+        } else {
+            delete (*first)->endpoint;
+        }
         free(*first);
         *first = next;
     }
@@ -196,7 +200,11 @@ void Mainloop::process_tcp_hangups()
             if (current->remove) {
                 prev->next = current->next;
                 remove_fd(current->endpoint->fd);
-                delete current->endpoint;
+                if (current->endpoint->retry_timeout > 0) {
+                    _add_tcp_retry(current->endpoint);
+                } else {
+                    delete current->endpoint;
+                }
                 free(current);
                 current = prev->next;
             } else {
@@ -367,9 +375,13 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct opt *opt)
         }
         case Tcp: {
             std::unique_ptr<TcpEndpoint> tcp{new TcpEndpoint{}};
+            tcp->retry_timeout = conf->retry_timeout;
             if (tcp->open(conf->address, conf->port) < 0) {
-                log_error("Could not open %s:%ld", conf->address, conf->port);
-                return false;
+                log_error("Could not open %s:%ld.", conf->address, conf->port);
+                if (tcp->retry_timeout > 0) {
+                    _add_tcp_retry(tcp.release());
+                }
+                continue;
             }
 
             if (_add_tcp_endpoint(tcp.get()) < 0) {
@@ -524,4 +536,39 @@ void Mainloop::_del_timeouts()
             }
         }
     }
+}
+
+void Mainloop::_add_tcp_retry(TcpEndpoint *tcp)
+{
+    Timeout *t
+        ;
+    if (tcp->retry_timeout <= 0) {
+        return;
+    }
+
+    tcp->close();
+    t = add_timeout(MSEC_PER_SEC * tcp->retry_timeout,
+            std::bind(&Mainloop::_retry_timeout_cb, this, std::placeholders::_1),
+            tcp);
+
+    if (t == nullptr) {
+        log_warning("Could not create retry timeout for TCP endpoint %s:%lu\n"
+                    "No attempts to reconnect will be made", tcp->get_ip(), tcp->get_port());
+    }
+}
+
+bool Mainloop::_retry_timeout_cb(void *data)
+{
+    TcpEndpoint *tcp = (TcpEndpoint *)data;
+
+    if (tcp->open(tcp->get_ip(), tcp->get_port()) < 0) {
+        return true;
+    }
+
+    if (_add_tcp_endpoint(tcp) < 0) {
+        tcp->close();
+        return true;
+    }
+
+    return false;
 }
