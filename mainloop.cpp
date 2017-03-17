@@ -461,7 +461,7 @@ int Mainloop::tcp_open(unsigned long tcp_port)
     return fd;
 }
 
-Timeout *Mainloop::add_timeout(uint32_t timeout_msec, bool (*cb)(void *data), const void *data)
+Timeout *Mainloop::add_timeout(uint32_t timeout_msec, std::function<bool(void*)> cb, const void *data)
 {
     struct itimerspec ts;
     Timeout *t = new Timeout(cb, data);

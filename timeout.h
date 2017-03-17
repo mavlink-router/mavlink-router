@@ -17,11 +17,13 @@
  */
 #pragma once
 
+#include <functional>
+
 #include "pollable.h"
 
 class Timeout : public Pollable {
 public:
-    Timeout(bool (*cb)(void *data), const void *data);
+    Timeout(std::function<bool(void*)> cb, const void *data);
     bool remove_me = false;
     Timeout *next = nullptr;
 
@@ -29,6 +31,6 @@ public:
     bool handle_canwrite() override;
 
 private:
-    bool (*_cb)(void *data);
+    std::function<bool(void*)> _cb;
     const void *_data;
 };

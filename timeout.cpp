@@ -21,7 +21,7 @@
 #include <stdint.h>
 #include <unistd.h>
 
-Timeout::Timeout(bool (*cb)(void *data), const void *data)
+Timeout::Timeout(std::function<bool(void*)> cb, const void *data)
 {
     assert(cb);
     _cb = cb;
