@@ -526,6 +526,11 @@ TcpEndpoint::TcpEndpoint()
     bzero(&sockaddr, sizeof(sockaddr));
 }
 
+TcpEndpoint::~TcpEndpoint()
+{
+    free(_ip);
+}
+
 int TcpEndpoint::accept(int listener_fd)
 {
     socklen_t addrlen = sizeof(sockaddr);
@@ -539,6 +544,14 @@ int TcpEndpoint::accept(int listener_fd)
 
 int TcpEndpoint::open(const char *ip, unsigned long port)
 {
+    if (!_ip || strcmp(ip, _ip)) {
+        free(_ip);
+        _ip = strdup(ip);
+        _port = port;
+    }
+
+    assert_or_return(_ip, -ENOMEM);
+
     fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd == -1) {
         log_error_errno(errno, "Could not create socket (%m)");
@@ -564,7 +577,7 @@ int TcpEndpoint::open(const char *ip, unsigned long port)
     return fd;
 
 fail:
-    close(fd);
+    ::close(fd);
     return -1;
 }
 
@@ -613,4 +626,12 @@ int TcpEndpoint::write_msg(const struct buffer *pbuf)
     log_debug("TCP: [%d] wrote %zd bytes", fd, r);
 
     return r;
+}
+
+void TcpEndpoint::close()
+{
+    if (fd > -1) {
+        ::close(fd);
+    }
+    fd = -1;
 }

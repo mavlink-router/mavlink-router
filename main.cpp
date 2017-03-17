@@ -34,6 +34,7 @@
 #define DEFAULT_BAUDRATE 115200U
 #define DEFAULT_CONFFILE "/etc/mavlink-router/main.conf"
 #define DEFAULT_CONF_DIR "/etc/mavlink-router/config.d"
+#define DEFAULT_RETRY_TCP_TIMEOUT 5
 
 static struct opt opt = {
         .endpoints = nullptr,
@@ -125,7 +126,7 @@ static int log_level_from_str(const char *str)
 }
 
 static int add_tcp_endpoint_address(struct endpoint_config *conf, const char *name, const char *ip,
-                                    long unsigned port)
+                                    long unsigned port, int timeout)
 {
     bool new_conf = false;
     int ret;
@@ -168,6 +169,8 @@ static int add_tcp_endpoint_address(struct endpoint_config *conf, const char *na
         ret = -EINVAL;
         goto fail;
     }
+
+    conf->retry_timeout = timeout;
 
     if (new_conf) {
         conf->next = opt.endpoints;
@@ -398,7 +401,7 @@ static int parse_argv(int argc, char *argv[])
                 return -EINVAL;
             }
 
-            add_tcp_endpoint_address(NULL, NULL, ip, port);
+            add_tcp_endpoint_address(NULL, NULL, ip, port, DEFAULT_RETRY_TCP_TIMEOUT);
             free(ip);
             break;
         }
@@ -628,8 +631,9 @@ static int parse_conf(const char *conf_file_name)
             break;
         }
         case Tcp: {
-            const char *addr, *portstr;
+            const char *addr, *portstr, *timeoutstr;
             unsigned long port = ULONG_MAX;
+            int timeout = DEFAULT_RETRY_TCP_TIMEOUT;
 
             addr = conf.next_from_section(section, "address");
             if (!addr && !endpoint) {
@@ -643,7 +647,13 @@ static int parse_conf(const char *conf_file_name)
                 return -EINVAL;
             }
 
-            ret = add_tcp_endpoint_address(endpoint, name, addr, port);
+            timeoutstr = conf.next_from_section(section, "RetryTimeout");
+            if (timeoutstr && safe_atoi(timeoutstr, &timeout) < 0) {
+                log_error("On file %s: invalid timeout for %s", conf_file_name, section);
+                return -EINVAL;
+            }
+
+            ret = add_tcp_endpoint_address(endpoint, name, addr, port, timeout);
             if (ret < 0) {
                 return ret;
             }
