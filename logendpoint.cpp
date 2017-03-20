@@ -17,6 +17,7 @@
  */
 #include "logendpoint.h"
 
+#include <dirent.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <stdio.h>
@@ -30,6 +31,8 @@
 #include "log.h"
 #include "mainloop.h"
 #include "util.h"
+
+#define MAX_LOG_FILE_PREFIX 999
 
 static bool _logging_start_timeout_cb(void *data)
 {
@@ -62,7 +65,33 @@ void LogEndpoint::_send_msg(const mavlink_message_t *msg, int target_sysid)
         _stat.read.handled_bytes += sizeof(struct mavlink_router_mavlink1_header);
 }
 
-char *LogEndpoint::_get_filename(const char *extension)
+int LogEndpoint::_get_prefix(const char *extension, const char *dirname, uint16_t *prefix)
+{
+    struct dirent *ent;
+    DIR *dir;
+    uint16_t u;
+
+    dir = opendir(dirname);
+    if (!dir) {
+        return -errno;
+    }
+
+    *prefix = 0;
+
+    while ((ent = readdir(dir)) != nullptr) {
+        if (sscanf(ent->d_name, "%hu-", &u) == 1) {
+            if (u >= *prefix && u < MAX_LOG_FILE_PREFIX) {
+                *prefix = ++u;
+            }
+        }
+    }
+
+    closedir(dir);
+
+    return 0;
+}
+
+int LogEndpoint::_get_file(const char *extension, char **filename_result)
 {
     char filename[PATH_MAX] = {};
 
@@ -71,35 +100,40 @@ char *LogEndpoint::_get_filename(const char *extension)
     int r;
     uint16_t i;
 
-    for (i = 0; i < UINT16_MAX; i++) {
-        if (i) {
-            r = snprintf(filename, sizeof(filename), "%s/%i-%02i-%02i_%02i-%02i-%02i_%u.%s",
-                         _logs_dir, timeinfo->tm_year + 1900, timeinfo->tm_mon + 1,
-                         timeinfo->tm_mday, timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec,
-                         i, extension);
-        } else {
-            r = snprintf(filename, sizeof(filename), "%s/%i-%02i-%02i_%02i-%02i-%02i.%s", _logs_dir,
-                         timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday,
-                         timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec, extension);
-        }
+    if (_get_prefix(extension, _logs_dir, &i) < 0) {
+        log_error_errno(errno, "Error formatting Log file name: (%m)");
+    }
+
+    for (; i <= MAX_LOG_FILE_PREFIX; i++) {
+        r = snprintf(filename, sizeof(filename), "%s/%03u-%i-%02i-%02i_%02i-%02i-%02i.%s",
+                     _logs_dir, i, timeinfo->tm_year + 1900, timeinfo->tm_mon + 1,
+                     timeinfo->tm_mday, timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec,
+                     extension);
 
         if (r < 1 || (size_t)r >= sizeof(filename)) {
             log_error_errno(errno, "Error formatting Log file name: (%m)");
-            return nullptr;
+            return -EINVAL;
         }
 
-        if (access(filename, F_OK)) {
-            /* file not found */
-            break;
+        r = open(filename, O_WRONLY | O_CLOEXEC | O_CREAT | O_NONBLOCK | O_TRUNC,
+                 S_IRUSR | S_IROTH | S_IRGRP);
+        if (r >= 0) {
+            *filename_result = strdup(filename);
+            if (!*filename_result) {
+                log_error_errno(errno, "Unable to open Log file: (%m)");
+                close(r);
+                return -ENOMEM;
+            }
+            return r;
+        }
+        if (errno != EEXIST) {
+            log_error_errno(errno, "Unable to open Log file(%s): (%m)", filename);
+            return -1;
         }
     }
 
-    if (i == UINT16_MAX) {
-        log_error("Unable to create a Log file without override another file.");
-        return nullptr;
-    }
-
-    return strdup(filename);
+    log_error("Unable to create a Log file without override another file.");
+    return -1;
 }
 
 void LogEndpoint::stop()
@@ -129,17 +163,10 @@ bool LogEndpoint::start()
         return false;
     }
 
-    filename = _get_filename(_get_logfile_extension());
-    if (!filename) {
-        log_error("Could not get log filename");
-        return false;
-    }
-
-    _file = open(filename, O_WRONLY | O_CLOEXEC | O_CREAT | O_NONBLOCK | O_TRUNC,
-                 S_IRUSR | S_IROTH | S_IRGRP);
+    _file = _get_file(_get_logfile_extension(), &filename);
     if (_file < 0) {
-        log_error_errno(errno, "Unable to open Log file(%s): (%m)", filename);
-        goto open_error;
+        _file = -1;
+        return false;
     }
 
     _logging_start_timeout = _mainloop->add_timeout(MSEC_PER_SEC, _logging_start_timeout_cb, this);
@@ -156,7 +183,6 @@ bool LogEndpoint::start()
 timeout_error:
     close(_file);
     _file = -1;
-open_error:
     free(filename);
     return false;
 }

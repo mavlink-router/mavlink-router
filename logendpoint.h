@@ -57,5 +57,6 @@ protected:
     bool _start_alive_timeout();
 
 private:
-    char *_get_filename(const char *extension);
+    int _get_file(const char *extension, char **filename_result);
+    int _get_prefix(const char *extension, const char *dirname, uint16_t *prefix);
 };
