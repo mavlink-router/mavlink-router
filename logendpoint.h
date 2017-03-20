@@ -18,6 +18,7 @@
 #pragma once
 
 #include <assert.h>
+#include <dirent.h>
 
 #include "endpoint.h"
 #include "timeout.h"
@@ -56,5 +57,6 @@ protected:
     virtual bool _alive_timeout();
 
 private:
-    char *_get_filename(const char *extension);
+    int _get_file(const char *extension, char *filename_result, size_t filename_size);
+    uint32_t _get_prefix(DIR *dir);
 };

@@ -17,6 +17,7 @@
  */
 #include "logendpoint.h"
 
+#include <dirent.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <stdio.h>
@@ -27,11 +28,14 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <memory>
+
 #include "log.h"
 #include "mainloop.h"
 #include "util.h"
 
 #define ALIVE_TIMEOUT 5
+#define MAX_RETRIES 10
 
 void LogEndpoint::_send_msg(const mavlink_message_t *msg, int target_sysid)
 {
@@ -48,44 +52,62 @@ void LogEndpoint::_send_msg(const mavlink_message_t *msg, int target_sysid)
     _stat.read.handled_bytes += buffer.len;
 }
 
-char *LogEndpoint::_get_filename(const char *extension)
+uint32_t LogEndpoint::_get_prefix(DIR *dir)
 {
-    char filename[PATH_MAX] = {};
+    struct dirent *ent;
+    uint32_t u, prefix = 0;
 
+    while ((ent = readdir(dir)) != nullptr) {
+        if (sscanf(ent->d_name, "%u-", &u) == 1) {
+            if (u >= prefix && u < UINT32_MAX) {
+                prefix = ++u;
+            }
+        }
+    }
+
+    return prefix;
+}
+
+int LogEndpoint::_get_file(const char *extension, char *filename, size_t filename_size)
+{
     time_t t = time(NULL);
     struct tm *timeinfo = localtime(&t);
-    int r;
-    uint16_t i;
+    uint32_t i;
+    int j, r;
+    DIR *dir;
 
-    for (i = 0; i < UINT16_MAX; i++) {
-        if (i) {
-            r = snprintf(filename, sizeof(filename), "%s/%i-%02i-%02i_%02i-%02i-%02i_%u.%s",
-                         _logs_dir, timeinfo->tm_year + 1900, timeinfo->tm_mon + 1,
-                         timeinfo->tm_mday, timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec,
-                         i, extension);
-        } else {
-            r = snprintf(filename, sizeof(filename), "%s/%i-%02i-%02i_%02i-%02i-%02i.%s", _logs_dir,
-                         timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday,
-                         timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec, extension);
+    dir = opendir(_logs_dir);
+    if (!dir) {
+        return log_error_errno(errno, "Could not open log dir (%m)");
+    }
+    // Close dir when leaving function.
+    std::shared_ptr<void> defer(dir, [](auto p) { closedir(p); });
+
+    i = _get_prefix(dir);
+
+    for (j = 0; j <= MAX_RETRIES; j++) {
+        r = snprintf(filename, filename_size, "%05u-%i-%02i-%02i_%02i-%02i-%02i.%s", i + j,
+                     timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday,
+                     timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec, extension);
+
+        if (r < 1 || (size_t)r >= filename_size) {
+            return log_error_errno(errno, "Error formatting Log file name: (%m)");
         }
 
-        if (r < 1 || (size_t)r >= sizeof(filename)) {
-            log_error_errno(errno, "Error formatting Log file name: (%m)");
-            return nullptr;
+        r = openat(dirfd(dir), filename, O_WRONLY | O_CLOEXEC | O_CREAT | O_NONBLOCK | O_EXCL,
+                   0644);
+        if (r < 0) {
+            if (errno != EEXIST) {
+                return log_error_errno(errno, "Unable to open Log file(%s): (%m)", filename);
+            }
+            continue;
         }
 
-        if (access(filename, F_OK)) {
-            /* file not found */
-            break;
-        }
+        return r;
     }
 
-    if (i == UINT16_MAX) {
-        log_error("Unable to create a Log file without override another file.");
-        return nullptr;
-    }
-
-    return strdup(filename);
+    log_error("Unable to create a Log file without override another file.");
+    return -EEXIST;
 }
 
 void LogEndpoint::stop()
@@ -108,24 +130,17 @@ void LogEndpoint::stop()
 
 bool LogEndpoint::start()
 {
-    char *filename = NULL;
+    char filename[PATH_MAX];
 
     if (_file != -1) {
         log_warning("Log already started");
         return false;
     }
 
-    filename = _get_filename(_get_logfile_extension());
-    if (!filename) {
-        log_error("Could not get log filename");
-        return false;
-    }
-
-    _file = open(filename, O_WRONLY | O_CLOEXEC | O_CREAT | O_NONBLOCK | O_TRUNC,
-                 S_IRUSR | S_IROTH | S_IRGRP);
+    _file = _get_file(_get_logfile_extension(), filename, sizeof(filename));
     if (_file < 0) {
-        log_error_errno(errno, "Unable to open Log file(%s): (%m)", filename);
-        goto open_error;
+        _file = -1;
+        return false;
     }
 
     _logging_start_timeout
@@ -136,15 +151,12 @@ bool LogEndpoint::start()
     }
 
     log_info("Logging target system_id=%u on %s", _target_system_id, filename);
-    free(filename);
 
     return true;
 
 timeout_error:
     close(_file);
     _file = -1;
-open_error:
-    free(filename);
     return false;
 }
 
