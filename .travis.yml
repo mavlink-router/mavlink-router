@@ -12,13 +12,12 @@ matrix:
             - g++-6
             - gcc-6
             - python-pip
-            - python3-pip
 
 before_script:
-        - pip install --user future #mavlink
-        - pip3 install --user future #make test
+        - pip install --user future pymavlink
         - CXX="g++-6"
         - CC="gcc-6"
-        - export PYTHONPATH=$PWD/modules/mavlink:$PYTHONPATH #pymavlink
-        - ./autogen.sh
-        - sed -i 's,python\ ,python3\ ,g' Makefile.am
+
+script:
+        - ./autogen.sh c
+        - make -j
