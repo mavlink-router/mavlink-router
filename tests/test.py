@@ -38,7 +38,7 @@ class MavlinkSender(Thread):
     '''MAVLink message sender'''
 
     def __init__(self, name, port, sysId, compId, targetSysId, targetCompId):
-        super().__init__()
+        super(MavlinkSender, self).__init__()
         self.name = name
         self.sysId = sysId
         self.compId = compId
@@ -85,7 +85,7 @@ class MavlinkReceiver(Thread):
     '''MAVLink message receiver'''
 
     def __init__(self, name, port, sysId, compId):
-        super().__init__()
+        super(MavlinkReceiver, self).__init__()
         self.name = name
         self.sysId = sysId
         self.compId = compId
