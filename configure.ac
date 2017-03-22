@@ -23,6 +23,7 @@ AM_SILENT_RULES([yes])
 
 AC_PROG_CC_C99
 AX_CXX_COMPILE_STDCXX([11], [ext], [mandatory])
+AM_PATH_PYTHON([2.7])
 
 #####################################################################
 
