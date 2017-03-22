@@ -18,15 +18,18 @@
 #pragma once
 
 #include "logendpoint.h"
+#include "timeout.h"
 
 #define BUFFER_LEN 2048
 
-class ULog : public LogEndpoint {
+class BinLog : public LogEndpoint {
 public:
-    ULog(const char *logs_dir) : LogEndpoint{logs_dir} { }
+    BinLog(const char *logs_dir) : LogEndpoint{logs_dir} { }
 
     bool start() override;
     void stop() override;
+
+    bool logging_start_timeout();
 
     int write_msg(const struct buffer *pbuf) override;
     int flush_pending_msgs() override { return -ENOSYS; }
@@ -35,19 +38,13 @@ protected:
     ssize_t _read_msg(uint8_t *buf, size_t len) { return 0; };
     bool _start_timeout() override;
 
-    const char *_get_logfile_extension() { return "ulg"; };
+    const char *_get_logfile_extension() { return "bin"; };
 private:
-    uint16_t _expected_seq;
-    bool _waiting_header;
-    bool _waiting_first_msg_offset;
-    uint8_t _buffer[BUFFER_LEN];
-    uint16_t _buffer_len;
-    /* Where valid data starts on buffer */
-    uint16_t _buffer_index;
-    uint8_t _buffer_partial[BUFFER_LEN / 2];
-    uint16_t _buffer_partial_len;
+    uint32_t _last_acked_seqno = 0;
 
     bool _logging_seq(uint16_t seq, bool *drop);
-    void _logging_data_process(mavlink_logging_data_t *msg);
+    void _logging_data_process(mavlink_remote_log_data_block_t *msg);
     bool _logging_flush();
+
+    void _send_ack(uint32_t seqno);
 };
