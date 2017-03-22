@@ -151,7 +151,7 @@ heartbeat_print_SOURCES = \
 noinst_SCRIPTS += examples/heartbeat-print.py
 
 test: mavlink-routerd
-	/usr/bin/env python $(top_builddir)/tests/test.py $(top_builddir)/mavlink-routerd
+	$(PYTHON) $(top_builddir)/tests/test.py $(top_builddir)/mavlink-routerd
 
 # ------------------------------------------------------------------------------
 # coverity
