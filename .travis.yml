@@ -1,0 +1,24 @@
+language: cpp
+dist: trusty
+cache: pip
+matrix:
+  include:
+    - os: linux
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-6
+            - gcc-6
+            - python-pip
+            - python3-pip
+
+before_script:
+        - pip install --user future #mavlink
+        - pip3 install --user future #make test
+        - CXX="g++-6"
+        - CC="gcc-6"
+        - export PYTHONPATH=$PWD/modules/mavlink:$PYTHONPATH #pymavlink
+        - ./autogen.sh
+        - sed -i 's,python\ ,python3\ ,g' Makefile.am
