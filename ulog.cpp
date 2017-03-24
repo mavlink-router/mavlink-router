@@ -338,12 +338,16 @@ void ULog::_logging_data_process(mavlink_logging_data_t *msg)
 
         if (msg->length < ULOG_HEADER_SIZE) {
             /* This should never happen */
-            log_error("ULog header is not complete");
+            log_error("ULog header is not complete, restarting ULog...");
+            stop();
+            start();
             return;
         }
 
         if (memcmp(magic, msg->data, sizeof(magic))) {
-            log_error("Invalid ULog Magic number");
+            log_error("Invalid ULog Magic number, restarting ULog...");
+            stop();
+            start();
             return;
         }
 
