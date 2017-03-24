@@ -495,13 +495,13 @@ static int parse_conf(const char *conf_file_name)
         return ret;
     }
 
-    value = conf.next_from_section("General", "tcp-server-port");
+    value = conf.next_from_section("General", "TcpServerPort");
     if (value && (safe_atoul(value, &opt.tcp_port) < 0)) {
         log_error("On file %s: invalid argument for tcp-server-port = '%s'", conf_file_name, value);
         return -EINVAL;
     }
 
-    value = conf.next_from_section("General", "report-stats");
+    value = conf.next_from_section("General", "ReportStats");
     if (value) {
         if (strcaseeq(value, "true") || !strcmp(value, "1")) {
             opt.report_msg_statistics = true;
@@ -510,16 +510,16 @@ static int parse_conf(const char *conf_file_name)
         }
     }
 
-    value = conf.next_from_section("General", "log");
+    value = conf.next_from_section("General", "Log");
     if (value) {
         opt.logs_dir = value;
     }
 
-    value = conf.next_from_section("General", "log-debug-level");
+    value = conf.next_from_section("General", "LogDebugLevel");
     if (value) {
         int lvl = log_level_from_str(value);
         if (lvl == -EINVAL) {
-            log_error("On file %s: invalid argument for debug-log-level = %s", conf_file_name,
+            log_error("On file %s: invalid argument for DebugLogLevel = %s", conf_file_name,
                       value);
             return -EINVAL;
         }
