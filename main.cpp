@@ -314,7 +314,7 @@ static int parse_argv(int argc, char *argv[])
         { "baudrate",               required_argument,  NULL,   'b' },
         { "endpoints",              required_argument,  NULL,   'e' },
         { "conf-file",              required_argument,  NULL,   'i' },
-        { "dir-file" ,              required_argument,  NULL,   'd' },
+        { "conf-dir" ,              required_argument,  NULL,   'd' },
         { "report_msg_statistics",  no_argument,        NULL,   'r' },
         { "tcp-port",               required_argument,  NULL,   't' },
         { "tcp-endpoint",           required_argument,  NULL,   'p' },
