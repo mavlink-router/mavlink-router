@@ -45,11 +45,7 @@ void LogEndpoint::_send_msg(const mavlink_message_t *msg, int target_sysid)
 
     _stat.read.total++;
     _stat.read.handled++;
-    _stat.read.handled_bytes += msg->len;
-    if (msg->magic == MAVLINK_STX)
-        _stat.read.handled_bytes += sizeof(struct mavlink_router_mavlink2_header);
-    else
-        _stat.read.handled_bytes += sizeof(struct mavlink_router_mavlink1_header);
+    _stat.read.handled_bytes += buffer.len;
 }
 
 char *LogEndpoint::_get_filename(const char *extension)
