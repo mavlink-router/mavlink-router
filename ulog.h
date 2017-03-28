@@ -50,15 +50,15 @@ private:
     Timeout *_alive_check_timeout = nullptr;
     uint32_t _timeout_write_total = 0;
 
-    uint16_t _expected_seq;
-    bool _waiting_header;
-    bool _waiting_first_msg_offset;
+    uint16_t _expected_seq = 0;
+    bool _waiting_header = true;
+    bool _waiting_first_msg_offset = false;
     uint8_t _buffer[BUFFER_LEN];
-    uint16_t _buffer_len;
+    uint16_t _buffer_len = 0;
     /* Where valid data starts on buffer */
-    uint16_t _buffer_index;
+    uint16_t _buffer_index = 0;
     uint8_t _buffer_partial[BUFFER_LEN / 2];
-    uint16_t _buffer_partial_len;
+    uint16_t _buffer_partial_len = 0;
 
     bool _logging_seq(uint16_t seq, bool *drop);
     void _logging_data_process(mavlink_logging_data_t *msg);
