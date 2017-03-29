@@ -98,10 +98,14 @@ Port = 11000
 [TcpEndpoint delta]
 Address = 127.0.0.1
 Port = 25790
+RetryTimeout=10
 ```
 
 Note that `Port` is optional for endpoints whose `mode` is `normal`, as
 well as `baud` for UART endpoints.
+On TcpEndpoints, `RetryTimeout` is a time in seconds in which mavlink-router
+will try to reconnect a lost TCP connection. Default is 5 seconds, and setting
+it to zero disables reconnections.
 
 #### Conf dirs ####
 

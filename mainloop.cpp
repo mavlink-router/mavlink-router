@@ -229,6 +229,8 @@ int Mainloop::_add_tcp_endpoint(TcpEndpoint *tcp)
     tcp_entry->endpoint = tcp;
     g_tcp_endpoints = tcp_entry;
 
+    add_fd(tcp->fd, tcp, EPOLLIN);
+
     return 0;
 }
 
@@ -244,8 +246,6 @@ void Mainloop::handle_tcp_connection()
 
     if (_add_tcp_endpoint(tcp) < 0)
         goto add_error;
-
-    add_fd(fd, tcp, EPOLLIN);
 
     log_debug("Accepted TCP connection on [%d]", fd);
     return;
@@ -388,7 +388,6 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct opt *opt)
                 log_error("Could not open %s:%ld", conf->address, conf->port);
                 return false;
             }
-            mainloop.add_fd(tcp->fd, tcp.get(), EPOLLIN);
             tcp.release();
             break;
         }
