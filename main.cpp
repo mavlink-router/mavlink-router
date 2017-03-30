@@ -313,7 +313,7 @@ static int parse_argv(int argc, char *argv[])
     static const struct option options[] = {
         { "baudrate",               required_argument,  NULL,   'b' },
         { "endpoints",              required_argument,  NULL,   'e' },
-        { "conf-file",              required_argument,  NULL,   'i' },
+        { "conf-file",              required_argument,  NULL,   'c' },
         { "conf-dir" ,              required_argument,  NULL,   'd' },
         { "report_msg_statistics",  no_argument,        NULL,   'r' },
         { "tcp-port",               required_argument,  NULL,   't' },
