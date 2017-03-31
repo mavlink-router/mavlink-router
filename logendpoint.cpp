@@ -81,7 +81,7 @@ int LogEndpoint::_get_file(const char *extension, char *filename, size_t filenam
         return log_error_errno(errno, "Could not open log dir (%m)");
     }
     // Close dir when leaving function.
-    std::shared_ptr<void> defer(dir, [](auto p) { closedir(p); });
+    std::shared_ptr<void> defer(dir, [](DIR *p) { closedir(p); });
 
     i = _get_prefix(dir);
 
