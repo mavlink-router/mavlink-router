@@ -57,15 +57,6 @@ AC_ARG_WITH([rootlibdir],
         [], [with_rootlibdir=$libdir])
 AC_SUBST([rootlibdir], [$with_rootlibdir])
 
-AC_ARG_WITH([dialect],
-            [AS_HELP_STRING([--with-dialect=common|ardupilotmega],[mavlink dialect to use [default=common]])],
-            [],
-            [with_dialect="common"])
-AS_IF([test $with_dialect != ardupilotmega -a $with_dialect != common ],
-      [AC_MSG_ERROR([invalid dialect $with_dialect. must be ´common´ or ´ardupilotmega´])],
-      [])
-AC_SUBST([DIALECT], [$with_dialect])
-
 #####################################################################
 # --enable-
 #####################################################################
@@ -98,6 +89,4 @@ AC_MSG_RESULT([
 
 	C compiler:		${CC}
 	C++ compiler:		${CXX}
-
-	Mavlink dialect:	${with_dialect}
 ])
