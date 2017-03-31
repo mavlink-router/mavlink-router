@@ -43,7 +43,8 @@ static struct opt opt = {
         .tcp_port = ULONG_MAX,
         .report_msg_statistics = false,
         .logs_dir = nullptr,
-        .debug_log_level = LOG_INFO
+        .debug_log_level = LOG_INFO,
+        .mavlink_dialect = Common
 };
 
 static void help(FILE *fp) {
@@ -509,6 +510,19 @@ static int parse_conf(const char *conf_file_name)
             opt.report_msg_statistics = true;
         } else {
             opt.report_msg_statistics = false;
+        }
+    }
+
+    value = conf.next_from_section("General", "MavlinkDialect");
+    if (value) {
+        if (strcaseeq(value, "common")) {
+            opt.mavlink_dialect = Common;
+        } else if (strcaseeq(value, "ardupilotmega")) {
+            opt.mavlink_dialect = Ardupilotmega;
+        } else {
+            log_error("On file %s: invalid argument for MavlinkDialect = %s", conf_file_name,
+                      value);
+            return -EINVAL;
         }
     }
 

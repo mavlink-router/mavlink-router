@@ -14,28 +14,24 @@ AM_MAKEFLAGS = --no-print-directory
 GCC_COLORS ?= 'yes'
 export GCC_COLORS
 
-DIALECT=@DIALECT@
-
-BUILT_SOURCES = include/mavlink/$(DIALECT)/mavlink.h
-
-MAVLINK_XML=$(DIALECT).xml
+BUILT_SOURCES = include/mavlink/ardupilotmega/mavlink.h
 
 clean-local:
 	rm -rf $(top_builddir)/include/mavlink
 
-include/mavlink/$(DIALECT)/mavlink.h: modules/mavlink/pymavlink/tools/mavgen.py modules/mavlink/message_definitions/v1.0/$(MAVLINK_XML)
+include/mavlink/ardupilotmega/mavlink.h: modules/mavlink/pymavlink/tools/mavgen.py modules/mavlink/message_definitions/v1.0/ardupilotmega.xml
 	$(AM_V_GEN)python2 $(srcdir)/modules/mavlink/pymavlink/tools/mavgen.py \
 		-o include/mavlink \
 		--lang C \
 		--wire-protocol 2.0 \
-		$(srcdir)/modules/mavlink/message_definitions/v1.0/$(MAVLINK_XML)
+		$(srcdir)/modules/mavlink/message_definitions/v1.0/ardupilotmega.xml
 
 AM_CPPFLAGS = \
 	-include $(top_builddir)/config.h \
 	-I$(top_builddir) \
 	-I$(top_srcdir) \
 	-I$(top_builddir)/include/mavlink \
-	-I$(top_builddir)/include/mavlink/$(DIALECT) \
+	-I$(top_builddir)/include/mavlink/ardupilotmega \
 	-DSYSCONFDIR=\""$(sysconfdir)"\"
 
 AM_CFLAGS = \
