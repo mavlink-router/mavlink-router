@@ -368,7 +368,7 @@ static int parse_argv(int argc, char *argv[])
             break;
         }
         case 'l': {
-            opt.logs_dir = optarg;
+            opt.logs_dir = strdup(optarg);
             break;
         }
         case 'g': {
@@ -514,7 +514,8 @@ static int parse_conf(const char *conf_file_name)
 
     value = conf.next_from_section("General", "Log");
     if (value) {
-        opt.logs_dir = value;
+        free(opt.logs_dir);
+        opt.logs_dir = strdup(value);
     }
 
     value = conf.next_from_section("General", "LogDebugLevel");
@@ -776,6 +777,8 @@ int main(int argc, char *argv[])
     mainloop.loop();
 
     mainloop.free_endpoints(&opt);
+
+    free(opt.logs_dir);
 
     log_close();
 

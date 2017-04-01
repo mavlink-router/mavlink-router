@@ -93,6 +93,6 @@ struct opt {
     const char *conf_dir;
     unsigned long tcp_port;
     bool report_msg_statistics;
-    const char *logs_dir;
+    char *logs_dir;
     int debug_log_level;
 };
