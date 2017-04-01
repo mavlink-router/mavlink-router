@@ -501,7 +501,7 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
     ssize_t r = ::sendto(fd, pbuf->data, pbuf->len, 0,
                          (struct sockaddr *)&sockaddr, sizeof(sockaddr));
     if (r == -1) {
-        if (errno != EAGAIN && errno != ECONNREFUSED)
+        if (errno != EAGAIN && errno != ECONNREFUSED && errno != ENETUNREACH)
             log_error_errno(errno, "Error sending udp packet (%m)");
         return -errno;
     };
