@@ -367,7 +367,7 @@ int UartEndpoint::open(const char *path, speed_t baudrate)
         goto fail;
     }
 
-    log_info("Open UART [%d] %s *", fd, path);
+    log_info("Open UART [%d] %s:%u *", fd, path, baudrate);
 
     return fd;
 
