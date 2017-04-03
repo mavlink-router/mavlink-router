@@ -24,7 +24,7 @@
 #include <sys/stat.h>
 
 #include "comm.h"
-#include "conf.h"
+#include "conf_file.h"
 #include "endpoint.h"
 #include "log.h"
 #include "mainloop.h"

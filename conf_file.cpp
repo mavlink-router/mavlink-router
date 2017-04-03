@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-#include "conf.h"
+#include "conf_file.h"
 
 #include <assert.h>
 #include <ctype.h>

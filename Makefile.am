@@ -123,8 +123,8 @@ mavlink_routerd_SOURCES = \
 	binlog.cpp \
 	binlog.h \
 	comm.h \
-	conf.cpp \
-	conf.h \
+	conf_file.cpp \
+	conf_file.h \
 	endpoint.cpp \
 	endpoint.h \
 	log.c \
