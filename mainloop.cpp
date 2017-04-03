@@ -120,7 +120,6 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int sender_sysid)
 {
     if (target_sysid > 0) {
         Endpoint *target = nullptr;
-        struct endpoint_entry *tcp_target = nullptr;
 
         // First, check UART and UDP endpoints
         if (!target) {
@@ -137,7 +136,6 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int sender_sysid)
             for (struct endpoint_entry *e = g_tcp_endpoints; e; e = e->next) {
                 if (e->endpoint->get_system_id() == target_sysid) {
                     target = e->endpoint;
-                    tcp_target = e;
                     break;
                 }
             }
@@ -148,8 +146,7 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int sender_sysid)
                       target->fd);
 
             int r = write_msg(target, buf);
-            if (r == -EPIPE && tcp_target) {
-                tcp_target->remove = true;
+            if (r == -EPIPE && !target->is_valid()) {
                 should_process_tcp_hangups = true;
             }
         } else {
@@ -167,7 +164,6 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int sender_sysid)
             if (sender_sysid != e->endpoint->get_system_id()) {
                 int r = write_msg(e->endpoint, buf);
                 if (r == -EPIPE) {
-                    e->remove = true;
                     should_process_tcp_hangups = true;
                 }
             }
@@ -180,7 +176,7 @@ void Mainloop::process_tcp_hangups()
     // First, remove entries from the beginning of list, ensuring `g_tcp_endpoints` still
     // points to list beginning
     struct endpoint_entry **first = &g_tcp_endpoints;
-    while (*first && (*first)->remove) {
+    while (*first && !(*first)->endpoint->is_valid()) {
         struct endpoint_entry *next = (*first)->next;
         remove_fd((*first)->endpoint->fd);
         if ((*first)->endpoint->retry_timeout > 0) {
@@ -197,7 +193,7 @@ void Mainloop::process_tcp_hangups()
         struct endpoint_entry *prev = *first;
         struct endpoint_entry *current = prev->next;
         while (current) {
-            if (current->remove) {
+            if (!current->endpoint->is_valid()) {
                 prev->next = current->next;
                 remove_fd(current->endpoint->fd);
                 if (current->endpoint->retry_timeout > 0) {
@@ -290,13 +286,8 @@ void Mainloop::loop()
 
             if (events[i].events & EPOLLIN) {
                 r = p->handle_read();
-                if (r < 0 && dynamic_cast<TcpEndpoint*>(p)) {
-                    for (struct endpoint_entry *e = g_tcp_endpoints; e; e = e->next) {
-                        if (e->endpoint == p) {
-                            e->remove = true;
-                            break;
-                        }
-                    }
+                if (r < 0 && !p->is_valid()) {
+                    // Only TcpEndpoint may become invalid after a read
                     should_process_tcp_hangups = true;
                 }
             }

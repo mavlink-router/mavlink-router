@@ -26,7 +26,6 @@
 struct endpoint_entry {
     struct endpoint_entry *next;
     TcpEndpoint *endpoint;
-    bool remove;
 };
 
 class Mainloop {
