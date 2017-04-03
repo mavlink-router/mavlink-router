@@ -63,15 +63,17 @@ bool Endpoint::handle_canwrite()
     return r == -EAGAIN;
 }
 
-void Endpoint::handle_read()
+int Endpoint::handle_read()
 {
     assert(_mainloop);
 
-    int target_sysid;
+    int target_sysid, r;
     struct buffer buf{};
 
-    while (read_msg(&buf, &target_sysid) > 0)
+    while ((r = read_msg(&buf, &target_sysid)) > 0)
         _mainloop->route_msg(&buf, target_sysid, _system_id);
+
+    return r;
 }
 
 int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid)
@@ -584,12 +586,18 @@ fail:
 ssize_t TcpEndpoint::_read_msg(uint8_t *buf, size_t len)
 {
     socklen_t addrlen = sizeof(sockaddr);
+    errno = 0;
     ssize_t r = ::recvfrom(fd, buf, len, 0,
                            (struct sockaddr *)&sockaddr, &addrlen);
+
     if (r == -1 && errno == EAGAIN)
         return 0;
     if (r == -1)
         return -errno;
+
+    // a read of zero on a stream socket means that other side shut down
+    if (r == 0 && len != 0)
+        return EOF; // TODO is EOF always negative?
 
     return r;
 }

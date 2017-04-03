@@ -27,7 +27,7 @@ public:
     bool remove_me = false;
     Timeout *next = nullptr;
 
-    void handle_read() override;
+    int handle_read() override;
     bool handle_canwrite() override;
 
 private:

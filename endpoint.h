@@ -66,7 +66,7 @@ public:
     Endpoint(const char *name, bool crc_check_enabled);
     virtual ~Endpoint();
 
-    void handle_read() override;
+    int handle_read() override;
     bool handle_canwrite() override;
 
     void print_statistics();

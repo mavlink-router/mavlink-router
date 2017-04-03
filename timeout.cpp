@@ -28,16 +28,18 @@ Timeout::Timeout(std::function<bool(void*)> cb, const void *data)
     _data = data;
 }
 
-void Timeout::handle_read()
+int Timeout::handle_read()
 {
     uint64_t val = 0;
     int ret = read(fd, &val, sizeof(val));
 
     if (ret < 1 || val == 0 || remove_me)
-        return;
+        return 0;
 
     if (!_cb((void *)_data))
         remove_me = true;
+
+    return 0;
 }
 
 bool Timeout::handle_canwrite()
