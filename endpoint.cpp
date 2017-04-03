@@ -576,6 +576,7 @@ int TcpEndpoint::open(const char *ip, unsigned long port)
 
     log_info("Open TCP [%d] %s:%lu", fd, ip, port);
 
+    _valid = true;
     return fd;
 
 fail:
@@ -596,8 +597,10 @@ ssize_t TcpEndpoint::_read_msg(uint8_t *buf, size_t len)
         return -errno;
 
     // a read of zero on a stream socket means that other side shut down
-    if (r == 0 && len != 0)
+    if (r == 0 && len != 0) {
+        _valid = false;
         return EOF; // TODO is EOF always negative?
+    }
 
     return r;
 }
@@ -619,6 +622,8 @@ int TcpEndpoint::write_msg(const struct buffer *pbuf)
     if (r == -1) {
         if (errno != EAGAIN && errno != ECONNREFUSED)
             log_error_errno(errno, "Error sending tcp packet (%m)");
+        if (errno == EPIPE)
+            _valid = false;
         return -errno;
     };
 

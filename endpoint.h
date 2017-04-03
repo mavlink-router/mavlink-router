@@ -165,10 +165,13 @@ public:
         return _port;
     }
 
+    bool is_valid() override { return _valid; };
+
 protected:
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
 
 private:
     char *_ip = nullptr;
     unsigned long _port = 0;
+    bool _valid = true;
 };

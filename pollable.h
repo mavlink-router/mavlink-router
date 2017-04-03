@@ -27,4 +27,10 @@ public:
      * Return true if there still more messages to be flushed.
      */
     virtual bool handle_canwrite() = 0;
+
+    /**
+     * If a pollabe isn't valid anymore, it should be removed
+     * from poll.
+     */
+    virtual bool is_valid() { return true; };
 };
