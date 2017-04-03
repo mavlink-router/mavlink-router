@@ -288,8 +288,18 @@ void Mainloop::loop()
             }
             Pollable *p = static_cast<Pollable *>(events[i].data.ptr);
 
-            if (events[i].events & EPOLLIN)
-                p->handle_read();
+            if (events[i].events & EPOLLIN) {
+                r = p->handle_read();
+                if (r < 0 && dynamic_cast<TcpEndpoint*>(p)) {
+                    for (struct endpoint_entry *e = g_tcp_endpoints; e; e = e->next) {
+                        if (e->endpoint == p) {
+                            e->remove = true;
+                            break;
+                        }
+                    }
+                    should_process_tcp_hangups = true;
+                }
+            }
 
             if (events[i].events & EPOLLOUT) {
                 if (!p->handle_canwrite()) {

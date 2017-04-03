@@ -21,7 +21,7 @@ class Pollable {
 public:
     int fd = -1;
     virtual ~Pollable();
-    virtual void handle_read() = 0;
+    virtual int handle_read() = 0;
     /**
      * Flush any pending messages.
      * Return true if there still more messages to be flushed.
