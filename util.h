@@ -18,8 +18,9 @@
 
 #pragma once
 
-#include <stdbool.h>
+#include <fcntl.h>
 #include <inttypes.h>
+#include <stdbool.h>
 #include <time.h>
 
 #include "macro.h"
@@ -49,6 +50,7 @@ int safe_atoi(const char *s, int *ret);
 usec_t now_usec(void);
 usec_t ts_usec(const struct timespec *ts);
 
+int mkdir_p(const char *path, int len, mode_t mode);
 #ifdef __cplusplus
 }
 #endif

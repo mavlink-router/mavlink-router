@@ -59,4 +59,5 @@ protected:
 private:
     int _get_file(const char *extension, char *filename_result, size_t filename_size);
     uint32_t _get_prefix(DIR *dir);
+    DIR *_open_or_create_dir(const char *name);
 };
