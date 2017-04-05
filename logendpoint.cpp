@@ -68,6 +68,24 @@ uint32_t LogEndpoint::_get_prefix(DIR *dir)
     return prefix;
 }
 
+DIR *LogEndpoint::_open_or_create_dir(const char *name)
+{
+    int r;
+    DIR *dir = opendir(name);
+
+    // If failed because dir doesn't exist, try to create it
+    if (!dir && errno == ENOENT) {
+        r = mkdir_p(name, strlen(name), 0755);
+        if (r < 0) {
+            errno = -r;
+            return NULL;
+        }
+        dir = opendir(name);
+    }
+
+    return dir;
+}
+
 int LogEndpoint::_get_file(const char *extension, char *filename, size_t filename_size)
 {
     time_t t = time(NULL);
@@ -76,7 +94,7 @@ int LogEndpoint::_get_file(const char *extension, char *filename, size_t filenam
     int j, r;
     DIR *dir;
 
-    dir = opendir(_logs_dir);
+    dir = _open_or_create_dir(_logs_dir);
     if (!dir) {
         return log_error_errno(errno, "Could not open log dir (%m)");
     }

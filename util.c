@@ -20,6 +20,9 @@
 #include <assert.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 usec_t ts_usec(const struct timespec *ts)
 {
@@ -100,5 +103,65 @@ int safe_atoi(const char *s, int *ret)
         return -ERANGE;
 
     *ret = (int) l;
+    return 0;
+}
+
+static inline int is_dir(const char *path)
+{
+    struct stat st;
+
+    if (stat(path, &st) >= 0)
+        return S_ISDIR(st.st_mode);
+
+    return -errno;
+}
+
+int mkdir_p(const char *path, int len, mode_t mode)
+{
+    char *start, *end;
+
+    start = strndupa(path, len);
+    end = start + len;
+
+    /*
+     * scan backwards, replacing '/' with '\0' while the component doesn't
+     * exist
+     */
+    for (;;) {
+        int r = is_dir(start);
+        if (r > 0) {
+            end += strlen(end);
+
+            if (end == start + len)
+                return 0;
+
+            /* end != start, since it would be caught on the first
+             * iteration */
+            *end = '/';
+            break;
+        } else if (r == 0)
+            return -ENOTDIR;
+
+        if (end == start)
+            break;
+
+        *end = '\0';
+
+        /* Find the next component, backwards, discarding extra '/'*/
+        while (end > start && *end != '/')
+            end--;
+
+        while (end > start && *(end - 1) == '/')
+            end--;
+    }
+
+    for (; end < start + len;) {
+        if (mkdir(start, mode) < 0 && errno != EEXIST)
+            return -errno;
+
+        end += strlen(end);
+        *end = '/';
+    }
+
     return 0;
 }
