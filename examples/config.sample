@@ -30,7 +30,7 @@
 #       Path to directory where to store flightstack log.
 #       No default value. If absent, no flightstack log will be stored.
 #
-#   LogDebugLevel
+#   DebugLogLevel
 #       One of <error>, <warning>, <info> or <debug>. Which debug log
 #       level is being used by mavlink-router, with <debug> being the
 #       most verbose.
