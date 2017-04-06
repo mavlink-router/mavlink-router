@@ -532,7 +532,7 @@ static int parse_conf(const char *conf_file_name)
         opt.logs_dir = strdup(value);
     }
 
-    value = conf.next_from_section("General", "LogDebugLevel");
+    value = conf.next_from_section("General", "DebugLogLevel");
     if (value) {
         int lvl = log_level_from_str(value);
         if (lvl == -EINVAL) {
