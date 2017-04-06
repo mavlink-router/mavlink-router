@@ -64,42 +64,7 @@ By default, mavlink-routerd looks for a file
 `/etc/mavlink-router/main.conf`. File location can be overriden via
 `MAVLINK_ROUTER_CONF_FILE` environment variable, or via `-c` switch when running
 mavlink-routerd.
-An example of conf file would be:
-
-```ini
-[General]
-#Mavlink-router serves on this TCP port
-TcpServerPort=5790
-ReportStats=false
-#Which mavlink dialect is being used. Can be `common`[default] or `ardupilotmega`
-MavlinkDialect=ardupilotmega
-
-[UdpEndpoint alfa]
-Mode = Eavesdropping
-Address = 0.0.0.0
-Port = 10000
-
-[UartEndpoint bravo]
-Device = /dev/tty0
-Baud = 52000
-
-[UdpEndpoint charlie]
-Mode = Normal
-Address = 127.0.0.1
-Port = 11000
-
-#Mavlink-router will connect to this TCP address
-[TcpEndpoint delta]
-Address = 127.0.0.1
-Port = 25790
-RetryTimeout=10
-```
-
-Note that `Port` is optional for endpoints whose `mode` is `normal`, as
-well as `baud` for UART endpoints.
-On TcpEndpoints, `RetryTimeout` is a time in seconds in which mavlink-router
-will try to reconnect a lost TCP connection. Default is 5 seconds, and setting
-it to zero disables reconnections.
+An example of conf file can be found on [examples/config.sample](examples/config.sample)
 
 #### Conf dirs ####
 
@@ -112,7 +77,7 @@ By default, `/etc/mavlink-router/config.d` is the directory, but it can be
 overriden via `MAVLINK_ROUTER_CONF_DIR` environment variable, or via `-d`
 switch when running mavlink-routerd.
 
-Suppose default configuration file contents are the same of section above,
+Suppose default configuration file defines an `UartEndpoint` using `Baud=56600`,
 an example of overriding configuration would be:
 
 ```ini
