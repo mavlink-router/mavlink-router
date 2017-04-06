@@ -57,6 +57,7 @@ It's also possible to route mavlinks packets from any interface using:
 mavlink-router also listens, by default, port 5760 for TCP connections. Any
 connection there will also receive routed packets.
 
+<a name="Conffiles"></a>
 ### Conf file ###
 
 It's also possible to use a .conf file to set options for mavlink-routerd.
@@ -86,6 +87,27 @@ Baud = 115200
 ```
 
 That would change `Endpoint bravo` baudrate to `115200`.
+
+### Flight stack logging ###
+
+Mavlink router can also collect flight stack log. It supports collecting
+both PX4 and Ardupilot flight stacks logs. To start logging, set a
+directory to `Log` key on `General` section of config file (or use
+argument option `-l`).
+Currently, mavlink router needs to be informed which MAVLink dialect
+flight speaks, `common` or `ardupilotmega`. To define it, use
+`MavlinkDialect` key. For instance, to collect Ardupilot logs to
+`/var/log/flight-stack` directory, one could add to conf file:
+
+    [General]
+    Log=/var/log/flight-stack
+    MavlinkDialect=ardupilotmega
+
+Logs are collected on `.bin` (for Ardupilot) or `.ulg` (for PX4) files
+inside specified directory. Note that they are named `XXXXX-date-time`,
+where `XXXXX` is an increasing number.
+
+For more information about configuration files, see [conf file section](#Conffiles).
 
 ### Contributing ###
 
