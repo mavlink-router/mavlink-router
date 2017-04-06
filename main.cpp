@@ -786,9 +786,11 @@ int main(int argc, char *argv[])
         opt.tcp_port = MAVLINK_TCP_PORT;
 
     if (!mainloop.add_endpoints(mainloop, &opt))
-        goto close_log;
+        goto endpoint_error;
 
+    log_debug("loop");
     mainloop.loop();
+    log_debug("end");
 
     mainloop.free_endpoints(&opt);
 
@@ -797,6 +799,10 @@ int main(int argc, char *argv[])
     log_close();
 
     return 0;
+
+endpoint_error:
+    mainloop.free_endpoints(&opt);
+    free(opt.logs_dir);
 
 close_log:
     log_close();
