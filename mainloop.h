@@ -23,6 +23,8 @@
 #include "timeout.h"
 #include "ulog.h"
 
+#define LOG_AGGREGATE_INTERVAL 5
+
 struct endpoint_entry {
     struct endpoint_entry *next;
     TcpEndpoint *endpoint;
@@ -56,15 +58,21 @@ private:
     endpoint_entry *g_tcp_endpoints;
     Endpoint **g_endpoints;
     int g_tcp_fd;
+    int _log_aggregate_interval = LOG_AGGREGATE_INTERVAL;
     LogEndpoint *_log_endpoint = nullptr;
 
     Timeout *_timeouts = nullptr;
+
+    struct {
+        uint32_t msg_to_unknown = 0;
+    } _errors_aggregate;
 
     int tcp_open(unsigned long tcp_port);
     void _del_timeouts();
     int _add_tcp_endpoint(TcpEndpoint *tcp);
     void _add_tcp_retry(TcpEndpoint *tcp);
     bool _retry_timeout_cb(void *data);
+    bool _log_aggregate_timeout(void *data);
 };
 
 enum endpoint_type { Tcp, Uart, Udp, Unknown };

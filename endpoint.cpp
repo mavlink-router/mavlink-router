@@ -333,6 +333,15 @@ uint8_t Endpoint::get_trimmed_zeros(const struct buffer *buffer)
     return msg_entry->msg_len - msg->payload_len;
 }
 
+void Endpoint::log_aggregate(int interval)
+{
+    if (_incomplete_msgs > 0) {
+        log_warning("Endpoint %s [%d] sysid %u: %u incomplete messages in the last %d seconds",
+                    _name, fd, _system_id, _incomplete_msgs, interval);
+        _incomplete_msgs = 0;
+    }
+}
+
 int UartEndpoint::open(const char *path, speed_t baudrate)
 {
     struct termios2 tc;
@@ -413,8 +422,8 @@ int UartEndpoint::write_msg(const struct buffer *pbuf)
 
     /* Incomplete packet, we warn and discard the rest */
     if (r != (ssize_t) pbuf->len) {
-        log_warning("Discarding packet, incomplete write %zd but len=%u",
-                    r, pbuf->len);
+        _incomplete_msgs++;
+        log_debug("Discarding packet, incomplete write %zd but len=%u", r, pbuf->len);
     }
 
     log_debug("UART: [%d] wrote %zd bytes", fd, r);
@@ -515,8 +524,8 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
 
     /* Incomplete packet, we warn and discard the rest */
     if (r != (ssize_t) pbuf->len) {
-        log_warning("Discarding packet, incomplete write %zd but len=%u",
-                    r, pbuf->len);
+        _incomplete_msgs++;
+        log_debug("Discarding packet, incomplete write %zd but len=%u", r, pbuf->len);
     }
 
     log_debug("UDP: [%d] wrote %zd bytes", fd, r);
@@ -634,8 +643,8 @@ int TcpEndpoint::write_msg(const struct buffer *pbuf)
 
     /* Incomplete packet, we warn and discard the rest */
     if (r != (ssize_t) pbuf->len) {
-        log_warning("Discarding packet, incomplete write %zd but len=%u",
-                    r, pbuf->len);
+        _incomplete_msgs++;
+        log_debug("Discarding packet, incomplete write %zd but len=%u", r, pbuf->len);
     }
 
     log_debug("TCP: [%d] wrote %zd bytes", fd, r);

@@ -150,7 +150,8 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int sender_sysid)
                 should_process_tcp_hangups = true;
             }
         } else {
-            log_error("Message to unknown sysid: %u", target_sysid);
+            _errors_aggregate.msg_to_unknown++;
+            log_debug("Message to unknown sysid: %u", target_sysid);
         }
     } else {
         log_debug("Routing message from %u to all other known endpoints", sender_sysid);
@@ -270,6 +271,9 @@ void Mainloop::loop()
     if (_log_endpoint)
         _log_endpoint->start();
 
+    add_timeout(_log_aggregate_interval * MSEC_PER_SEC,
+                std::bind(&Mainloop::_log_aggregate_timeout, this, std::placeholders::_1), this);
+
     while (!should_exit) {
         int i;
 
@@ -316,6 +320,24 @@ void Mainloop::loop()
         remove_fd(current->fd);
         delete current;
     }
+}
+
+bool Mainloop::_log_aggregate_timeout(void *data)
+{
+    if (_errors_aggregate.msg_to_unknown > 0) {
+        log_warning("%u messages to unknown endpoints in the last %d seconds",
+                    _errors_aggregate.msg_to_unknown, _log_aggregate_interval);
+        _errors_aggregate.msg_to_unknown = 0;
+    }
+
+    for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
+        (*e)->log_aggregate(_log_aggregate_interval);
+    }
+
+    for (auto *t = g_tcp_endpoints; t; t = t->next) {
+        t->endpoint->log_aggregate(_log_aggregate_interval);
+    }
+    return true;
 }
 
 void Mainloop::print_statistics()
