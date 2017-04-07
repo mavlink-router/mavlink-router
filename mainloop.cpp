@@ -331,7 +331,7 @@ static bool _print_statistics_timeout_cb(void *data)
     return true;
 }
 
-bool Mainloop::add_endpoints(Mainloop &mainloop, struct opt *opt)
+bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
 {
     unsigned n_endpoints = 0, i = 0;
     struct endpoint_config *conf;
@@ -416,7 +416,7 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct opt *opt)
     return true;
 }
 
-void Mainloop::free_endpoints(struct opt *opt)
+void Mainloop::free_endpoints(struct options *opt)
 {
     for (Endpoint **e = g_endpoints; *e; e++) {
         delete *e;

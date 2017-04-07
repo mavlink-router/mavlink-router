@@ -36,7 +36,7 @@
 #define DEFAULT_CONF_DIR "/etc/mavlink-router/config.d"
 #define DEFAULT_RETRY_TCP_TIMEOUT 5
 
-static struct opt opt = {
+static struct options opt = {
         .endpoints = nullptr,
         .conf_file_name = nullptr,
         .conf_dir = nullptr,

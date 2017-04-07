@@ -44,8 +44,8 @@ public:
     Timeout *add_timeout(uint32_t timeout_msec, std::function<bool(void*)> cb, const void *data);
     void del_timeout(Timeout *t);
 
-    void free_endpoints(struct opt *opt);
-    bool add_endpoints(Mainloop &mainloop, struct opt *opt);
+    void free_endpoints(struct options *opt);
+    bool add_endpoints(Mainloop &mainloop, struct options *opt);
 
     void print_statistics();
 
@@ -88,7 +88,7 @@ struct endpoint_config {
     };
 };
 
-struct opt {
+struct options {
     struct endpoint_config *endpoints;
     const char *conf_file_name;
     const char *conf_dir;
