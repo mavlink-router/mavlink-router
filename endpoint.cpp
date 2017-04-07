@@ -225,7 +225,9 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid)
     if (!_system_id && (!_crc_check_enabled || msg_entry))
         _system_id = sysid;
 
-    if (_system_id && _system_id != sysid)
+    /* Only print message if we would use this sysid. A msg with unknown id is not
+     * trustworth, as it may not have been crc checked. */
+    if (_system_id && _system_id != sysid && (!_crc_check_enabled || msg_entry))
         log_warning("Different system_id message for endpoint %d: Current: %u Read: %u", fd,
                     _system_id, sysid);
 
