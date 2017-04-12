@@ -268,7 +268,7 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid)
     pbuf->data = rx_buf.data;
     pbuf->len = expected_size;
 
-    return 1;
+    return msg_entry != nullptr ? ReadOk : ReadUnidentified;
 }
 
 bool Endpoint::_check_crc(const mavlink_msg_entry_t *msg_entry)
