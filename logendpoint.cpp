@@ -45,7 +45,7 @@ void LogEndpoint::_send_msg(const mavlink_message_t *msg, int target_sysid)
     };
 
     buffer.len = mavlink_msg_to_send_buffer(data, msg);
-    _mainloop->route_msg(&buffer, target_sysid, msg->sysid);
+    Mainloop::get_instance().route_msg(&buffer, target_sysid, msg->sysid);
 
     _stat.read.total++;
     _stat.read.handled++;
@@ -130,13 +130,14 @@ int LogEndpoint::_get_file(const char *extension, char *filename, size_t filenam
 
 void LogEndpoint::stop()
 {
+    Mainloop &mainloop = Mainloop::get_instance();
     if (_logging_start_timeout) {
-        _mainloop->del_timeout(_logging_start_timeout);
+        mainloop.del_timeout(_logging_start_timeout);
         _logging_start_timeout = nullptr;
     }
 
     if (_alive_check_timeout) {
-        _mainloop->del_timeout(_alive_check_timeout);
+        mainloop.del_timeout(_alive_check_timeout);
         _alive_check_timeout = nullptr;
     }
 
@@ -161,8 +162,8 @@ bool LogEndpoint::start()
         return false;
     }
 
-    _logging_start_timeout
-        = _mainloop->add_timeout(MSEC_PER_SEC, std::bind(&LogEndpoint::_start_timeout, this), this);
+    _logging_start_timeout = Mainloop::get_instance().add_timeout(
+        MSEC_PER_SEC, std::bind(&LogEndpoint::_start_timeout, this), this);
     if (!_logging_start_timeout) {
         log_error("Unable to add timeout");
         goto timeout_error;
@@ -192,13 +193,13 @@ bool LogEndpoint::_alive_timeout()
 
 void LogEndpoint::_remove_start_timeout()
 {
-    _mainloop->del_timeout(_logging_start_timeout);
+    Mainloop::get_instance().del_timeout(_logging_start_timeout);
     _logging_start_timeout = nullptr;
 }
 
 bool LogEndpoint::_start_alive_timeout()
 {
-    _alive_check_timeout = _mainloop->add_timeout(
+    _alive_check_timeout = Mainloop::get_instance().add_timeout(
         MSEC_PER_SEC * ALIVE_TIMEOUT, std::bind(&LogEndpoint::_alive_timeout, this), this);
     return !!_alive_check_timeout;
 }

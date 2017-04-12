@@ -48,6 +48,13 @@ static void setup_signal_handlers()
     sigaction(SIGPIPE, &sa, NULL);
 }
 
+Mainloop &Mainloop::get_instance()
+{
+    static Mainloop _instance;
+
+    return _instance;
+}
+
 int Mainloop::open()
 {
     if (epollfd != -1)
@@ -267,7 +274,6 @@ void Mainloop::loop()
         return;
 
     setup_signal_handlers();
-    Endpoint::set_Mainloop(this);
 
     if (_log_endpoint)
         _log_endpoint->start();

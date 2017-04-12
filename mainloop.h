@@ -52,6 +52,8 @@ public:
     int epollfd = -1;
     bool should_process_tcp_hangups = false;
 
+    static Mainloop &get_instance();
+
 private:
     static const unsigned int LOG_AGGREGATE_INTERVAL_SEC = 5;
 
@@ -72,6 +74,12 @@ private:
     void _add_tcp_retry(TcpEndpoint *tcp);
     bool _retry_timeout_cb(void *data);
     bool _log_aggregate_timeout(void *data);
+
+    Mainloop(){};
+    Mainloop(const Mainloop &) = delete;
+    Mainloop &operator=(const Mainloop &) = delete;
+
+    static Mainloop _instance;
 };
 
 enum endpoint_type { Tcp, Uart, Udp, Unknown };

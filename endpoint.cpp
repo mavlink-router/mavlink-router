@@ -36,8 +36,6 @@
 #define RX_BUF_MAX_SIZE (MAVLINK_MAX_PACKET_LEN * 4)
 #define TX_BUF_MAX_SIZE (8U * 1024U)
 
-Mainloop *Endpoint::_mainloop = nullptr;
-
 Endpoint::Endpoint(const char *name, bool crc_check_enabled)
     : _name{name}
     , _crc_check_enabled{crc_check_enabled}
@@ -65,13 +63,11 @@ bool Endpoint::handle_canwrite()
 
 int Endpoint::handle_read()
 {
-    assert(_mainloop);
-
     int target_sysid, r;
     struct buffer buf{};
 
     while ((r = read_msg(&buf, &target_sysid)) > 0)
-        _mainloop->route_msg(&buf, target_sysid, _system_id);
+        Mainloop::get_instance().route_msg(&buf, target_sysid, _system_id);
 
     return r;
 }

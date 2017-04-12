@@ -87,8 +87,6 @@ public:
 
     uint8_t get_system_id() { return _system_id; }
 
-    static void set_Mainloop(Mainloop *mainloop) { _mainloop = mainloop; }
-
     struct buffer rx_buf;
     struct buffer tx_buf;
 
@@ -120,8 +118,6 @@ protected:
     const bool _crc_check_enabled;
     uint32_t _incomplete_msgs = 0;
     uint8_t _system_id = 0;
-
-    static Mainloop *_mainloop;
 };
 
 class UartEndpoint : public Endpoint {
