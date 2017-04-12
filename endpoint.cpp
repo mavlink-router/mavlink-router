@@ -32,10 +32,13 @@
 
 #include "log.h"
 #include "mainloop.h"
+#include "util.h"
 #include "xtermios.h"
 
 #define RX_BUF_MAX_SIZE (MAVLINK_MAX_PACKET_LEN * 4)
 #define TX_BUF_MAX_SIZE (8U * 1024U)
+
+#define UART_BAUD_RETRY_SEC 5
 
 Endpoint::Endpoint(const char *name, bool crc_check_enabled)
     : _name{name}
@@ -462,6 +465,30 @@ fail:
     return -1;
 }
 
+bool UartEndpoint::_change_baud_cb(void *data)
+{
+    _current_baud_idx = (_current_baud_idx + 1) % _baudrates.size();
+
+    log_info("Retrying UART [%d] on new baudrate: %lu", fd, _baudrates[_current_baud_idx]);
+
+    set_speed(_baudrates[_current_baud_idx]);
+
+    return true;
+}
+
+int UartEndpoint::read_msg(struct buffer *pbuf, int *target_sysid)
+{
+    int ret = Endpoint::read_msg(pbuf, target_sysid);
+
+    if (_change_baud_timeout != nullptr && ret == ReadOk) {
+        log_info("Baudrate %lu responded, keeping it", _baudrates[_current_baud_idx]);
+        Mainloop::get_instance().del_timeout(_change_baud_timeout);
+        _change_baud_timeout = nullptr;
+    }
+
+    return ret;
+}
+
 ssize_t UartEndpoint::_read_msg(uint8_t *buf, size_t len)
 {
     ssize_t r = ::read(fd, buf, len);
@@ -501,6 +528,22 @@ int UartEndpoint::write_msg(const struct buffer *pbuf)
     log_debug("UART: [%d] wrote %zd bytes", fd, r);
 
     return r;
+}
+
+int UartEndpoint::add_speeds(std::vector<unsigned long> bauds)
+{
+    if (!bauds.size())
+        return -EINVAL;
+
+    _baudrates = bauds;
+
+    set_speed(_baudrates[0]);
+
+    _change_baud_timeout = Mainloop::get_instance().add_timeout(
+        MSEC_PER_SEC * UART_BAUD_RETRY_SEC,
+        std::bind(&UartEndpoint::_change_baud_cb, this, std::placeholders::_1), this);
+
+    return 0;
 }
 
 UdpEndpoint::UdpEndpoint()
