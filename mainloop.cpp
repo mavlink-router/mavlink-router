@@ -391,9 +391,16 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
         switch (conf->type) {
         case Uart: {
             std::unique_ptr<UartEndpoint> uart{new UartEndpoint{}};
-            if (uart->open(conf->device) < 0 ||
-                uart->set_speed(conf->baud) < 0)
+            if (uart->open(conf->device) < 0)
                 return false;
+
+            if (conf->bauds->size() == 1) {
+                if (uart->set_speed((*(conf->bauds))[0]) < 0)
+                    return false;
+            } else {
+                if (uart->add_speeds(*conf->bauds) < 0)
+                    return false;
+            }
 
             g_endpoints[i] = uart.release();
             mainloop.add_fd(g_endpoints[i]->fd, g_endpoints[i], EPOLLIN);
@@ -476,6 +483,7 @@ void Mainloop::free_endpoints(struct options *opt)
             free(e->address);
         } else {
             free(e->device);
+            delete e->bauds;
         }
         free(e->name);
         free(e);
