@@ -322,6 +322,9 @@ void Mainloop::print_statistics()
 {
     for (Endpoint **e = g_endpoints; *e != nullptr; e++)
         (*e)->print_statistics();
+
+    for (auto *t = g_tcp_endpoints; t; t = t->next)
+        t->endpoint->print_statistics();
 }
 
 static bool _print_statistics_timeout_cb(void *data)

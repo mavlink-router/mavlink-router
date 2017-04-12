@@ -297,7 +297,7 @@ void Endpoint::print_statistics()
 {
     const uint32_t read_total = _stat.read.total == 0 ? 1 : _stat.read.total;
 
-    printf("Endpoint %s sysid: %u {", _name, _system_id);
+    printf("Endpoint %s [%d] sysid: %u {", _name, fd, _system_id);
     printf("\n\tReceived messages {");
     printf("\n\t\tCRC error: %u %u%% %luKBytes", _stat.read.crc_error,
            (_stat.read.crc_error * 100) / read_total, _stat.read.crc_error_bytes / 1000);
