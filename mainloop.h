@@ -23,8 +23,6 @@
 #include "timeout.h"
 #include "ulog.h"
 
-#define LOG_AGGREGATE_INTERVAL 5
-
 struct endpoint_entry {
     struct endpoint_entry *next;
     TcpEndpoint *endpoint;
@@ -55,10 +53,11 @@ public:
     bool should_process_tcp_hangups = false;
 
 private:
+    static const unsigned int LOG_AGGREGATE_INTERVAL_SEC = 5;
+
     endpoint_entry *g_tcp_endpoints;
     Endpoint **g_endpoints;
     int g_tcp_fd;
-    int _log_aggregate_interval = LOG_AGGREGATE_INTERVAL;
     LogEndpoint *_log_endpoint = nullptr;
 
     Timeout *_timeouts = nullptr;

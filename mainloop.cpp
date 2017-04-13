@@ -271,7 +271,7 @@ void Mainloop::loop()
     if (_log_endpoint)
         _log_endpoint->start();
 
-    add_timeout(_log_aggregate_interval * MSEC_PER_SEC,
+    add_timeout(LOG_AGGREGATE_INTERVAL_SEC * MSEC_PER_SEC,
                 std::bind(&Mainloop::_log_aggregate_timeout, this, std::placeholders::_1), this);
 
     while (!should_exit) {
@@ -326,16 +326,16 @@ bool Mainloop::_log_aggregate_timeout(void *data)
 {
     if (_errors_aggregate.msg_to_unknown > 0) {
         log_warning("%u messages to unknown endpoints in the last %d seconds",
-                    _errors_aggregate.msg_to_unknown, _log_aggregate_interval);
+                    _errors_aggregate.msg_to_unknown, LOG_AGGREGATE_INTERVAL_SEC);
         _errors_aggregate.msg_to_unknown = 0;
     }
 
     for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
-        (*e)->log_aggregate(_log_aggregate_interval);
+        (*e)->log_aggregate(LOG_AGGREGATE_INTERVAL_SEC);
     }
 
     for (auto *t = g_tcp_endpoints; t; t = t->next) {
-        t->endpoint->log_aggregate(_log_aggregate_interval);
+        t->endpoint->log_aggregate(LOG_AGGREGATE_INTERVAL_SEC);
     }
     return true;
 }

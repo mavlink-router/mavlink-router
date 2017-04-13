@@ -333,11 +333,11 @@ uint8_t Endpoint::get_trimmed_zeros(const struct buffer *buffer)
     return msg_entry->msg_len - msg->payload_len;
 }
 
-void Endpoint::log_aggregate(int interval)
+void Endpoint::log_aggregate(unsigned int interval_sec)
 {
     if (_incomplete_msgs > 0) {
         log_warning("Endpoint %s [%d] sysid %u: %u incomplete messages in the last %d seconds",
-                    _name, fd, _system_id, _incomplete_msgs, interval);
+                    _name, fd, _system_id, _incomplete_msgs, interval_sec);
         _incomplete_msgs = 0;
     }
 }

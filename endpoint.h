@@ -73,7 +73,7 @@ public:
     virtual int write_msg(const struct buffer *pbuf) = 0;
     virtual int flush_pending_msgs() = 0;
 
-    void log_aggregate(int interval);
+    void log_aggregate(unsigned int interval_sec);
 
     uint8_t get_trimmed_zeros(const struct buffer *buffer);
 
