@@ -44,7 +44,7 @@ static struct options opt = {
         .report_msg_statistics = false,
         .logs_dir = nullptr,
         .debug_log_level = LOG_INFO,
-        .mavlink_dialect = Common
+        .mavlink_dialect = Auto
 };
 
 static void help(FILE *fp) {
@@ -515,7 +515,9 @@ static int parse_conf(const char *conf_file_name)
 
     value = conf.next_from_section("General", "MavlinkDialect");
     if (value) {
-        if (strcaseeq(value, "common")) {
+        if (strcaseeq(value, "auto")) {
+            opt.mavlink_dialect = Auto;
+        } else if (strcaseeq(value, "common")) {
             opt.mavlink_dialect = Common;
         } else if (strcaseeq(value, "ardupilotmega")) {
             opt.mavlink_dialect = Ardupilotmega;

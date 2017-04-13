@@ -68,7 +68,7 @@ private:
 };
 
 enum endpoint_type { Tcp, Uart, Udp, Unknown };
-enum mavlink_dialect { Common, Ardupilotmega };
+enum mavlink_dialect { Auto, Common, Ardupilotmega };
 
 struct endpoint_config {
     struct endpoint_config *next;

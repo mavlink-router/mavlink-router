@@ -120,6 +120,8 @@ AM_LDFLAGS = \
 
 bin_PROGRAMS += mavlink-routerd
 mavlink_routerd_SOURCES = \
+	autolog.cpp \
+	autolog.h \
 	binlog.cpp \
 	binlog.h \
 	comm.h \

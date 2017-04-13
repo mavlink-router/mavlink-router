@@ -24,6 +24,7 @@
 #include <sys/timerfd.h>
 #include <unistd.h>
 
+#include "autolog.h"
 #include "log.h"
 #include "util.h"
 
@@ -402,10 +403,12 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
         g_tcp_fd = tcp_open(opt->tcp_port);
 
     if (opt->logs_dir) {
-        if (opt->mavlink_dialect == Common) {
+        if (opt->mavlink_dialect == Ardupilotmega) {
+            _log_endpoint = new BinLog(opt->logs_dir);
+        } else if (opt->mavlink_dialect == Common) {
             _log_endpoint = new ULog(opt->logs_dir);
         } else {
-            _log_endpoint = new BinLog(opt->logs_dir);
+            _log_endpoint = new AutoLog(opt->logs_dir);
         }
         g_endpoints[i] = _log_endpoint;
     }
