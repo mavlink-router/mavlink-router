@@ -21,10 +21,11 @@
 #       Default: false
 #
 #   MavlinkDialect
-#       One of <common> or <ardupilotmega>. Defines which MAVLink dialect
-#       is being used by flight stack, so mavlink-router can log
-#       appropiately.
-#       Default: common
+#       One of <auto>, <common> or <ardupilotmega>. Defines which MAVLink
+#       dialect is being used by flight stack, so mavlink-router can log
+#       appropiately. If <auto>, mavlink-router will try to decide based
+#       on heartbeat received from flight stack.
+#       Default: auto
 #
 #   Log
 #       Path to directory where to store flightstack log.
