@@ -73,6 +73,8 @@ public:
     virtual int write_msg(const struct buffer *pbuf) = 0;
     virtual int flush_pending_msgs() = 0;
 
+    void log_aggregate(int interval);
+
     uint8_t get_trimmed_zeros(const struct buffer *buffer);
 
     uint8_t get_system_id() { return _system_id; }
@@ -108,7 +110,7 @@ protected:
     } _stat;
 
     const bool _crc_check_enabled;
-
+    uint32_t _incomplete_msgs = 0;
     uint8_t _system_id = 0;
 
     static Mainloop *_mainloop;
