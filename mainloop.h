@@ -55,9 +55,9 @@ public:
 private:
     static const unsigned int LOG_AGGREGATE_INTERVAL_SEC = 5;
 
-    endpoint_entry *g_tcp_endpoints;
-    Endpoint **g_endpoints;
-    int g_tcp_fd;
+    endpoint_entry *g_tcp_endpoints = nullptr;
+    Endpoint **g_endpoints = nullptr;
+    int g_tcp_fd = -1;
     LogEndpoint *_log_endpoint = nullptr;
 
     Timeout *_timeouts = nullptr;
