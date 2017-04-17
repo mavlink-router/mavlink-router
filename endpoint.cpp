@@ -81,7 +81,7 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid)
     bool should_read_more = true;
     uint32_t msg_id;
     const mavlink_msg_entry_t *msg_entry;
-    uint8_t *payload, seq, sysid;
+    uint8_t *payload, seq, sysid, payload_len;
 
     if (fd < 0) {
         log_error("Trying to read invalid fd");
@@ -171,6 +171,7 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid)
         payload = rx_buf.data + sizeof(*hdr);
         seq = hdr->seq;
         sysid = hdr->sysid;
+        payload_len = hdr->payload_len;
 
         expected_size = sizeof(*hdr);
         expected_size += hdr->payload_len;
@@ -188,6 +189,7 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid)
         payload = rx_buf.data + sizeof(*hdr);
         seq = hdr->seq;
         sysid = hdr->sysid;
+        payload_len = hdr->payload_len;
 
         expected_size = sizeof(*hdr);
         expected_size += hdr->payload_len;
@@ -236,8 +238,14 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid)
     if (msg_entry == nullptr) {
         log_debug("No message entry for %u", msg_id);
     } else {
-        if (msg_entry->flags & MAV_MSG_ENTRY_FLAG_HAVE_TARGET_SYSTEM)
-            *target_sysid = payload[msg_entry->target_system_ofs];
+        if (msg_entry->flags & MAV_MSG_ENTRY_FLAG_HAVE_TARGET_SYSTEM) {
+            // if target_system is 0, it may have been trimmed out on mavlink2
+            if (msg_entry->target_system_ofs < payload_len) {
+                *target_sysid = payload[msg_entry->target_system_ofs];
+            } else {
+                *target_sysid = 0;
+            }
+        }
     }
 
     // Check for sequence drops
