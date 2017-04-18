@@ -27,11 +27,9 @@ import subprocess
 import sys
 import time
 
-log_file = open("test.log", 'w')
-
 
 def log(s):
-    log_file.write("%s\n" % s)
+    print("%s\n" % s)
 
 
 class MavlinkSender(Thread):
@@ -126,11 +124,11 @@ if __name__ == "__main__":
     # Setup mavlink-router
     proc = subprocess.Popen(
         [
-            sys.argv[1], "-e", "127.0.0.1:10100", "-e", "127.0.0.1:10101",
-            "127.0.0.1:10000", "127.0.0.1:10001"
+            "./mavlink-routerd", "-e", "127.0.0.1:10100", "-e",
+            "127.0.0.1:10101", "127.0.0.1:10000", "127.0.0.1:10001"
         ],
-        stderr=log_file.fileno(),
-        stdout=log_file.fileno())
+        stderr=sys.stdout.fileno(),
+        stdout=sys.stdout.fileno())
 
     # Two senders: one send to all (target 0). The other sends to target 100
     sender0 = MavlinkSender("sender0", 10000, 1, 1, 0, 0)
@@ -179,10 +177,6 @@ if __name__ == "__main__":
         receiver100.accept(lambda msgs: expectLen(receiver100.name, msgs, 19)))
 
     if functools.reduce((lambda p, q: p and q), results):
-        log("All tests OK")
-        print("All tests OK")
+        log("Routing test OK")
     else:
-        log("Tests failed. See previous output for more information")
-        print("Tests failed. See test.log file for more information")
-
-    log_file.close()
+        log("Routing test FAILED. See previous output for more information")
