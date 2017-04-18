@@ -18,6 +18,8 @@ BUILT_SOURCES = include/mavlink/ardupilotmega/mavlink.h
 
 clean-local:
 	rm -rf $(top_builddir)/include/mavlink
+	rm -f $(top_builddir)/gtest.a
+	rm -f $(top_builddir)/tests/unit_test
 
 include/mavlink/ardupilotmega/mavlink.h: modules/mavlink/pymavlink/tools/mavgen.py modules/mavlink/message_definitions/v1.0/ardupilotmega.xml
 	$(AM_V_GEN)python2 $(srcdir)/modules/mavlink/pymavlink/tools/mavgen.py \
@@ -152,8 +154,29 @@ heartbeat_print_SOURCES = \
 
 noinst_SCRIPTS += examples/heartbeat-print.py
 
-test: mavlink-routerd
-	$(PYTHON) $(top_builddir)/tests/test.py $(top_builddir)/mavlink-routerd
+TESTS = unit_test \
+		tests/routing_test.py
+
+TEST_EXTENSIONS = .py
+PY_LOG_COMPILER = $(PYTHON)
+
+# ------------------------------------------------------------------------------
+# gtest
+# ------------------------------------------------------------------------------
+GTEST_ROOT = $(top_builddir)/modules/gtest/googletest
+GTEST_CPPFLAGS = -isystem $(GTEST_ROOT)/include
+GTEST_CXXFLAGS = -g -Wall -Wextra -pthread
+GTEST_SRCS_ = $(GTEST_ROOT)/src/*.cc $(GTEST_ROOT)/src/*.h $(GTEST_HEADERS)
+
+gtest-all.o: $(GTEST_SRCS_)
+	$(CXX) $(GTEST_CPPFLAGS) -I$(GTEST_ROOT) $(GTEST_CXXFLAGS) -c \
+		$(GTEST_ROOT)/src/gtest-all.cc
+
+gtest.a : gtest-all.o
+	$(AR) $(ARFLAGS) $@ $^
+
+unit_test: $(top_builddir)/tests/*.cpp gtest.a $(GTEST_HEADERS)
+	$(CXX) $(GTEST_CPPFLAGS) $(GTEST_CXXFLAGS) -lpthread $^ -o $@
 
 # ------------------------------------------------------------------------------
 # coverity
