@@ -75,7 +75,7 @@ private:
     bool _retry_timeout_cb(void *data);
     bool _log_aggregate_timeout(void *data);
 
-    Mainloop(){};
+    Mainloop() { }
     Mainloop(const Mainloop &) = delete;
     Mainloop &operator=(const Mainloop &) = delete;
 
