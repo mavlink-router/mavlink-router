@@ -61,10 +61,16 @@ struct _packed_ mavlink_router_mavlink1_header {
     uint8_t msgid;
 };
 
-enum read_msg_result { ReadOk = 1, ReadUnidentified };
-
 class Endpoint : public Pollable {
 public:
+    /*
+     * Success returns for @read_msg()
+     */
+    enum read_msg_result {
+        ReadOk = 1,
+        ReadUnkownMsg,
+    };
+
     Endpoint(const char *name, bool crc_check_enabled);
     virtual ~Endpoint();
 
