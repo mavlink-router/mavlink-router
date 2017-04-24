@@ -52,7 +52,20 @@ public:
     int epollfd = -1;
     bool should_process_tcp_hangups = false;
 
-    static Mainloop &get_instance();
+    /*
+     * Return singleton for this class, tied to the main thread. It needds to
+     * be called after a call to Mainloop::init().
+     */
+    static Mainloop &get_instance()
+    {
+        assert(_initialized);
+        return _instance;
+    }
+
+    /*
+     * Initialize and return singleton.
+     */
+    static Mainloop &init();
 
 private:
     static const unsigned int LOG_AGGREGATE_INTERVAL_SEC = 5;
@@ -80,6 +93,7 @@ private:
     Mainloop &operator=(const Mainloop &) = delete;
 
     static Mainloop _instance;
+    static bool _initialized;
 };
 
 enum endpoint_type { Tcp, Uart, Udp, Unknown };

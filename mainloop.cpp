@@ -30,6 +30,9 @@
 
 static volatile bool should_exit = false;
 
+Mainloop Mainloop::_instance{};
+bool Mainloop::_initialized = false;
+
 static void exit_signal_handler(int signum)
 {
     should_exit = true;
@@ -48,9 +51,11 @@ static void setup_signal_handlers()
     sigaction(SIGPIPE, &sa, NULL);
 }
 
-Mainloop &Mainloop::get_instance()
+Mainloop &Mainloop::init()
 {
-    static Mainloop _instance;
+    assert(_initialized == false);
+
+    _initialized = true;
 
     return _instance;
 }

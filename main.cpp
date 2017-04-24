@@ -769,7 +769,7 @@ fail:
 
 int main(int argc, char *argv[])
 {
-    Mainloop &mainloop = Mainloop::get_instance();
+    Mainloop &mainloop = Mainloop::init();
 
     log_open();
 
