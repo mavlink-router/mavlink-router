@@ -50,7 +50,6 @@ struct section {
 };
 
 struct conffile {
-    int fd;
     void *addr;
     size_t len;
     char *filename;
@@ -87,7 +86,9 @@ int ConfFile::parse(const char *filename)
         goto error;
     }
 
-    _files = new conffile{fd, addr, (size_t)fstat.st_size, strdup(filename), _files};
+    close(fd);
+
+    _files = new conffile{addr, (size_t)fstat.st_size, strdup(filename), _files};
 
     ret = _parse_file((char *)addr, (size_t)fstat.st_size, _files->filename);
     if (ret < 0) {
@@ -279,7 +280,6 @@ void ConfFile::release_all()
         _files = _files->next;
 
         munmap(f->addr, f->len);
-        close(f->fd);
         free(f->filename);
         delete f;
     }
