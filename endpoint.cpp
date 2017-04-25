@@ -545,6 +545,7 @@ TcpEndpoint::TcpEndpoint()
 
 TcpEndpoint::~TcpEndpoint()
 {
+    close();
     free(_ip);
 }
 
