@@ -557,6 +557,8 @@ int TcpEndpoint::accept(int listener_fd)
     if (fd == -1)
         return -1;
 
+    log_info("TCP connection [%d] accepted", fd);
+
     return fd;
 }
 
@@ -661,6 +663,9 @@ void TcpEndpoint::close()
 {
     if (fd > -1) {
         ::close(fd);
+
+        log_info("TCP Connection [%d] closed", fd);
     }
+
     fd = -1;
 }
