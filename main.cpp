@@ -20,6 +20,7 @@
 #include <dirent.h>
 #include <getopt.h>
 #include <limits.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <sys/stat.h>
 
@@ -126,22 +127,19 @@ static int log_level_from_str(const char *str)
     return -EINVAL;
 }
 
-static int add_tcp_endpoint_address(struct endpoint_config *conf, const char *name, const char *ip,
+static int add_tcp_endpoint_address(const char *name, size_t name_len, const char *ip,
                                     long unsigned port, int timeout)
 {
-    bool new_conf = false;
     int ret;
 
-    if (!conf) {
-        conf = (struct endpoint_config *)calloc(1, sizeof(struct endpoint_config));
-        assert_or_return(conf, -ENOMEM);
-        conf->type = Tcp;
-        conf->port = ULONG_MAX;
-        new_conf = true;
-    }
+    struct endpoint_config *conf
+        = (struct endpoint_config *)calloc(1, sizeof(struct endpoint_config));
+    assert_or_return(conf, -ENOMEM);
+    conf->type = Tcp;
+    conf->port = ULONG_MAX;
 
     if (!conf->name && name) {
-        conf->name = strdup(name);
+        conf->name = strndup(name, name_len);
         if (!conf->name) {
             ret = -ENOMEM;
             goto fail;
@@ -173,10 +171,8 @@ static int add_tcp_endpoint_address(struct endpoint_config *conf, const char *na
 
     conf->retry_timeout = timeout;
 
-    if (new_conf) {
-        conf->next = opt.endpoints;
-        opt.endpoints = conf;
-    }
+    conf->next = opt.endpoints;
+    opt.endpoints = conf;
 
     return 0;
 
@@ -188,22 +184,19 @@ fail:
     return ret;
 }
 
-static int add_endpoint_address(struct endpoint_config *conf, const char *name, const char *ip,
+static int add_endpoint_address(const char *name, size_t name_len, const char *ip,
                                 long unsigned port, bool eavesdropping)
 {
-    bool new_conf = false;
     int ret;
 
-    if (!conf) {
-        conf = (struct endpoint_config *)calloc(1, sizeof(struct endpoint_config));
-        assert_or_return(conf, -ENOMEM);
-        conf->type = Udp;
-        conf->port = ULONG_MAX;
-        new_conf = true;
-    }
+    struct endpoint_config *conf
+        = (struct endpoint_config *)calloc(1, sizeof(struct endpoint_config));
+    assert_or_return(conf, -ENOMEM);
+    conf->type = Udp;
+    conf->port = ULONG_MAX;
 
     if (!conf->name && name) {
-        conf->name = strdup(name);
+        conf->name = strndup(name, name_len);
         if (!conf->name) {
             ret = -ENOMEM;
             goto fail;
@@ -234,10 +227,8 @@ static int add_endpoint_address(struct endpoint_config *conf, const char *name, 
 
     conf->eavesdropping = eavesdropping;
 
-    if (new_conf) {
-        conf->next = opt.endpoints;
-        opt.endpoints = conf;
-    }
+    conf->next = opt.endpoints;
+    opt.endpoints = conf;
 
     return 0;
 
@@ -249,23 +240,20 @@ fail:
     return ret;
 }
 
-static int add_uart_endpoint(struct endpoint_config *conf, const char *name,
-                             const char *uart_device, unsigned long baudrate)
+static int add_uart_endpoint(const char *name, size_t name_len, const char *uart_device,
+                             unsigned long baudrate)
 {
-    bool new_conf = false;
     int ret;
 
-    if (!conf) {
-        conf = (struct endpoint_config *)calloc(1, sizeof(struct endpoint_config));
-        assert_or_return(conf, -ENOMEM);
-        conf->type = Uart;
-        conf->baud = ULONG_MAX;
-        new_conf = true;
-    }
+    struct endpoint_config *conf
+        = (struct endpoint_config *)calloc(1, sizeof(struct endpoint_config));
+    assert_or_return(conf, -ENOMEM);
+    conf->type = Uart;
+    conf->baud = ULONG_MAX;
 
     // As name doesn't change, only update if there's no name yet
     if (!conf->name && name) {
-        conf->name = strdup(name);
+        conf->name = strndup(name, name_len);
         if (!conf->name) {
             ret = -ENOMEM;
             goto fail;
@@ -294,10 +282,8 @@ static int add_uart_endpoint(struct endpoint_config *conf, const char *name,
         conf->baud = DEFAULT_BAUDRATE;
     }
 
-    if (new_conf) {
-        conf->next = opt.endpoints;
-        opt.endpoints = conf;
-    }
+    conf->next = opt.endpoints;
+    opt.endpoints = conf;
 
     return 0;
 
@@ -344,7 +330,7 @@ static int parse_argv(int argc, char *argv[])
                 return -EINVAL;
             }
 
-            add_endpoint_address(NULL, NULL, ip, port, false);
+            add_endpoint_address(NULL, 0, ip, port, false);
             free(ip);
             break;
         }
@@ -401,7 +387,7 @@ static int parse_argv(int argc, char *argv[])
                 return -EINVAL;
             }
 
-            add_tcp_endpoint_address(NULL, NULL, ip, port, DEFAULT_RETRY_TCP_TIMEOUT);
+            add_tcp_endpoint_address(NULL, 0, ip, port, DEFAULT_RETRY_TCP_TIMEOUT);
             free(ip);
             break;
         }
@@ -433,9 +419,9 @@ static int parse_argv(int argc, char *argv[])
                 return -EINVAL;
             }
 
-            add_endpoint_address(NULL, NULL, base, number, true);
+            add_endpoint_address(NULL, 0, base, number, true);
         } else {
-            int ret = add_uart_endpoint(NULL, NULL, base, number);
+            int ret = add_uart_endpoint(NULL, 0, base, number);
             if (ret < 0)
                 return ret;
         }
@@ -474,214 +460,184 @@ static const char *get_conf_dir()
     return DEFAULT_CONF_DIR;
 }
 
-static struct endpoint_config *search_endpoints(const char *name)
+static int parse_mavlink_dialect(const char *val, size_t val_len, void *storage, size_t storage_len)
 {
-    for (struct endpoint_config *conf = opt.endpoints; conf; conf = conf->next) {
-        if (conf->name && strcaseeq(conf->name, name)) {
-            return conf;
-        }
-    }
+    assert(val);
+    assert(storage);
+    assert(val_len);
 
-    return nullptr;
-}
+    enum mavlink_dialect *dialect = (enum mavlink_dialect *)storage;
 
-static int parse_conf(const char *conf_file_name)
-{
-    const char *value, *section;
-    int ret;
+    if (storage_len < sizeof(options::mavlink_dialect))
+        return -ENOBUFS;
+    if (val_len > INT_MAX)
+        return -EINVAL;
 
-    ConfFile conf{conf_file_name};
-
-    ret = conf.parse_file();
-
-    if (ret < 0) {
-        return ret;
-    }
-
-    value = conf.next_from_section("General", "TcpServerPort");
-    if (value && (safe_atoul(value, &opt.tcp_port) < 0)) {
-        log_error("On file %s: invalid argument for tcp-server-port = '%s'", conf_file_name, value);
+    if (memcaseeq(val, val_len, "auto", sizeof("auto") - 1)) {
+        *dialect = Auto;
+    } else if (memcaseeq(val, val_len, "common", sizeof("common") - 1)) {
+        *dialect = Common;
+    } else if (memcaseeq(val, val_len, "ardupilotmega", sizeof("ardupilotmega") - 1)) {
+        *dialect = Ardupilotmega;
+    } else {
+        log_error("Invalid argument for MavlinkDialect = %.*s", (int)val_len, val);
         return -EINVAL;
     }
 
-    value = conf.next_from_section("General", "ReportStats");
-    if (value) {
-        if (strcaseeq(value, "true") || !strcmp(value, "1")) {
-            opt.report_msg_statistics = true;
-        } else {
-            opt.report_msg_statistics = false;
-        }
+    return 0;
+}
+
+#define MAX_LOG_LEVEL_SIZE 10
+static int parse_log_level(const char *val, size_t val_len, void *storage, size_t storage_len)
+{
+    assert(val);
+    assert(storage);
+    assert(val_len);
+
+    if (storage_len < sizeof(options::debug_log_level))
+        return -ENOBUFS;
+    if (val_len > MAX_LOG_LEVEL_SIZE)
+        return -EINVAL;
+
+    const char *log_level = strndupa(val, val_len);
+    int lvl = log_level_from_str(log_level);
+    if (lvl == -EINVAL) {
+        log_error("Invalid argument for DebugLogLevel = %s", log_level);
+        return -EINVAL;
+    }
+    *((int *)storage) = lvl;
+
+    return 0;
+}
+#undef MAX_LOG_LEVEL_SIZE
+
+static int parse_mode(const char *val, size_t val_len, void *storage, size_t storage_len)
+{
+    assert(val);
+    assert(storage);
+    assert(val_len);
+
+    if (storage_len < sizeof(bool))
+        return -ENOBUFS;
+    if (val_len > INT_MAX)
+        return -EINVAL;
+
+    bool *eavesdropping = (bool *)storage;
+    if (memcaseeq(val, val_len, "normal", sizeof("normal") - 1)) {
+        *eavesdropping = false;
+    } else if (memcaseeq(val, val_len, "eavesdropping", sizeof("eavesdropping") - 1)) {
+        *eavesdropping = true;
+    } else {
+        log_error("Unknown 'mode' key: %.*s", (int)val_len, val);
+        return -EINVAL;
     }
 
-    value = conf.next_from_section("General", "MavlinkDialect");
-    if (value) {
-        if (strcaseeq(value, "auto")) {
-            opt.mavlink_dialect = Auto;
-        } else if (strcaseeq(value, "common")) {
-            opt.mavlink_dialect = Common;
-        } else if (strcaseeq(value, "ardupilotmega")) {
-            opt.mavlink_dialect = Ardupilotmega;
-        } else {
-            log_error("On file %s: invalid argument for MavlinkDialect = %s", conf_file_name,
-                      value);
-            return -EINVAL;
-        }
+    return 0;
+}
+
+static int parse_confs(ConfFile &conf)
+{
+    int ret;
+    size_t offset;
+    struct ConfFile::section_iter iter;
+    const char *pattern;
+
+    static const ConfFile::OptionsTable option_table[] = {
+        {"TcpServerPort", false, ConfFile::parse_ul, OPTIONS_TABLE_STRUCT_FIELD(options, tcp_port)},
+        {"ReportStats", false, ConfFile::parse_bool,
+         OPTIONS_TABLE_STRUCT_FIELD(options, report_msg_statistics)},
+        {"MavlinkDialect", false, parse_mavlink_dialect,
+         OPTIONS_TABLE_STRUCT_FIELD(options, mavlink_dialect)},
+        {"Log", false, ConfFile::parse_str_dup, OPTIONS_TABLE_STRUCT_FIELD(options, logs_dir)},
+        {"DebugLogLevel", false, parse_log_level,
+         OPTIONS_TABLE_STRUCT_FIELD(options, debug_log_level)},
+    };
+
+    struct option_uart {
+        char *device;
+        unsigned long baud;
+    };
+    static const ConfFile::OptionsTable option_table_uart[] = {
+        {"baud", false, ConfFile::parse_ul, OPTIONS_TABLE_STRUCT_FIELD(option_uart, baud)},
+        {"device", true, ConfFile::parse_str_dup, OPTIONS_TABLE_STRUCT_FIELD(option_uart, device)},
+    };
+
+    struct option_udp {
+        char *addr;
+        bool eavesdropping;
+        unsigned long port;
+    };
+    static const ConfFile::OptionsTable option_table_udp[] = {
+        {"address", true, ConfFile::parse_str_dup, OPTIONS_TABLE_STRUCT_FIELD(option_udp, addr)},
+        {"mode", true, parse_mode, OPTIONS_TABLE_STRUCT_FIELD(option_udp, eavesdropping)},
+        {"port", false, ConfFile::parse_ul, OPTIONS_TABLE_STRUCT_FIELD(option_udp, port)},
+    };
+
+    struct option_tcp {
+        char *addr;
+        unsigned long port;
+        int timeout;
+    };
+    static const ConfFile::OptionsTable option_table_tcp[] = {
+        {"address", true, ConfFile::parse_str_dup, OPTIONS_TABLE_STRUCT_FIELD(option_tcp, addr)},
+        {"port", true, ConfFile::parse_ul, OPTIONS_TABLE_STRUCT_FIELD(option_tcp, port)},
+        {"RetryTimeout", false, ConfFile::parse_i, OPTIONS_TABLE_STRUCT_FIELD(option_tcp, timeout)},
+    };
+
+    ret = conf.extract_options("General", option_table, ARRAY_SIZE(option_table), &opt);
+    if (ret < 0)
+        return ret;
+
+    iter = {};
+    pattern = "uartendpoint *";
+    offset = strlen(pattern) - 1;
+    while (conf.get_sections(pattern, &iter) == 0) {
+        struct option_uart opt_uart = {nullptr, ULONG_MAX};
+        ret = conf.extract_options(&iter, option_table_uart, ARRAY_SIZE(option_table_uart),
+                                   &opt_uart);
+        if (ret == 0)
+            ret = add_uart_endpoint(iter.name + offset, iter.name_len - offset, opt_uart.device,
+                                    opt_uart.baud);
+        free(opt_uart.device);
+        if (ret < 0)
+            return ret;
     }
 
-    value = conf.next_from_section("General", "Log");
-    if (value) {
-        free(opt.logs_dir);
-        opt.logs_dir = strdup(value);
-    }
-
-    value = conf.next_from_section("General", "DebugLogLevel");
-    if (value) {
-        int lvl = log_level_from_str(value);
-        if (lvl == -EINVAL) {
-            log_error("On file %s: invalid argument for DebugLogLevel = %s", conf_file_name,
-                      value);
-            return -EINVAL;
-        }
-        opt.debug_log_level = lvl;
-    }
-
-    section = conf.first_section();
-    while (section) {
-        const char *name = nullptr;
-        struct endpoint_config *endpoint = nullptr;
-        enum endpoint_type type = Unknown;
-
-        if (!strncasecmp(section, "tcpendpoint ", strlen("tcpendpoint "))) {
-            type = Tcp;
-            name = section + strlen("tcpendpoint");
-        } else if (!strncasecmp(section, "udpendpoint ", strlen("udpendpoint "))) {
-            type = Udp;
-            name = section + strlen("udpendpoint");
-        } else if (!strncasecmp(section, "uartendpoint ", strlen("uartendpoint "))) {
-            type = Uart;
-            name = section + strlen("uartendpoint");
-        } else {
-            section = conf.next_section();
-            continue;
-        }
-
-        // If we've seen this endpoint, keep it here
-        endpoint = search_endpoints(name);
-        if (endpoint && endpoint->type != type) {
-            log_error("On file %s: redefining type for %s", conf_file_name, section);
-            return -EINVAL;
-        }
-
-        switch (type) {
-        case Uart: {
-            const char *baudstr, *device;
-            unsigned long baud = ULONG_MAX;
-
-            device = conf.next_from_section(section, "device");
-            if (!device && !endpoint) {
-                log_error("On file %s: expected 'device' key for %s", conf_file_name, section);
-                return -EINVAL;
-            }
-
-            baudstr = conf.next_from_section(section, "baud");
-            if (baudstr && safe_atoul(baudstr, &baud) < 0) {
-                log_error("On file %s: invalid baudrate for %s", conf_file_name, section);
-                return -EINVAL;
-            }
-
-            ret = add_uart_endpoint(endpoint, name, device, baud);
-            if (ret < 0) {
-                return ret;
-            }
-            break;
-        }
-        case Udp: {
-            const char *addr, *portstr, *mode;
-            unsigned long port = ULONG_MAX;
-            bool eavesdropping;
-
-            addr = conf.next_from_section(section, "address");
-            if (!addr && !endpoint) {
-                log_error("On file %s: expected key 'address' for %s", conf_file_name, section);
-                return -EINVAL;
-            }
-
-            mode = conf.next_from_section(section, "mode");
-            if (!mode && !endpoint) {
-                log_error("On file %s: expected key 'mode' for %s", conf_file_name, section);
-                return -EINVAL;
-            }
-
-            portstr = conf.next_from_section(section, "port");
-            if (portstr && safe_atoul(portstr, &port) < 0) {
-                log_error("On file %s: invalid port for %s", conf_file_name, section);
-                return -EINVAL;
-            }
-
-            if (mode) {
-                if (strcaseeq(mode, "normal")) {
-                    eavesdropping = false;
-                } else if (strcaseeq(mode, "eavesdropping")) {
-                    eavesdropping = true;
-                } else {
-                    log_error("On file %s: unknown 'mode' key for %s", conf_file_name, section);
-                    return -EINVAL;
-                }
+    iter = {};
+    pattern = "udpendpoint *";
+    offset = strlen(pattern) - 1;
+    while (conf.get_sections(pattern, &iter) == 0) {
+        struct option_udp opt_udp = {nullptr, false, ULONG_MAX};
+        ret = conf.extract_options(&iter, option_table_udp, ARRAY_SIZE(option_table_udp), &opt_udp);
+        if (ret == 0) {
+            if (opt_udp.eavesdropping && opt_udp.port == ULONG_MAX) {
+                log_error("Expected 'port' key for section %.*s", (int)iter.name_len, iter.name);
+                ret = -EINVAL;
             } else {
-                eavesdropping = endpoint->eavesdropping;
+                ret = add_endpoint_address(iter.name + offset, iter.name_len - offset, opt_udp.addr,
+                                           opt_udp.port, opt_udp.eavesdropping);
             }
-
-            // Eavesdroppoing (or master) udp endpoints need an explicit port
-            if (port == ULONG_MAX && !endpoint) {
-                if (eavesdropping) {
-                    log_error("On file %s: expected 'port' key for %s", conf_file_name, section);
-                    return -EINVAL;
-                }
-                port = find_next_endpoint_port(addr);
-            }
-
-            ret = add_endpoint_address(endpoint, name, addr, port, eavesdropping);
-            if (ret < 0) {
-                return ret;
-            }
-            break;
-        }
-        case Tcp: {
-            const char *addr, *portstr, *timeoutstr;
-            unsigned long port = ULONG_MAX;
-            int timeout = DEFAULT_RETRY_TCP_TIMEOUT;
-
-            addr = conf.next_from_section(section, "address");
-            if (!addr && !endpoint) {
-                log_error("On file %s: expected key 'address' for %s", conf_file_name, section);
-                return -EINVAL;
-            }
-
-            portstr = conf.next_from_section(section, "port");
-            if (portstr && safe_atoul(portstr, &port) < 0) {
-                log_error("On file %s: invalid port for %s", conf_file_name, section);
-                return -EINVAL;
-            }
-
-            timeoutstr = conf.next_from_section(section, "RetryTimeout");
-            if (timeoutstr && safe_atoi(timeoutstr, &timeout) < 0) {
-                log_error("On file %s: invalid timeout for %s", conf_file_name, section);
-                return -EINVAL;
-            }
-
-            ret = add_tcp_endpoint_address(endpoint, name, addr, port, timeout);
-            if (ret < 0) {
-                return ret;
-            }
-
-            break;
-        }
-        default:
-            log_info("On file %s: Unknown type for %s", conf_file_name, section);
-            return -EINVAL;
         }
 
-        section = conf.next_section();
+        free(opt_udp.addr);
+        if (ret < 0)
+            return ret;
+    }
+
+    iter = {};
+    pattern = "tcpendpoint *";
+    offset = strlen(pattern) - 1;
+    while (conf.get_sections(pattern, &iter) == 0) {
+        struct option_tcp opt_tcp = {nullptr, ULONG_MAX, DEFAULT_RETRY_TCP_TIMEOUT};
+        ret = conf.extract_options(&iter, option_table_tcp, ARRAY_SIZE(option_table_tcp), &opt_tcp);
+
+        if (ret == 0) {
+            ret = add_tcp_endpoint_address(iter.name + offset, iter.name_len - offset, opt_tcp.addr,
+                                           opt_tcp.port, opt_tcp.timeout);
+        }
+        free(opt_tcp.addr);
+        if (ret < 0)
+            return ret;
     }
 
     return 0;
@@ -700,22 +656,22 @@ static int parse_conf_files()
     int ret = 0;
     char *files[128] = {};
     int i = 0, j = 0;
+    ConfFile conf;
 
     // First, open default conf file
     filename = get_conf_file_name();
-    ret = parse_conf(filename);
+    ret = conf.parse(filename);
 
     // If there's no default conf file, everything is good
-    if (ret < 0 && ret != -EIO) {
+    if (ret < 0 && ret != -ENOENT) {
         return ret;
     }
 
     dirname = get_conf_dir();
     // Then, parse all files on configuration directory
     dir = opendir(dirname);
-    if (!dir) {
-        return 0;
-    }
+    if (!dir)
+        return parse_confs(conf);
 
     while ((ent = readdir(dir))) {
         char path[PATH_MAX];
@@ -746,17 +702,15 @@ static int parse_conf_files()
     qsort(files, (size_t)i, sizeof(char *), cmpstr);
 
     for (j = 0; j < i; j++) {
-        ret = parse_conf(files[j]);
-        if (ret < 0) {
+        ret = conf.parse(files[j]);
+        if (ret < 0)
             goto fail;
-        }
         free(files[j]);
     }
 
     closedir(dir);
 
-    return 0;
-
+    return parse_confs(conf);
 fail:
     while (j < i) {
         free(files[j++]);
@@ -790,9 +744,7 @@ int main(int argc, char *argv[])
     if (!mainloop.add_endpoints(mainloop, &opt))
         goto endpoint_error;
 
-    log_debug("loop");
     mainloop.loop();
-    log_debug("end");
 
     mainloop.free_endpoints(&opt);
 
