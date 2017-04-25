@@ -543,14 +543,11 @@ static int parse_confs(ConfFile &conf)
     const char *pattern;
 
     static const ConfFile::OptionsTable option_table[] = {
-        {"TcpServerPort", false, ConfFile::parse_ul, OPTIONS_TABLE_STRUCT_FIELD(options, tcp_port)},
-        {"ReportStats", false, ConfFile::parse_bool,
-         OPTIONS_TABLE_STRUCT_FIELD(options, report_msg_statistics)},
-        {"MavlinkDialect", false, parse_mavlink_dialect,
-         OPTIONS_TABLE_STRUCT_FIELD(options, mavlink_dialect)},
-        {"Log", false, ConfFile::parse_str_dup, OPTIONS_TABLE_STRUCT_FIELD(options, logs_dir)},
-        {"DebugLogLevel", false, parse_log_level,
-         OPTIONS_TABLE_STRUCT_FIELD(options, debug_log_level)},
+        {"TcpServerPort",   false, ConfFile::parse_ul,      OPTIONS_TABLE_STRUCT_FIELD(options, tcp_port)},
+        {"ReportStats",     false, ConfFile::parse_bool,    OPTIONS_TABLE_STRUCT_FIELD(options, report_msg_statistics)},
+        {"MavlinkDialect",  false, parse_mavlink_dialect,   OPTIONS_TABLE_STRUCT_FIELD(options, mavlink_dialect)},
+        {"Log",             false, ConfFile::parse_str_dup, OPTIONS_TABLE_STRUCT_FIELD(options, logs_dir)},
+        {"DebugLogLevel",   false, parse_log_level,         OPTIONS_TABLE_STRUCT_FIELD(options, debug_log_level)},
     };
 
     struct option_uart {
@@ -558,8 +555,8 @@ static int parse_confs(ConfFile &conf)
         unsigned long baud;
     };
     static const ConfFile::OptionsTable option_table_uart[] = {
-        {"baud", false, ConfFile::parse_ul, OPTIONS_TABLE_STRUCT_FIELD(option_uart, baud)},
-        {"device", true, ConfFile::parse_str_dup, OPTIONS_TABLE_STRUCT_FIELD(option_uart, device)},
+        {"baud",    false,  ConfFile::parse_ul,         OPTIONS_TABLE_STRUCT_FIELD(option_uart, baud)},
+        {"device",  true,   ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_uart, device)},
     };
 
     struct option_udp {
@@ -568,9 +565,9 @@ static int parse_confs(ConfFile &conf)
         unsigned long port;
     };
     static const ConfFile::OptionsTable option_table_udp[] = {
-        {"address", true, ConfFile::parse_str_dup, OPTIONS_TABLE_STRUCT_FIELD(option_udp, addr)},
-        {"mode", true, parse_mode, OPTIONS_TABLE_STRUCT_FIELD(option_udp, eavesdropping)},
-        {"port", false, ConfFile::parse_ul, OPTIONS_TABLE_STRUCT_FIELD(option_udp, port)},
+        {"address", true,   ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_udp, addr)},
+        {"mode",    true,   parse_mode,                 OPTIONS_TABLE_STRUCT_FIELD(option_udp, eavesdropping)},
+        {"port",    false,  ConfFile::parse_ul,         OPTIONS_TABLE_STRUCT_FIELD(option_udp, port)},
     };
 
     struct option_tcp {
@@ -579,9 +576,9 @@ static int parse_confs(ConfFile &conf)
         int timeout;
     };
     static const ConfFile::OptionsTable option_table_tcp[] = {
-        {"address", true, ConfFile::parse_str_dup, OPTIONS_TABLE_STRUCT_FIELD(option_tcp, addr)},
-        {"port", true, ConfFile::parse_ul, OPTIONS_TABLE_STRUCT_FIELD(option_tcp, port)},
-        {"RetryTimeout", false, ConfFile::parse_i, OPTIONS_TABLE_STRUCT_FIELD(option_tcp, timeout)},
+        {"address",         true,   ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_tcp, addr)},
+        {"port",            true,   ConfFile::parse_ul,         OPTIONS_TABLE_STRUCT_FIELD(option_tcp, port)},
+        {"RetryTimeout",    false,  ConfFile::parse_i,          OPTIONS_TABLE_STRUCT_FIELD(option_tcp, timeout)},
     };
 
     ret = conf.extract_options("General", option_table, ARRAY_SIZE(option_table), &opt);
