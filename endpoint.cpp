@@ -347,7 +347,42 @@ void Endpoint::log_aggregate(unsigned int interval_sec)
     }
 }
 
-int UartEndpoint::open(const char *path, speed_t baudrate)
+int UartEndpoint::set_speed(speed_t baudrate)
+{
+    struct termios2 tc;
+
+    if (fd < 0) {
+        return -1;
+    }
+
+    bzero(&tc, sizeof(tc));
+    if (ioctl(fd, TCGETS2, &tc) == -1) {
+        log_error_errno(errno, "Could not get termios2 (%m)");
+        return -1;
+    }
+
+    /* speed is configured by c_[io]speed */
+    tc.c_cflag &= ~CBAUD;
+    tc.c_cflag |= BOTHER;
+    tc.c_ispeed = baudrate;
+    tc.c_ospeed = baudrate;
+
+    if (ioctl(fd, TCSETS2, &tc) == -1) {
+        log_error_errno(errno, "Could not set terminal attributes (%m)");
+        return -1;
+    }
+
+    log_info("UART [%d] speed = %u", fd, baudrate);
+
+    if (ioctl(fd, TCFLSH, TCIOFLUSH) == -1) {
+        log_error_errno(errno, "Could not flush terminal (%m)");
+        return -1;
+    }
+
+    return 0;
+}
+
+int UartEndpoint::open(const char *path)
 {
     struct termios2 tc;
 
@@ -384,11 +419,8 @@ int UartEndpoint::open(const char *path, speed_t baudrate)
     /* ignore modem control lines */
     tc.c_cflag |= CLOCAL;
 
-    /* 8 bits, speed is configured by c_[io]speed */
-    tc.c_cflag &= ~CBAUD;
-    tc.c_cflag |= CS8 | BOTHER;
-    tc.c_ispeed = baudrate;
-    tc.c_ospeed = baudrate;
+    /* 8 bits */
+    tc.c_cflag |= CS8;
 
     /* we use epoll to get notification of available bytes */
     tc.c_cc[VMIN] = 0;
@@ -404,7 +436,7 @@ int UartEndpoint::open(const char *path, speed_t baudrate)
         goto fail;
     }
 
-    log_info("Open UART [%d] %s:%u *", fd, path, baudrate);
+    log_info("Open UART [%d] %s *", fd, path);
 
     return fd;
 

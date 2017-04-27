@@ -127,7 +127,9 @@ public:
     int write_msg(const struct buffer *pbuf) override;
     int flush_pending_msgs() override { return -ENOSYS; }
 
-    int open(const char *path, speed_t baudrate);
+    int open(const char *path);
+    int set_speed(speed_t baudrate);
+
 protected:
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
 };

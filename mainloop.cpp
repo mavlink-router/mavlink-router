@@ -391,7 +391,8 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
         switch (conf->type) {
         case Uart: {
             std::unique_ptr<UartEndpoint> uart{new UartEndpoint{}};
-            if (uart->open(conf->device, conf->baud) < 0)
+            if (uart->open(conf->device) < 0 ||
+                uart->set_speed(conf->baud) < 0)
                 return false;
 
             g_endpoints[i] = uart.release();
