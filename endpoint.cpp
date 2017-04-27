@@ -371,14 +371,28 @@ int UartEndpoint::open(const char *path, speed_t baudrate)
 
     tc.c_iflag &= ~(IGNBRK | BRKINT | ICRNL | INLCR | PARMRK | INPCK | ISTRIP | IXON);
     tc.c_oflag &= ~(OCRNL | ONLCR | ONLRET | ONOCR | OFILL | OPOST);
-    tc.c_lflag &= ~(ECHO | ECHOE | ECHOK | ECHOCTL | ECHOKE | ECHONL | ICANON | IEXTEN | ISIG | TOSTOP);
-    tc.c_cflag &= ~(CSIZE | PARENB | CBAUD | CRTSCTS);
-    tc.c_cflag |= CS8 | BOTHER;
 
-    tc.c_cc[VMIN] = 0;
-    tc.c_cc[VTIME] = 0;
+    tc.c_lflag &= ~(ECHO | ECHOE | ECHOK | ECHOCTL | ECHOKE | ECHONL | ICANON | IEXTEN | ISIG);
+
+    /* never send SIGTTOU*/
+    tc.c_lflag &= ~(TOSTOP);
+
+    /* disable flow control */
+    tc.c_cflag &= ~(CRTSCTS);
+    tc.c_cflag &= ~(CSIZE | PARENB);
+
+    /* ignore modem control lines */
+    tc.c_cflag |= CLOCAL;
+
+    /* 8 bits, speed is configured by c_[io]speed */
+    tc.c_cflag &= ~CBAUD;
+    tc.c_cflag |= CS8 | BOTHER;
     tc.c_ispeed = baudrate;
     tc.c_ospeed = baudrate;
+
+    /* we use epoll to get notification of available bytes */
+    tc.c_cc[VMIN] = 0;
+    tc.c_cc[VTIME] = 0;
 
     if (ioctl(fd, TCSETS2, &tc) == -1) {
         log_error_errno(errno, "Could not set terminal attributes (%m)");
