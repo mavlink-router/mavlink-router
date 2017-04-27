@@ -371,7 +371,7 @@ int UartEndpoint::open(const char *path, speed_t baudrate)
 
     tc.c_iflag &= ~(IGNBRK | BRKINT | ICRNL | INLCR | PARMRK | INPCK | ISTRIP | IXON);
     tc.c_oflag &= ~(OCRNL | ONLCR | ONLRET | ONOCR | OFILL | OPOST);
-    tc.c_lflag &= ~(ECHO | ECHONL | ICANON | IEXTEN | ISIG | TOSTOP);
+    tc.c_lflag &= ~(ECHO | ECHOE | ECHOK | ECHOCTL | ECHOKE | ECHONL | ICANON | IEXTEN | ISIG | TOSTOP);
     tc.c_cflag &= ~(CSIZE | PARENB | CBAUD | CRTSCTS);
     tc.c_cflag |= CS8 | BOTHER;
 
