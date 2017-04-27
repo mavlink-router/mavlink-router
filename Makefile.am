@@ -146,7 +146,9 @@ mavlink_routerd_SOURCES = \
 	ulog.h \
 	ulog.cpp \
 	util.c \
-	util.h
+	util.h \
+	xtermios.cpp \
+	xtermios.h
 
 noinst_PROGRAMS += heartbeat-print
 heartbeat_print_SOURCES = \

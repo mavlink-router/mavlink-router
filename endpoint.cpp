@@ -32,6 +32,7 @@
 
 #include "log.h"
 #include "mainloop.h"
+#include "xtermios.h"
 
 #define RX_BUF_MAX_SIZE (MAVLINK_MAX_PACKET_LEN * 4)
 #define TX_BUF_MAX_SIZE (8U * 1024U)
@@ -354,6 +355,11 @@ int UartEndpoint::open(const char *path, speed_t baudrate)
     if (fd < 0) {
         log_error_errno(errno, "Could not open %s (%m)", path);
         return -1;
+    }
+
+    if (reset_uart(fd) < 0) {
+        log_error("Could not reset uart");
+        goto fail;
     }
 
     bzero(&tc, sizeof(tc));
