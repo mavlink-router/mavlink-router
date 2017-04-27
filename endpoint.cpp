@@ -347,6 +347,13 @@ void Endpoint::log_aggregate(unsigned int interval_sec)
     }
 }
 
+UartEndpoint::~UartEndpoint()
+{
+    if (fd > 0) {
+        reset_uart(fd);
+    }
+}
+
 int UartEndpoint::set_speed(speed_t baudrate)
 {
     struct termios2 tc;

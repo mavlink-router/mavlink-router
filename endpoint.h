@@ -123,7 +123,7 @@ protected:
 class UartEndpoint : public Endpoint {
 public:
     UartEndpoint() : Endpoint{"UART", true} { }
-    virtual ~UartEndpoint() { }
+    virtual ~UartEndpoint();
     int write_msg(const struct buffer *pbuf) override;
     int flush_pending_msgs() override { return -ENOSYS; }
 
