@@ -96,7 +96,8 @@ int LogEndpoint::_get_file(const char *extension, char *filename, size_t filenam
 
     dir = _open_or_create_dir(_logs_dir);
     if (!dir) {
-        return log_error_errno(errno, "Could not open log dir (%m)");
+        log_error("Could not open log dir (%m)");
+        return -1;
     }
     // Close dir when leaving function.
     std::shared_ptr<void> defer(dir, [](DIR *p) { closedir(p); });
@@ -109,14 +110,16 @@ int LogEndpoint::_get_file(const char *extension, char *filename, size_t filenam
                      timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec, extension);
 
         if (r < 1 || (size_t)r >= filename_size) {
-            return log_error_errno(errno, "Error formatting Log file name: (%m)");
+            log_error("Error formatting Log file name: (%m)");
+            return -1;
         }
 
         r = openat(dirfd(dir), filename, O_WRONLY | O_CLOEXEC | O_CREAT | O_NONBLOCK | O_EXCL,
                    0644);
         if (r < 0) {
             if (errno != EEXIST) {
-                return log_error_errno(errno, "Unable to open Log file(%s): (%m)", filename);
+                log_error("Unable to open Log file(%s): (%m)", filename);
+                return -1;
             }
             continue;
         }

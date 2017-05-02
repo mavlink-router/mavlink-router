@@ -309,7 +309,7 @@ bool ULog::_logging_flush()
         if (r == 0 || (r == -1 && errno == EAGAIN))
             return true;
         if (r < 0) {
-            log_error_errno(errno, "Unable to write to ULog file: (%m)");
+            log_error("Unable to write to ULog file: (%m)");
             return false;
         }
 
@@ -334,7 +334,7 @@ bool ULog::_logging_flush()
         if (r == 0 || (r == -1 && errno == EAGAIN))
             break;
         if (r < 0) {
-            log_error_errno(errno, "Unable to write to ULog file: (%m)");
+            log_error("Unable to write to ULog file: (%m)");
             return false;
         }
 

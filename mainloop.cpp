@@ -68,7 +68,7 @@ int Mainloop::open()
     epollfd = epoll_create1(EPOLL_CLOEXEC);
 
     if (epollfd == -1) {
-        log_error_errno(errno, "%m");
+        log_error("%m");
         return -1;
     }
 
@@ -83,7 +83,7 @@ int Mainloop::mod_fd(int fd, void *data, int events)
     epev.data.ptr = data;
 
     if (epoll_ctl(epollfd, EPOLL_CTL_MOD, fd, &epev) < 0) {
-        log_error_errno(errno, "Could not mod fd (%m)");
+        log_error("Could not mod fd (%m)");
         return -1;
     }
 
@@ -98,7 +98,7 @@ int Mainloop::add_fd(int fd, void *data, int events)
     epev.data.ptr = data;
 
     if (epoll_ctl(epollfd, EPOLL_CTL_ADD, fd, &epev) < 0) {
-        log_error_errno(errno, "Could not add fd to epoll (%m)");
+        log_error("Could not add fd to epoll (%m)");
         return -1;
     }
 
@@ -108,7 +108,7 @@ int Mainloop::add_fd(int fd, void *data, int events)
 int Mainloop::remove_fd(int fd)
 {
     if (epoll_ctl(epollfd, EPOLL_CTL_DEL, fd, NULL) < 0) {
-        log_error_errno(errno, "Could not remove fd from epoll (%m)");
+        log_error("Could not remove fd from epoll (%m)");
         return -1;
     }
 
@@ -265,7 +265,7 @@ add_error:
     close(fd);
     errno = errno_copy;
 accept_error:
-    log_error_errno(errno, "Could not accept TCP connection (%m)");
+    log_error("Could not accept TCP connection (%m)");
     delete tcp;
 }
 
@@ -490,7 +490,7 @@ int Mainloop::tcp_open(unsigned long tcp_port)
 
     fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
     if (fd == -1) {
-        log_error_errno(errno, "Could not create tcp socket (%m)");
+        log_error("Could not create tcp socket (%m)");
         return -1;
     }
 
@@ -499,13 +499,13 @@ int Mainloop::tcp_open(unsigned long tcp_port)
     sockaddr.sin_addr.s_addr = INADDR_ANY;
 
     if (bind(fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) < 0) {
-        log_error_errno(errno, "Could not bind to tcp socket (%m)");
+        log_error("Could not bind to tcp socket (%m)");
         close(fd);
         return -1;
     }
 
     if (listen(fd, SOMAXCONN) < 0) {
-        log_error_errno(errno, "Could not listen on tcp socket (%m)");
+        log_error("Could not listen on tcp socket (%m)");
         close(fd);
         return -1;
     }
@@ -526,7 +526,7 @@ Timeout *Mainloop::add_timeout(uint32_t timeout_msec, std::function<bool(void*)>
 
     t->fd = timerfd_create(CLOCK_MONOTONIC, 0);
     if (t->fd < 0) {
-        log_error_errno(errno, "Unable to create timerfd: %m");
+        log_error("Unable to create timerfd: %m");
         goto error;
     }
 

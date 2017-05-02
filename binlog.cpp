@@ -169,14 +169,14 @@ void BinLog::_logging_data_process(mavlink_remote_log_data_block_t *msg)
     ssize_t r;
 
     if (lseek(_file, msg->seqno * MAVLINK_MSG_REMOTE_LOG_DATA_BLOCK_FIELD_DATA_LEN, SEEK_SET) < 0) {
-        log_error_errno(errno, "lseek failed (%m)");
+        log_error("lseek failed (%m)");
         _restart();
         return;
     }
 
     r = write(_file, msg->data, MAVLINK_MSG_REMOTE_LOG_DATA_BLOCK_FIELD_DATA_LEN);
     if (r < 0 && errno != EAGAIN) {
-        log_error_errno(errno, "Error writing data (%m)");
+        log_error("Error writing data (%m)");
         _restart();
         return;
     }

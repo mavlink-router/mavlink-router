@@ -364,7 +364,7 @@ int UartEndpoint::set_speed(speed_t baudrate)
 
     bzero(&tc, sizeof(tc));
     if (ioctl(fd, TCGETS2, &tc) == -1) {
-        log_error_errno(errno, "Could not get termios2 (%m)");
+        log_error("Could not get termios2 (%m)");
         return -1;
     }
 
@@ -375,14 +375,14 @@ int UartEndpoint::set_speed(speed_t baudrate)
     tc.c_ospeed = baudrate;
 
     if (ioctl(fd, TCSETS2, &tc) == -1) {
-        log_error_errno(errno, "Could not set terminal attributes (%m)");
+        log_error("Could not set terminal attributes (%m)");
         return -1;
     }
 
     log_info("UART [%d] speed = %u", fd, baudrate);
 
     if (ioctl(fd, TCFLSH, TCIOFLUSH) == -1) {
-        log_error_errno(errno, "Could not flush terminal (%m)");
+        log_error("Could not flush terminal (%m)");
         return -1;
     }
 
@@ -397,7 +397,7 @@ int UartEndpoint::open(const char *path)
 
     fd = ::open(path, O_RDWR|O_NONBLOCK|O_CLOEXEC|O_NOCTTY);
     if (fd < 0) {
-        log_error_errno(errno, "Could not open %s (%m)", path);
+        log_error("Could not open %s (%m)", path);
         return -1;
     }
 
@@ -409,7 +409,7 @@ int UartEndpoint::open(const char *path)
     bzero(&tc, sizeof(tc));
 
     if (ioctl(fd, TCGETS2, &tc) == -1) {
-        log_error_errno(errno, "Could not get termios2 (%m)");
+        log_error("Could not get termios2 (%m)");
         goto fail;
     }
 
@@ -436,19 +436,19 @@ int UartEndpoint::open(const char *path)
     tc.c_cc[VTIME] = 0;
 
     if (ioctl(fd, TCSETS2, &tc) == -1) {
-        log_error_errno(errno, "Could not set terminal attributes (%m)");
+        log_error("Could not set terminal attributes (%m)");
         goto fail;
     }
 
     /* set DTR/RTS */
     if (ioctl(fd, TIOCMBIS, &bit_dtr) == -1 ||
         ioctl(fd, TIOCMBIS, &bit_rts) == -1) {
-        log_error_errno(errno, "Could not set DTR/RTS (%m)");
+        log_error("Could not set DTR/RTS (%m)");
         goto fail;
     }
 
     if (ioctl(fd, TCFLSH, TCIOFLUSH) == -1) {
-        log_error_errno(errno, "Could not flush terminal (%m)");
+        log_error("Could not flush terminal (%m)");
         goto fail;
     }
 
@@ -514,7 +514,7 @@ int UdpEndpoint::open(const char *ip, unsigned long port, bool to_bind)
     const int broadcast_val = 1;
     fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (fd == -1) {
-        log_error_errno(errno, "Could not create socket (%m)");
+        log_error("Could not create socket (%m)");
         return -1;
     }
 
@@ -524,18 +524,18 @@ int UdpEndpoint::open(const char *ip, unsigned long port, bool to_bind)
 
     if (to_bind) {
         if (bind(fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) < 0) {
-            log_error_errno(errno, "Error binding socket (%m)");
+            log_error("Error binding socket (%m)");
             goto fail;
         }
     } else {
         if (setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &broadcast_val, sizeof(broadcast_val))) {
-            log_error_errno(errno, "Error enabling broadcast in socket (%m)");
+            log_error("Error enabling broadcast in socket (%m)");
             goto fail;
         }
     }
 
     if (fcntl(fd, F_SETFL, O_NONBLOCK | FASYNC) < 0) {
-        log_error_errno(errno, "Error setting socket fd as non-blocking (%m)");
+        log_error("Error setting socket fd as non-blocking (%m)");
         goto fail;
     }
 
@@ -587,7 +587,7 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
                          (struct sockaddr *)&sockaddr, sizeof(sockaddr));
     if (r == -1) {
         if (errno != EAGAIN && errno != ECONNREFUSED && errno != ENETUNREACH)
-            log_error_errno(errno, "Error sending udp packet (%m)");
+            log_error("Error sending udp packet (%m)");
         return -errno;
     };
 
@@ -642,7 +642,7 @@ int TcpEndpoint::open(const char *ip, unsigned long port)
 
     fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd == -1) {
-        log_error_errno(errno, "Could not create socket (%m)");
+        log_error("Could not create socket (%m)");
         return -1;
     }
 
@@ -651,12 +651,12 @@ int TcpEndpoint::open(const char *ip, unsigned long port)
     sockaddr.sin_port = htons(port);
 
     if (connect(fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) < 0) {
-        log_error_errno(errno, "Error connecting to socket (%m)");
+        log_error("Error connecting to socket (%m)");
         goto fail;
     }
 
     if (fcntl(fd, F_SETFL, O_NONBLOCK | FASYNC) < 0) {
-        log_error_errno(errno, "Error setting socket fd as non-blocking (%m)");
+        log_error("Error setting socket fd as non-blocking (%m)");
         goto fail;
     }
 
@@ -707,7 +707,7 @@ int TcpEndpoint::write_msg(const struct buffer *pbuf)
                          (struct sockaddr *)&sockaddr, sizeof(sockaddr));
     if (r == -1) {
         if (errno != EAGAIN && errno != ECONNREFUSED)
-            log_error_errno(errno, "Error sending tcp packet (%m)");
+            log_error("Error sending tcp packet (%m)");
         if (errno == EPIPE)
             _valid = false;
         return -errno;
