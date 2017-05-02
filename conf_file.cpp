@@ -71,7 +71,7 @@ int ConfFile::parse(const char *filename)
 
     fd = open(filename, O_RDONLY | O_CLOEXEC);
     if (fd < 0) {
-        log_error_errno(errno, "Could not open conf file '%s' (%m)", filename);
+        log_error("Could not open conf file '%s' (%m)", filename);
         return -errno;
     }
 
