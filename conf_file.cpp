@@ -303,7 +303,7 @@ static void print_filenames(struct section *s)
     int files_size = 0;
     struct config *c;
 
-    if (log_get_max_level() < LOG_PRI(LOG_ERR))
+    if (Log::get_max_level() < Log::Level::ERROR)
         return;
 
     for (c = s->configs; c; c = c->next) {

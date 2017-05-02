@@ -44,7 +44,7 @@ static struct options opt = {
         .tcp_port = ULONG_MAX,
         .report_msg_statistics = false,
         .logs_dir = nullptr,
-        .debug_log_level = LOG_INFO,
+        .debug_log_level = (int)Log::Level::INFO,
         .mavlink_dialect = Auto
 };
 
@@ -116,13 +116,13 @@ static int split_on_colon(const char *str, char **base, unsigned long *number)
 static int log_level_from_str(const char *str)
 {
     if (strcaseeq(str, "error"))
-        return LOG_ERR;
+        return (int)Log::Level::ERROR;
     if (strcaseeq(str, "warning"))
-        return LOG_WARNING;
+        return (int)Log::Level::WARNING;
     if (strcaseeq(str, "info"))
-        return LOG_INFO;
+        return (int)Log::Level::INFO;
     if (strcaseeq(str, "debug"))
-        return LOG_DEBUG;
+        return (int)Log::Level::DEBUG;
 
     return -EINVAL;
 }
@@ -369,7 +369,7 @@ static int parse_argv(int argc, char *argv[])
             break;
         }
         case 'v': {
-            opt.debug_log_level = LOG_DEBUG;
+            opt.debug_log_level = (int)Log::Level::DEBUG;
             break;
         }
         case 'p': {
@@ -722,7 +722,7 @@ int main(int argc, char *argv[])
 {
     Mainloop &mainloop = Mainloop::init();
 
-    log_open();
+    Log::open();
 
     if (parse_argv(argc, argv) != 2)
         goto close_log;
@@ -730,7 +730,7 @@ int main(int argc, char *argv[])
     if (parse_conf_files() < 0)
         goto close_log;
 
-    log_set_max_level(opt.debug_log_level);
+    Log::set_max_level((Log::Level) opt.debug_log_level);
 
     if (mainloop.open() < 0)
         goto close_log;
@@ -747,7 +747,7 @@ int main(int argc, char *argv[])
 
     free(opt.logs_dir);
 
-    log_close();
+    Log::close();
 
     return 0;
 
@@ -756,6 +756,6 @@ endpoint_error:
     free(opt.logs_dir);
 
 close_log:
-    log_close();
+    Log::close();
     return EXIT_FAILURE;
 }

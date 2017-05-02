@@ -1,7 +1,7 @@
 /*
  * This file is part of the MAVLink Router project
  *
- * Copyright (C) 2016  Intel Corporation. All rights reserved.
+ * Copyright (C) 2017  Intel Corporation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,55 +20,46 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <stdlib.h>
-#include <syslog.h>
 
 #include "macro.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+class Log {
+public:
+    enum class Level {
+        ERROR = 0,
+        WARNING,
+        NOTICE,
+        INFO,
+        DEBUG,
+    };
 
-int log_open(void);
-int log_close(void);
+    static int open();
+    static int close();
 
-int log_get_max_level(void) _pure_;
-void log_set_max_level(int level);
-int log_internal(int level, int error,
-                 const char *file, int line,
-                 const char *format, ...) _printf_format_(5, 6);
+    static Level get_max_level() _pure_ { return _max_level; }
+    static void set_max_level(Level level);
 
-#define log_full_errno(level, error, ...)                               \
-    ({                                                                  \
-         int _level = (level), _e = (error);                            \
-         (log_get_max_level() >= LOG_PRI(_level))                       \
-            ? log_internal(_level, _e, __FILE__, __LINE__, __VA_ARGS__) \
-            : -abs(_e);                                                 \
-        })
+    static void logv(Level level, const char *format, va_list ap);
+    static void log(Level level, const char *format, ...) _printf_format_(2, 3);
 
-#define log_full(level, ...) log_full_errno(level, 0, __VA_ARGS__)
+protected:
+    static const char *_get_color(Level level);
 
-/* Normal logging */
-#define log_debug(...)     log_full(LOG_DEBUG,   __VA_ARGS__)
-#define log_info(...)      log_full(LOG_INFO,    __VA_ARGS__)
-#define log_notice(...)    log_full(LOG_NOTICE,  __VA_ARGS__)
-#define log_warning(...)   log_full(LOG_WARNING, __VA_ARGS__)
-#define log_error(...)     log_full(LOG_ERR,     __VA_ARGS__)
+    static int _target_fd;
+    static Level _max_level;
+    static bool _show_colors;
+};
 
-/* Logging triggered by an errno-like error */
-#define log_debug_errno(error, ...)     log_full_errno(LOG_DEBUG,   error, __VA_ARGS__)
-#define log_info_errno(error, ...)      log_full_errno(LOG_INFO,    error, __VA_ARGS__)
-#define log_notice_errno(error, ...)    log_full_errno(LOG_NOTICE,  error, __VA_ARGS__)
-#define log_warning_errno(error, ...)   log_full_errno(LOG_WARNING, error, __VA_ARGS__)
-#define log_error_errno(error, ...)     log_full_errno(LOG_ERR,     error, __VA_ARGS__)
+#define log_debug(...) Log::log(Log::Level::DEBUG, __VA_ARGS__)
+#define log_info(...) Log::log(Log::Level::INFO, __VA_ARGS__)
+#define log_notice(...) Log::log(Log::Level::NOTICE, __VA_ARGS__)
+#define log_warning(...) Log::log(Log::Level::WARNING, __VA_ARGS__)
+#define log_error(...) Log::log(Log::Level::ERROR, __VA_ARGS__)
 
-#define assert_or_return(exp, ...)                          \
-    do {                                                    \
-        if (__builtin_expect(!(exp), 0)) {                  \
-            log_warning("Expresssion `" #exp "` is false"); \
-            return __VA_ARGS__;                             \
-        }                                                   \
+#define assert_or_return(exp, ...)                              \
+    do {                                                        \
+        if (__builtin_expect(!(exp), 0)) {                      \
+            log_warning("Expresssion `" #exp "` is false");     \
+            return __VA_ARGS__;                                 \
+        }                                                       \
     } while (0)
-
-#ifdef __cplusplus
-}
-#endif
