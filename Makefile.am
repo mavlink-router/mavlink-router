@@ -129,6 +129,7 @@ mavlink_routerd_SOURCES = \
 	comm.h \
 	conf_file.cpp \
 	conf_file.h \
+	dbg.h \
 	endpoint.cpp \
 	endpoint.h \
 	log.cpp \
