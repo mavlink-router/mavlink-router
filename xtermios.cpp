@@ -17,17 +17,45 @@
  */
 #include "xtermios.h"
 
+#include <string.h>
 #include <termios.h>
 #include <unistd.h>
 
 int reset_uart(int fd)
 {
     struct termios tc = {};
+    /* See termios(3) */
+    const cc_t default_cc[] = { 03, 034, 0177, 025, 04, 0, 0, 0, 021, 023, 032, 0,
+                                022, 017, 027, 026, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0 };
 
-    cfmakeraw(&tc);
+    static_assert(sizeof(default_cc) == sizeof(tc.c_cc));
+
+    if (tcgetattr(fd, &tc) < 0) {
+        return -1;
+    }
+
+    /* Put UART in known state: it's the equivalent of "sane" in stty */
+    tc.c_cflag = CREAD;
+
+    tc.c_iflag |= BRKINT | ICRNL | IMAXBEL;
+    tc.c_iflag &= ~(INLCR | IGNCR | IUTF8 | IXOFF| IUCLC | IXANY);
+
+    tc.c_oflag |= OPOST | ONLCR;
+    tc.c_oflag &= ~(OLCUC | OCRNL | ONLRET | OFILL | OFDEL | NL0 | CR0 | TAB0 | BS0 | VT0 | FF0);
+
+    tc.c_lflag |= ISIG | ICANON | IEXTEN | ECHO | ECHOE | ECHOK | ECHOCTL | ECHOKE;
+    tc.c_lflag &= ~(ECHONL | NOFLSH | XCASE | TOSTOP | ECHOPRT);
+
+    /* special characters to their default values */
+    memcpy(tc.c_cc, default_cc, sizeof(default_cc));
+
+    if (tcsetattr(fd, TCSANOW, &tc) < 0) {
+        return -1;
+    }
+
     cfsetspeed(&tc, B1200);
 
-    /* Put UART in known raw state */
     if (tcsetattr(fd, TCSANOW, &tc) < 0) {
         return -1;
     }
