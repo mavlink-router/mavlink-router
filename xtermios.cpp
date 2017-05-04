@@ -29,7 +29,7 @@ int reset_uart(int fd)
                                 022, 017, 027, 026, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                                 0, 0, 0, 0, 0, 0 };
 
-    static_assert(sizeof(default_cc) == sizeof(tc.c_cc));
+    static_assert(sizeof(default_cc) == sizeof(tc.c_cc), "Unknown termios struct with different size");
 
     if (tcgetattr(fd, &tc) < 0) {
         return -1;
