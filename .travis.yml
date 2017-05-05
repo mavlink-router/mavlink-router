@@ -19,6 +19,6 @@ before_script:
         - CC="gcc-6"
 
 script:
-        - ./autogen.sh c
+        - ./autogen.sh c --with-systemdsystemunitdir=/usr/lib/systemd/system
         - make -j
         - make check
