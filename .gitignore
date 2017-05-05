@@ -24,6 +24,7 @@
 /mav.parm
 /mav.tlog
 /mav.tlog.raw
+/mavlink-router.service
 /perf.data
 /perf.data.old
 /stamp-h1
