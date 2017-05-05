@@ -28,6 +28,11 @@ include/mavlink/ardupilotmega/mavlink.h: modules/mavlink/pymavlink/tools/mavgen.
 		--wire-protocol 2.0 \
 		$(srcdir)/modules/mavlink/message_definitions/v1.0/ardupilotmega.xml
 
+#if SYSTEMD
+systemdsystemunitdir = @SYSTEMD_SYSTEMUNITDIR@
+systemdsystemunit_DATA = mavlink-router.service.in
+#endif
+
 AM_CPPFLAGS = \
 	-include $(top_builddir)/config.h \
 	-I$(top_builddir) \
