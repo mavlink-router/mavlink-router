@@ -1,0 +1,10 @@
+[Unit]
+Description=MAVLink Router
+
+[Service]
+Type=simple
+ExecStart=@prefix@/mavlink-routerd
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
