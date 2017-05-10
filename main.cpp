@@ -241,39 +241,43 @@ fail:
     return ret;
 }
 
-static std::vector<unsigned long> *add_bauds(const char *bauds_str)
+static std::vector<unsigned long> *strlist_to_ul(const char *list,
+                                                 const char *listname,
+                                                 const char *delim,
+                                                 unsigned long default_value)
 {
-    char *baud, *tmp_str;
-    std::unique_ptr<std::vector<unsigned long>> ret{new std::vector<unsigned long>()};
+    char *s, *tmp_str;
+    std::unique_ptr<std::vector<unsigned long>> v{new std::vector<unsigned long>()};
 
-    if (!bauds_str || bauds_str[0] == '\0') {
-        ret->push_back(DEFAULT_BAUDRATE);
-        return ret.release();
+    if (!list || list[0] == '\0') {
+        v->push_back(default_value);
+        return v.release();
     }
 
-    tmp_str = strdup(bauds_str);
+    tmp_str = strdup(list);
     if (!tmp_str) {
         return nullptr;
     }
 
-    baud = strtok(tmp_str, ",");
-    while (baud) {
+    s = strtok(tmp_str, delim);
+    while (s) {
         unsigned long l;
-        if (safe_atoul(baud, &l) < 0) {
-            log_error("Invalid baud %s", baud);
+        if (safe_atoul(s, &l) < 0) {
+            log_error("Invalid %s %s", listname, s);
             goto error;
         }
-        ret->push_back(l);
-        baud = strtok(NULL, ",");
-    }
-
-    if (!ret->size()) {
-        log_error("No valid baud on %s", bauds_str);
-        goto error;
+        v->push_back(l);
+        s = strtok(NULL, delim);
     }
 
     free(tmp_str);
-    return ret.release();
+
+    if (!v->size()) {
+        log_error("No valid %s on %s", listname, list);
+        return nullptr;
+    }
+
+    return v.release();
 
 error:
     free(tmp_str);
@@ -304,7 +308,7 @@ static int add_uart_endpoint(const char *name, size_t name_len, const char *uart
         goto fail;
     }
 
-    conf->bauds = add_bauds(bauds);
+    conf->bauds = strlist_to_ul(bauds, "baud", ",", DEFAULT_BAUDRATE);
     if (!conf->bauds) {
         ret = -EINVAL;
         goto fail;
