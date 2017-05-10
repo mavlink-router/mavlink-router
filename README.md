@@ -30,6 +30,13 @@ to be done only once. A typical configuration is shown below:
             --sysconfdir=/etc --localstatedir=/var --libdir=/usr/lib64 \
 	    --prefix=/usr
 
+By default systemd integration is enabled. In a system without systemd it can
+be disabled --disable-systemd. The default systemd system directory
+is taken via pkg-config. To use another directory update the above
+path, use --with-systemdsystemunitdir.
+
+Installation location can be changed using --prefix option while configuring.
+
 Build:
 
     $ make
@@ -39,7 +46,6 @@ Install:
     $ make install
     $ # or... to another root directory:
     $ make DESTDIR=/tmp/root/dir install
-
 ### Running ###
 
 To route mavlink packets from master `ttyS1` to 2 other UDP endpoints, do as
