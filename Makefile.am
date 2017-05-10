@@ -18,6 +18,7 @@ BUILT_SOURCES = include/mavlink/ardupilotmega/mavlink.h
 
 clean-local:
 	rm -rf $(top_builddir)/include/mavlink
+	rm -f mavlink-router.service
 	rm -f $(top_builddir)/gtest.a
 	rm -f $(top_builddir)/tests/unit_test
 
@@ -27,6 +28,12 @@ include/mavlink/ardupilotmega/mavlink.h: modules/mavlink/pymavlink/tools/mavgen.
 		--lang C \
 		--wire-protocol 2.0 \
 		$(srcdir)/modules/mavlink/message_definitions/v1.0/ardupilotmega.xml
+
+#if SYSTEMD
+systemdsystemunitdir = @SYSTEMD_SYSTEMUNITDIR@
+systemdsystemunit_DATA = mavlink-router.service
+#endif
+
 
 AM_CPPFLAGS = \
 	-include $(top_builddir)/config.h \
@@ -155,6 +162,12 @@ noinst_PROGRAMS += heartbeat-print
 heartbeat_print_SOURCES = \
 	examples/heartbeat-print.cpp
 
+SED_PROCESS = $(AM_V_GEN) $(MKDIR_P) $(dir $@) && \
+	 $(SED) -e 's,@bindir\@,$(bindir),g' \
+	 < $< > $@
+
+%.service: %.service.in Makefile
+	$(SED_PROCESS)
 noinst_SCRIPTS += examples/heartbeat-print.py
 
 TESTS = unit_test \
