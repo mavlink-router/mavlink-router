@@ -19,8 +19,12 @@
 
 #include <mavlink.h>
 
+#include <memory>
+#include <vector>
+
 #include "comm.h"
 #include "pollable.h"
+#include "timeout.h"
 
 class Mainloop;
 
@@ -91,7 +95,7 @@ public:
     struct buffer tx_buf;
 
 protected:
-    int read_msg(struct buffer *pbuf, int *target_system);
+    virtual int read_msg(struct buffer *pbuf, int *target_system);
     virtual ssize_t _read_msg(uint8_t *buf, size_t len) = 0;
     bool _check_crc(const mavlink_msg_entry_t *msg_entry);
 
@@ -129,9 +133,18 @@ public:
 
     int open(const char *path);
     int set_speed(speed_t baudrate);
+    int add_speeds(std::vector<unsigned long> baudrates);
 
 protected:
+    int read_msg(struct buffer *pbuf, int *target_sysid) override;
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
+
+private:
+    size_t _current_baud_idx = 0;
+    Timeout *_change_baud_timeout = nullptr;
+    std::vector<unsigned long> _baudrates;
+
+    bool _change_baud_cb(void *data);
 };
 
 class UdpEndpoint : public Endpoint {

@@ -241,8 +241,47 @@ fail:
     return ret;
 }
 
+static std::vector<unsigned long> *add_bauds(const char *bauds_str)
+{
+    char *baud, *tmp_str;
+    std::unique_ptr<std::vector<unsigned long>> ret{new std::vector<unsigned long>()};
+
+    if (!bauds_str || bauds_str[0] == '\0') {
+        ret->push_back(DEFAULT_BAUDRATE);
+        return ret.release();
+    }
+
+    tmp_str = strdup(bauds_str);
+    if (!tmp_str) {
+        return nullptr;
+    }
+
+    baud = strtok(tmp_str, ",");
+    while (baud) {
+        unsigned long l;
+        if (safe_atoul(baud, &l) < 0) {
+            log_error("Invalid baud %s", baud);
+            goto error;
+        }
+        ret->push_back(l);
+        baud = strtok(NULL, ",");
+    }
+
+    if (!ret->size()) {
+        log_error("No valid baud on %s", bauds_str);
+        goto error;
+    }
+
+    free(tmp_str);
+    return ret.release();
+
+error:
+    free(tmp_str);
+    return nullptr;
+}
+
 static int add_uart_endpoint(const char *name, size_t name_len, const char *uart_device,
-                             unsigned long baudrate)
+                             const char *bauds)
 {
     int ret;
 
@@ -250,10 +289,8 @@ static int add_uart_endpoint(const char *name, size_t name_len, const char *uart
         = (struct endpoint_config *)calloc(1, sizeof(struct endpoint_config));
     assert_or_return(conf, -ENOMEM);
     conf->type = Uart;
-    conf->baud = ULONG_MAX;
 
-    // As name doesn't change, only update if there's no name yet
-    if (!conf->name && name) {
+    if (name) {
         conf->name = strndup(name, name_len);
         if (!conf->name) {
             ret = -ENOMEM;
@@ -261,26 +298,16 @@ static int add_uart_endpoint(const char *name, size_t name_len, const char *uart
         }
     }
 
-    if (uart_device) {
-        free(conf->device);
-        conf->device = strdup(uart_device);
-        if (!conf->device) {
-            ret = -ENOMEM;
-            goto fail;
-        }
-    }
-
+    conf->device = strdup(uart_device);
     if (!conf->device) {
-        ret = -EINVAL;
+        ret = -ENOMEM;
         goto fail;
     }
 
-    if (baudrate != ULONG_MAX) {
-        conf->baud = baudrate;
-    }
-
-    if (conf->baud == ULONG_MAX) {
-        conf->baud = DEFAULT_BAUDRATE;
+    conf->bauds = add_bauds(bauds);
+    if (!conf->bauds) {
+        ret = -EINVAL;
+        goto fail;
     }
 
     conf->next = opt.endpoints;
@@ -422,7 +449,7 @@ static int parse_argv(int argc, char *argv[])
 
             add_endpoint_address(NULL, 0, base, number, true);
         } else {
-            int ret = add_uart_endpoint(NULL, 0, base, number);
+            int ret = add_uart_endpoint(NULL, 0, base, base + strlen(base) + 1);
             if (ret < 0)
                 return ret;
         }
@@ -553,10 +580,10 @@ static int parse_confs(ConfFile &conf)
 
     struct option_uart {
         char *device;
-        unsigned long baud;
+        char *bauds;
     };
     static const ConfFile::OptionsTable option_table_uart[] = {
-        {"baud",    false,  ConfFile::parse_ul,         OPTIONS_TABLE_STRUCT_FIELD(option_uart, baud)},
+        {"baud",    false,  ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_uart, bauds)},
         {"device",  true,   ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_uart, device)},
     };
 
@@ -590,13 +617,14 @@ static int parse_confs(ConfFile &conf)
     pattern = "uartendpoint *";
     offset = strlen(pattern) - 1;
     while (conf.get_sections(pattern, &iter) == 0) {
-        struct option_uart opt_uart = {nullptr, ULONG_MAX};
+        struct option_uart opt_uart = {nullptr, nullptr};
         ret = conf.extract_options(&iter, option_table_uart, ARRAY_SIZE(option_table_uart),
                                    &opt_uart);
         if (ret == 0)
             ret = add_uart_endpoint(iter.name + offset, iter.name_len - offset, opt_uart.device,
-                                    opt_uart.baud);
+                                    opt_uart.bauds);
         free(opt_uart.device);
+        free(opt_uart.bauds);
         if (ret < 0)
             return ret;
     }

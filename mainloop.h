@@ -112,7 +112,7 @@ struct endpoint_config {
         };
         struct {
             char *device;
-            long unsigned baud;
+            std::vector<unsigned long> *bauds;
         };
     };
 };
