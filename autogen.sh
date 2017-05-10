@@ -31,19 +31,26 @@ fi
 
 cd $oldpwd
 
-if [ "x$1" = "xc" ]; then
+if [ $# -ge 1 ]; then
+    cmd=$1
+    shift
+fi
+
+args="$args $@"
+
+if [ "$cmd" = "c" ]; then
         $topdir/configure CFLAGS='-g -O2' CXXFLAGS='-g -O2' $args
         make clean
-elif [ "x$1" = "xg" ]; then
+elif [ "$cmd" = "g" ]; then
         $topdir/configure CFLAGS='-g -Og' CXXFLAGS='-g -O2' $args
         make clean
-elif [ "x$1" = "xl" ]; then
+elif [ "$cmd" = "l" ]; then
         $topdir/configure CC=clang CXX=clang++ CFLAGS='-g -O2' CXXFLAGS='-g -O2' $args
         make clean
-elif [ "x$1" = "xa" ]; then
+elif [ "$cmd" = "a" ]; then
         $topdir/configure CFLAGS='-g -O2 -Wsuggest-attribute=pure -Wsuggest-attribute=const' CXXFLAGS='-g -O2 -Wsuggest-attribute=pure -Wsuggest-attribute=const' $args
         make clean
-elif [ "x$1" = "xs" ]; then
+elif [ "$cmd" = "s" ]; then
         scan-build $topdir/configure CFLAGS='-g -O0 -std=gnu11' CXXFLAGS='-g -O0 -std=gnu++11' $args
         scan-build make
 else
