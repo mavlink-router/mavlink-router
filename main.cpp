@@ -49,6 +49,21 @@ static struct options opt = {
         .mavlink_dialect = Auto
 };
 
+static const struct option long_options[] = {
+    { "endpoints",              required_argument,  NULL,   'e' },
+    { "conf-file",              required_argument,  NULL,   'c' },
+    { "conf-dir" ,              required_argument,  NULL,   'd' },
+    { "report_msg_statistics",  no_argument,        NULL,   'r' },
+    { "tcp-port",               required_argument,  NULL,   't' },
+    { "tcp-endpoint",           required_argument,  NULL,   'p' },
+    { "log",                    required_argument,  NULL,   'l' },
+    { "debug-log-level",        required_argument,  NULL,   'g' },
+    { "verbose",                no_argument,        NULL,   'v' },
+    { }
+};
+
+static const char* short_options = "he:rt:c:d:l:p:g:v";
+
 static void help(FILE *fp) {
     fprintf(fp,
             "%s [OPTIONS...] [<uart>|<udp_address>]\n\n"
@@ -327,27 +342,41 @@ fail:
     return ret;
 }
 
+static void pre_parse_argv(int argc, char *argv[])
+{
+    // This function parses only conf-file and conf-dir from
+    // command line, so we can read the conf files.
+    // parse_argv will then parse all other options, overriding
+    // config files definitions
+
+    int c;
+
+    while ((c = getopt_long(argc, argv, short_options, long_options, NULL)) >= 0) {
+        switch (c) {
+        case 'c': {
+            opt.conf_file_name = optarg;
+            break;
+        }
+        case 'd': {
+            opt.conf_dir = optarg;
+            break;
+        }
+        }
+    }
+
+    // Reset getopt*
+    optind = 1;
+}
+
 static int parse_argv(int argc, char *argv[])
 {
-    static const struct option options[] = {
-        { "endpoints",              required_argument,  NULL,   'e' },
-        { "conf-file",              required_argument,  NULL,   'c' },
-        { "conf-dir" ,              required_argument,  NULL,   'd' },
-        { "report_msg_statistics",  no_argument,        NULL,   'r' },
-        { "tcp-port",               required_argument,  NULL,   't' },
-        { "tcp-endpoint",           required_argument,  NULL,   'p' },
-        { "log",                    required_argument,  NULL,   'l' },
-        { "debug-log-level",        required_argument,  NULL,   'g' },
-        { "verbose",                no_argument,        NULL,   'v' },
-        { }
-    };
     int c;
     struct stat st;
 
     assert(argc >= 0);
     assert(argv);
 
-    while ((c = getopt_long(argc, argv, "he:rt:c:d:l:p:g:v", options, NULL)) >= 0) {
+    while ((c = getopt_long(argc, argv, short_options, long_options, NULL)) >= 0) {
         switch (c) {
         case 'h':
             help(stdout);
@@ -376,14 +405,6 @@ static int parse_argv(int argc, char *argv[])
                 help(stderr);
                 return -EINVAL;
             }
-            break;
-        }
-        case 'c': {
-            opt.conf_file_name = optarg;
-            break;
-        }
-        case 'd': {
-            opt.conf_dir = optarg;
             break;
         }
         case 'l': {
@@ -423,6 +444,9 @@ static int parse_argv(int argc, char *argv[])
             free(ip);
             break;
         }
+        case 'c':
+        case 'd':
+            break; // These options were parsed on pre_parse_argv
         case '?':
         default:
             help(stderr);
@@ -757,10 +781,12 @@ int main(int argc, char *argv[])
 
     Log::open();
 
-    if (parse_argv(argc, argv) != 2)
-        goto close_log;
+    pre_parse_argv(argc, argv);
 
     if (parse_conf_files() < 0)
+        goto close_log;
+
+    if (parse_argv(argc, argv) != 2)
         goto close_log;
 
     Log::set_max_level((Log::Level) opt.debug_log_level);
