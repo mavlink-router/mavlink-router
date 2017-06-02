@@ -129,59 +129,35 @@ int Mainloop::write_msg(Endpoint *e, const struct buffer *buf)
     return r;
 }
 
-void Mainloop::route_msg(struct buffer *buf, int target_sysid, int sender_sysid)
+void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid, int sender_sysid,
+                         int sender_compid)
 {
-    if (target_sysid > 0) {
-        Endpoint *target = nullptr;
+    bool unknown = true;
 
-        // First, check UART and UDP endpoints
-        if (!target) {
-            for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
-                if ((*e)->get_system_id() == target_sysid) {
-                    target = *e;
-                    break;
-                }
-            }
+    for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
+        if ((*e)->accept_msg(target_sysid, target_compid, sender_sysid, sender_compid)) {
+            log_debug("Endpoint [%d] accepted message to %d/%d from %u/%u", (*e)->fd, target_sysid,
+                      target_compid, sender_sysid, sender_compid);
+            write_msg(*e, buf);
+            unknown = false;
         }
+    }
 
-        // Last, check TCP endpoints
-        if (!target) {
-            for (struct endpoint_entry *e = g_tcp_endpoints; e; e = e->next) {
-                if (e->endpoint->get_system_id() == target_sysid) {
-                    target = e->endpoint;
-                    break;
-                }
-            }
-        }
-
-        if (target) {
-            log_debug("Routing message from %u to endpoint %u[%d]", sender_sysid, target_sysid,
-                      target->fd);
-
-            int r = write_msg(target, buf);
-            if (r == -EPIPE && !target->is_valid()) {
+    for (struct endpoint_entry *e = g_tcp_endpoints; e; e = e->next) {
+        if (e->endpoint->accept_msg(target_sysid, target_compid, sender_sysid, sender_compid)) {
+            log_debug("Endpoint [%d] accepted message to %d/%d from %u/%u", e->endpoint->fd,
+                      target_sysid, target_compid, sender_sysid, sender_compid);
+            int r = write_msg(e->endpoint, buf);
+            if (r == -EPIPE) {
                 should_process_tcp_hangups = true;
             }
-        } else {
-            _errors_aggregate.msg_to_unknown++;
-            log_debug("Message to unknown sysid: %u", target_sysid);
+            unknown = false;
         }
-    } else {
-        log_debug("Routing message from %u to all other known endpoints", sender_sysid);
-        // No target_sysid, forward to all (taking care to not forward to source)
-        for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
-            if (sender_sysid != (*e)->get_system_id())
-                write_msg(*e, buf);
-        }
+    }
 
-        for (struct endpoint_entry *e = g_tcp_endpoints; e; e = e->next) {
-            if (sender_sysid != e->endpoint->get_system_id()) {
-                int r = write_msg(e->endpoint, buf);
-                if (r == -EPIPE) {
-                    should_process_tcp_hangups = true;
-                }
-            }
-        }
+    if (unknown) {
+        _errors_aggregate.msg_to_unknown++;
+        log_debug("Message to unknown sysid/compid: %u/%u", target_sysid, target_compid);
     }
 }
 

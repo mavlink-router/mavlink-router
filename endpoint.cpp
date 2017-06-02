@@ -67,21 +67,24 @@ bool Endpoint::handle_canwrite()
 
 int Endpoint::handle_read()
 {
-    int target_sysid, r;
+    int target_sysid, target_compid, r;
+    uint8_t src_sysid, src_compid;
     struct buffer buf{};
 
-    while ((r = read_msg(&buf, &target_sysid)) > 0)
-        Mainloop::get_instance().route_msg(&buf, target_sysid, _system_id);
+    while ((r = read_msg(&buf, &target_sysid, &target_compid, &src_sysid, &src_compid)) > 0)
+        Mainloop::get_instance().route_msg(&buf, target_sysid, target_compid, src_sysid,
+                                           src_compid);
 
     return r;
 }
 
-int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid)
+int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compid,
+                       uint8_t *src_sysid, uint8_t *src_compid)
 {
     bool should_read_more = true;
     uint32_t msg_id;
     const mavlink_msg_entry_t *msg_entry;
-    uint8_t *payload, seq, sysid, payload_len;
+    uint8_t *payload, seq, payload_len;
 
     if (fd < 0) {
         log_error("Trying to read invalid fd");
@@ -114,7 +117,7 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid)
         if (r <= 0)
             return r;
 
-        log_debug("%s: Got %zd bytes", _name, r);
+        log_debug("%s: Got %zd bytes [%d]", _name, r, fd);
         rx_buf.len += r;
     }
 
@@ -170,7 +173,8 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid)
         msg_id = hdr->msgid;
         payload = rx_buf.data + sizeof(*hdr);
         seq = hdr->seq;
-        sysid = hdr->sysid;
+        *src_sysid = hdr->sysid;
+        *src_compid = hdr->compid;
         payload_len = hdr->payload_len;
 
         expected_size = sizeof(*hdr);
@@ -188,7 +192,8 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid)
         msg_id = hdr->msgid;
         payload = rx_buf.data + sizeof(*hdr);
         seq = hdr->seq;
-        sysid = hdr->sysid;
+        *src_sysid = hdr->sysid;
+        *src_compid = hdr->compid;
         payload_len = hdr->payload_len;
 
         expected_size = sizeof(*hdr);
@@ -224,16 +229,12 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid)
     _stat.read.handled++;
     _stat.read.handled_bytes += expected_size;
 
-    if (!_system_id && (!_crc_check_enabled || msg_entry))
-        _system_id = sysid;
-
-    /* Only print message if we would use this sysid. A msg with unknown id is not
-     * trustworth, as it wasn't crc checked. */
-    if (_system_id && _system_id != sysid && (!_crc_check_enabled || msg_entry))
-        log_warning("Different system_id message for endpoint %d: Current: %u Read: %u", fd,
-                    _system_id, sysid);
+    if (!_crc_check_enabled || msg_entry) {
+        _add_sys_comp_id(((uint16_t)*src_sysid << 8) | *src_compid);
+    }
 
     *target_sysid = -1;
+    *target_compid = -1;
 
     if (msg_entry == nullptr) {
         log_debug("No message entry for %u", msg_id);
@@ -244,6 +245,14 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid)
                 *target_sysid = payload[msg_entry->target_system_ofs];
             } else {
                 *target_sysid = 0;
+            }
+        }
+        if (msg_entry->flags & MAV_MSG_ENTRY_FLAG_HAVE_TARGET_COMPONENT) {
+            // if target_system is 0, it may have been trimmed out on mavlink2
+            if (msg_entry->target_component_ofs < payload_len) {
+                *target_compid = payload[msg_entry->target_component_ofs];
+            } else {
+                *target_compid = 0;
             }
         }
     }
@@ -269,6 +278,67 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid)
     pbuf->len = expected_size;
 
     return msg_entry != nullptr ? ReadOk : ReadUnkownMsg;
+}
+
+void Endpoint::_add_sys_comp_id(uint16_t sys_comp_id)
+{
+    for (auto it = _sys_comp_ids.begin(); it != _sys_comp_ids.end(); it++) {
+        if (sys_comp_id == *it)
+            return;
+    }
+    _sys_comp_ids.push_back(sys_comp_id);
+}
+
+bool Endpoint::has_sys_id(unsigned sysid)
+{
+    for (auto it = _sys_comp_ids.begin(); it != _sys_comp_ids.end(); it++) {
+        if (((*it >> 8) | (sysid & 0xff)) == sysid)
+            return true;
+    }
+    return false;
+}
+
+bool Endpoint::has_sys_comp_id(unsigned sysid, unsigned compid)
+{
+    uint16_t sys_comp_id = ((sysid & 0xff) << 8) | (compid & 0xff);
+    for (auto it = _sys_comp_ids.begin(); it != _sys_comp_ids.end(); it++) {
+        if (sys_comp_id == *it)
+            return true;
+    }
+
+    return false;
+}
+
+bool Endpoint::accept_msg(int target_sysid, int target_compid, uint8_t src_sysid,
+                          uint8_t src_compid)
+{
+    if (Log::get_max_level() >= Log::Level::DEBUG) {
+        log_debug("Endpoint [%d] got message to %d/%d from %u/%u", fd, target_sysid, target_compid,
+                  src_sysid, src_compid);
+        log_debug("\tKnown endpoints:");
+        for (auto it = _sys_comp_ids.begin(); it != _sys_comp_ids.end(); it++) {
+            log_debug("\t\t%u/%u", (*it >> 8), *it & 0xff);
+        }
+    }
+
+    // This endpoint sent the message, and there's no other sys_comp_id: reject msg
+    if (has_sys_comp_id(src_sysid, src_compid) && _sys_comp_ids.size() == 1)
+        return false;
+
+    // Message is broadcast on sysid: accept msg
+    if (target_sysid == 0 || target_sysid == -1)
+        return true;
+
+    // This endpoint has the target of message (sys and comp id): accept
+    if (target_compid > 0 && has_sys_comp_id(target_sysid, target_compid))
+        return true;
+
+    // This endpoint has the target of message (sysid, but compid is broadcast): accept
+    if (has_sys_id(target_sysid))
+        return true;
+
+    // Reject everything else
+    return false;
 }
 
 bool Endpoint::_check_crc(const mavlink_msg_entry_t *msg_entry)
@@ -305,7 +375,7 @@ void Endpoint::print_statistics()
 {
     const uint32_t read_total = _stat.read.total == 0 ? 1 : _stat.read.total;
 
-    printf("Endpoint %s [%d] sysid: %u {", _name, fd, _system_id);
+    printf("Endpoint %s [%d] {", _name, fd);
     printf("\n\tReceived messages {");
     printf("\n\t\tCRC error: %u %u%% %luKBytes", _stat.read.crc_error,
            (_stat.read.crc_error * 100) / read_total, _stat.read.crc_error_bytes / 1000);
@@ -344,8 +414,8 @@ uint8_t Endpoint::get_trimmed_zeros(const struct buffer *buffer)
 void Endpoint::log_aggregate(unsigned int interval_sec)
 {
     if (_incomplete_msgs > 0) {
-        log_warning("Endpoint %s [%d] sysid %u: %u incomplete messages in the last %d seconds",
-                    _name, fd, _system_id, _incomplete_msgs, interval_sec);
+        log_warning("Endpoint %s [%d]: %u incomplete messages in the last %d seconds", _name, fd,
+                    _incomplete_msgs, interval_sec);
         _incomplete_msgs = 0;
     }
 }
@@ -476,9 +546,10 @@ bool UartEndpoint::_change_baud_cb(void *data)
     return true;
 }
 
-int UartEndpoint::read_msg(struct buffer *pbuf, int *target_sysid)
+int UartEndpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compid,
+                           uint8_t *src_sysid, uint8_t *src_compid)
 {
-    int ret = Endpoint::read_msg(pbuf, target_sysid);
+    int ret = Endpoint::read_msg(pbuf, target_sysid, target_compid, src_sysid, src_compid);
 
     if (_change_baud_timeout != nullptr && ret == ReadOk) {
         log_info("Baudrate %lu responded, keeping it", _baudrates[_current_baud_idx]);
