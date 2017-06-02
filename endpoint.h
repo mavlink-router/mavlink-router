@@ -89,15 +89,19 @@ public:
 
     uint8_t get_trimmed_zeros(const struct buffer *buffer);
 
-    uint8_t get_system_id() { return _system_id; }
+    bool has_sys_id(unsigned sysid);
+    bool has_sys_comp_id(unsigned sysid, unsigned compid);
+    bool accept_msg(int target_sysid, int target_compid, uint8_t src_sysid, uint8_t src_compid);
 
     struct buffer rx_buf;
     struct buffer tx_buf;
 
 protected:
-    virtual int read_msg(struct buffer *pbuf, int *target_system);
+    virtual int read_msg(struct buffer *pbuf, int *target_system, int *target_compid,
+                         uint8_t *src_sysid, uint8_t *src_compid);
     virtual ssize_t _read_msg(uint8_t *buf, size_t len) = 0;
     bool _check_crc(const mavlink_msg_entry_t *msg_entry);
+    void _add_sys_comp_id(uint16_t sys_comp_id);
 
     const char *_name;
     size_t _last_packet_len = 0;
@@ -121,7 +125,7 @@ protected:
 
     const bool _crc_check_enabled;
     uint32_t _incomplete_msgs = 0;
-    uint8_t _system_id = 0;
+    std::vector<uint16_t> _sys_comp_ids;
 };
 
 class UartEndpoint : public Endpoint {
@@ -136,7 +140,8 @@ public:
     int add_speeds(std::vector<unsigned long> baudrates);
 
 protected:
-    int read_msg(struct buffer *pbuf, int *target_sysid) override;
+    int read_msg(struct buffer *pbuf, int *target_system, int *target_compid, uint8_t *src_sysid,
+                 uint8_t *src_compid) override;
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
 
 private:
