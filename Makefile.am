@@ -38,8 +38,7 @@ AM_CPPFLAGS = \
 	-include $(top_builddir)/config.h \
 	-I$(top_builddir) \
 	-I$(top_srcdir)/src \
-	-I$(top_builddir)/include/mavlink \
-	-I$(top_builddir)/include/mavlink/ardupilotmega \
+	-I$(top_srcdir)/src/common \
 	-DSYSCONFDIR=\""$(sysconfdir)"\"
 
 AM_CFLAGS = \
@@ -157,9 +156,54 @@ mavlink_routerd_SOURCES = \
 	src/common/xtermios.cpp \
 	src/common/xtermios.h
 
+mavlink_routerd_CPPFLAGS = ${AM_CPPFLAGS}
+mavlink_routerd_CPPFLAGS += \
+	-I$(top_srcdir)/src/mavlink-router \
+	-I$(top_builddir)/include/mavlink \
+	-I$(top_builddir)/include/mavlink/ardupilotmega
+
+if RTPS
+bin_PROGRAMS += rtpsd
+rtpsd_SOURCES = \
+	src/common/log.cpp \
+	src/common/log.h \
+	src/common/util.c \
+	src/common/util.h \
+	src/rtps/main.cpp \
+	src/rtps/RtpsTopics.cxx \
+	src/rtps/RtpsTopics.h \
+	src/rtps/sensor_combined_.cxx \
+	src/rtps/sensor_combined_.h \
+	src/rtps/sensor_combined_Publisher.cxx \
+	src/rtps/sensor_combined_Publisher.h \
+	src/rtps/sensor_combined_PubSubTypes.cxx \
+	src/rtps/sensor_combined_PubSubTypes.h \
+	src/rtps/UART_node.cxx \
+	src/rtps/UART_node.h \
+	src/rtps/vehicle_command_ack_.cxx \
+	src/rtps/vehicle_command_ack_.h \
+	src/rtps/vehicle_command_ack_Publisher.cxx \
+	src/rtps/vehicle_command_ack_Publisher.h \
+	src/rtps/vehicle_command_ack_PubSubTypes.cxx \
+	src/rtps/vehicle_command_ack_PubSubTypes.h \
+	src/rtps/vehicle_command_.cxx \
+	src/rtps/vehicle_command_.h \
+	src/rtps/vehicle_command_PubSubTypes.cxx \
+	src/rtps/vehicle_command_PubSubTypes.h \
+	src/rtps/vehicle_command_Subscriber.cxx \
+	src/rtps/vehicle_command_Subscriber.h
+
+rtpsd_LDFLAGS = -lfastcdr -lfastrtps
+endif
+
 noinst_PROGRAMS += heartbeat-print
 heartbeat_print_SOURCES = \
 	examples/heartbeat-print.cpp
+
+heartbeat_print_CPPFLAGS = ${AM_CPPFLAGS}
+heartbeat_print_CPPFLAGS += \
+	-I$(top_builddir)/include/mavlink \
+	-I$(top_builddir)/include/mavlink/ardupilotmega
 
 noinst_PROGRAMS += px4-offboard-mode
 px4_offboard_mode_SOURCES = \
