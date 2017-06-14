@@ -38,6 +38,8 @@ AM_CPPFLAGS = \
 	-include $(top_builddir)/config.h \
 	-I$(top_builddir) \
 	-I$(top_srcdir) \
+	-I$(top_srcdir)/src/mavlink-router \
+	-I$(top_srcdir)/src/common \
 	-I$(top_builddir)/include/mavlink \
 	-I$(top_builddir)/include/mavlink/ardupilotmega \
 	-DSYSCONFDIR=\""$(sysconfdir)"\"
@@ -128,34 +130,34 @@ AM_LDFLAGS = \
 
 bin_PROGRAMS += mavlink-routerd
 mavlink_routerd_SOURCES = \
-	autolog.cpp \
-	autolog.h \
-	binlog.cpp \
-	binlog.h \
-	comm.h \
-	conf_file.cpp \
-	conf_file.h \
-	dbg.h \
-	endpoint.cpp \
-	endpoint.h \
-	log.cpp \
-	log.h \
-	logendpoint.cpp \
-	logendpoint.h \
-	macro.h \
-	main.cpp \
-	mainloop.cpp \
-	mainloop.h \
-	pollable.h \
-	pollable.cpp \
-	timeout.h \
-	timeout.cpp \
-	ulog.h \
-	ulog.cpp \
-	util.c \
-	util.h \
-	xtermios.cpp \
-	xtermios.h
+	src/mavlink-router/autolog.cpp \
+	src/mavlink-router/autolog.h \
+	src/mavlink-router/binlog.cpp \
+	src/mavlink-router/binlog.h \
+	src/mavlink-router/comm.h \
+	src/common/conf_file.cpp \
+	src/common/conf_file.h \
+	src/common/dbg.h \
+	src/mavlink-router/endpoint.cpp \
+	src/mavlink-router/endpoint.h \
+	src/common/log.cpp \
+	src/common/log.h \
+	src/mavlink-router/logendpoint.cpp \
+	src/mavlink-router/logendpoint.h \
+	src/common/macro.h \
+	src/mavlink-router/main.cpp \
+	src/mavlink-router/mainloop.cpp \
+	src/mavlink-router/mainloop.h \
+	src/mavlink-router/pollable.h \
+	src/mavlink-router/pollable.cpp \
+	src/mavlink-router/timeout.h \
+	src/mavlink-router/timeout.cpp \
+	src/mavlink-router/ulog.h \
+	src/mavlink-router/ulog.cpp \
+	src/common/util.c \
+	src/common/util.h \
+	src/common/xtermios.cpp \
+	src/common/xtermios.h
 
 noinst_PROGRAMS += heartbeat-print
 heartbeat_print_SOURCES = \
