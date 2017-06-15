@@ -194,6 +194,19 @@ rtpsd_SOURCES = \
 	src/rtps/vehicle_command_Subscriber.h
 
 rtpsd_LDFLAGS = -lfastcdr -lfastrtps
+
+noinst_PROGRAMS += rtps_command
+
+rtps_command_SOURCES = \
+	examples/rtps/command/vehicle_command_.cxx \
+	examples/rtps/command/vehicle_command_.h \
+	examples/rtps/command/vehicle_command_Publisher.cxx \
+	examples/rtps/command/vehicle_command_Publisher.h \
+	examples/rtps/command/vehicle_command_PubSubMain.cxx \
+	examples/rtps/command/vehicle_command_PubSubTypes.cxx \
+	examples/rtps/command/vehicle_command_PubSubTypes.h
+
+rtps_command_LDFLAGS = -lfastcdr -lfastrtps
 endif
 
 noinst_PROGRAMS += heartbeat-print

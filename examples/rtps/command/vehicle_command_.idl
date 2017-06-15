@@ -1,0 +1,17 @@
+struct vehicle_command_
+{
+	double param5;
+	double param6;
+	float param1;
+	float param2;
+	float param3;
+	float param4;
+	float param7;
+	unsigned long command;
+	unsigned long target_system;
+	unsigned long target_component;
+	unsigned long source_system;
+	unsigned long source_component;
+	octet confirmation;
+
+}; // struct vehicle_command_
