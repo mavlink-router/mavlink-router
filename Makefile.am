@@ -207,6 +207,19 @@ rtps_command_SOURCES = \
 	examples/rtps/command/vehicle_command_PubSubTypes.h
 
 rtps_command_LDFLAGS = -lfastcdr -lfastrtps
+
+noinst_PROGRAMS += rtps_sensor_combined
+
+rtps_sensor_combined_SOURCES = \
+	examples/rtps/sensor-combined/sensor_combined_.cxx \
+	examples/rtps/sensor-combined/sensor_combined_.h \
+	examples/rtps/sensor-combined/sensor_combined_PubSubMain.cxx \
+	examples/rtps/sensor-combined/sensor_combined_PubSubTypes.cxx \
+	examples/rtps/sensor-combined/sensor_combined_PubSubTypes.h \
+	examples/rtps/sensor-combined/sensor_combined_Subscriber.cxx \
+	examples/rtps/sensor-combined/sensor_combined_Subscriber.h
+
+rtps_sensor_combined_LDFLAGS = -lfastcdr -lfastrtps
 endif
 
 noinst_PROGRAMS += heartbeat-print
