@@ -36,6 +36,7 @@
 /unit_test
 /unit_test.log
 /unit_test.trs
+/arm-authorizer
 
 *~
 .*.swp

@@ -166,6 +166,10 @@ px4_offboard_mode_SOURCES = \
 	examples/px4-offboard-mode.cpp \
 	src/common/util.c
 
+noinst_PROGRAMS += arm-authorizer
+arm_authorizer_SOURCES = \
+	examples/arm-authorizer.cpp
+
 SED_PROCESS = $(AM_V_GEN) $(MKDIR_P) $(dir $@) && \
 	 $(SED) -e 's,@bindir\@,$(bindir),g' \
 	 < $< > $@
