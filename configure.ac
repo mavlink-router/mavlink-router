@@ -5,7 +5,7 @@ AC_INIT([mavlink-router],
 	[mavlink-router],
 	[])
 
-AC_CONFIG_SRCDIR([main.cpp])
+AC_CONFIG_SRCDIR([configure.ac])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS(config.h)
 AC_CONFIG_AUX_DIR([build-aux])
@@ -48,10 +48,36 @@ AC_COMPILE_IFELSE(
 	 AC_MSG_RESULT([yes])],
 	[AC_MSG_RESULT([no])])
 
+if (test -n "${with_fastrtpsdir}"); then
+    CXXFLAGS="${CXXFLAGS} -isystem${with_fastrtpsdir}/include"
+    LDFLAGS="${LDFLAGS} -L${with_fastrtpsdir}/lib"
+fi
+
+AC_LANG_PUSH([C++])
+AC_MSG_CHECKING([for eProsima fastcdr])
+AC_COMPILE_IFELSE(
+	[AC_LANG_PROGRAM([[#include <fastcdr/Cdr.h>]],
+                     [[eprosima::fastcdr::Cdr *cdr]])],
+        [have_fastcdr=yes
+	 AC_MSG_RESULT([yes])],
+	[AC_MSG_RESULT([no])])
+
+AC_MSG_CHECKING([for eProsima fastrtps])
+AC_COMPILE_IFELSE(
+	[AC_LANG_PROGRAM([[#include <fastrtps/attributes/ParticipantAttributes.h>]],
+                     [[eprosima::fastrtps::ParticipantAttributes PParam]])],
+        [have_fastrtps=yes
+	 AC_MSG_RESULT([yes])],
+	[AC_MSG_RESULT([no])])
+AC_LANG_POP([C++])
 
 #####################################################################
 # --with-
 #####################################################################
+
+AC_ARG_WITH([fastrtpsdir],
+        AS_HELP_STRING([--with-fastrtpsdir=DIR], [directory where eProsima FastRTPS is installed, if not on a default location]),
+        [], [])
 
 AC_ARG_WITH([rootlibdir],
         AS_HELP_STRING([--with-rootlibdir=DIR], [rootfs directory to install shared libraries]),
@@ -78,6 +104,13 @@ fi
 AC_ARG_ENABLE(systemd, AC_HELP_STRING([--disable-systemd],
 		[disable systemd integration]), [enable_systemd=${enableval}])
 AM_CONDITIONAL(SYSTEMD, test "${enable_systemd}" != "no")
+
+AC_ARG_ENABLE(rtps, AC_HELP_STRING([--enable-rtps],
+		[enable rtps module]), [], [enable_rtps="no"])
+AS_IF([test "${have_fastcdr}" = "yes" -a "${have_fastrtps}" = "yes"],
+      [],
+      [enable_rtps="no"])
+AM_CONDITIONAL(RTPS, test "${enable_rtps}" != "no")
 
 #####################################################################
 # Default CFLAGS and LDFLAGS
@@ -108,4 +141,6 @@ AC_MSG_RESULT([
 
 	C compiler:		${CC}
 	C++ compiler:		${CXX}
+
+	RTPS enabled:		${enable_rtps}
 ])

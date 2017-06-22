@@ -38,8 +38,7 @@ AM_CPPFLAGS = \
 	-include $(top_builddir)/config.h \
 	-I$(top_builddir) \
 	-I$(top_srcdir) \
-	-I$(top_builddir)/include/mavlink \
-	-I$(top_builddir)/include/mavlink/ardupilotmega \
+	-I$(top_srcdir)/src/common \
 	-DSYSCONFDIR=\""$(sysconfdir)"\"
 
 AM_CFLAGS = \
@@ -128,38 +127,109 @@ AM_LDFLAGS = \
 
 bin_PROGRAMS += mavlink-routerd
 mavlink_routerd_SOURCES = \
-	autolog.cpp \
-	autolog.h \
-	binlog.cpp \
-	binlog.h \
-	comm.h \
-	conf_file.cpp \
-	conf_file.h \
-	dbg.h \
-	endpoint.cpp \
-	endpoint.h \
-	log.cpp \
-	log.h \
-	logendpoint.cpp \
-	logendpoint.h \
-	macro.h \
-	main.cpp \
-	mainloop.cpp \
-	mainloop.h \
-	pollable.h \
-	pollable.cpp \
-	timeout.h \
-	timeout.cpp \
-	ulog.h \
-	ulog.cpp \
-	util.c \
-	util.h \
-	xtermios.cpp \
-	xtermios.h
+	src/mavlink-router/autolog.cpp \
+	src/mavlink-router/autolog.h \
+	src/mavlink-router/binlog.cpp \
+	src/mavlink-router/binlog.h \
+	src/mavlink-router/comm.h \
+	src/common/conf_file.cpp \
+	src/common/conf_file.h \
+	src/common/dbg.h \
+	src/mavlink-router/endpoint.cpp \
+	src/mavlink-router/endpoint.h \
+	src/common/log.cpp \
+	src/common/log.h \
+	src/mavlink-router/logendpoint.cpp \
+	src/mavlink-router/logendpoint.h \
+	src/common/macro.h \
+	src/mavlink-router/main.cpp \
+	src/mavlink-router/mainloop.cpp \
+	src/mavlink-router/mainloop.h \
+	src/mavlink-router/pollable.h \
+	src/mavlink-router/pollable.cpp \
+	src/mavlink-router/timeout.h \
+	src/mavlink-router/timeout.cpp \
+	src/mavlink-router/ulog.h \
+	src/mavlink-router/ulog.cpp \
+	src/common/util.c \
+	src/common/util.h \
+	src/common/xtermios.cpp \
+	src/common/xtermios.h
+
+mavlink_routerd_CPPFLAGS = ${AM_CPPFLAGS}
+mavlink_routerd_CPPFLAGS += \
+	-I$(top_srcdir)/src/mavlink-router \
+	-I$(top_builddir)/include/mavlink \
+	-I$(top_builddir)/include/mavlink/ardupilotmega
+
+if RTPS
+bin_PROGRAMS += rtpsd
+rtpsd_SOURCES = \
+	src/common/log.cpp \
+	src/common/log.h \
+	src/common/util.c \
+	src/common/util.h \
+	src/rtps/main.cpp \
+	src/rtps/RtpsTopics.cxx \
+	src/rtps/RtpsTopics.h \
+	src/rtps/sensor_combined_.cxx \
+	src/rtps/sensor_combined_.h \
+	src/rtps/sensor_combined_Publisher.cxx \
+	src/rtps/sensor_combined_Publisher.h \
+	src/rtps/sensor_combined_PubSubTypes.cxx \
+	src/rtps/sensor_combined_PubSubTypes.h \
+	src/rtps/UART_node.cxx \
+	src/rtps/UART_node.h \
+	src/rtps/vehicle_command_ack_.cxx \
+	src/rtps/vehicle_command_ack_.h \
+	src/rtps/vehicle_command_ack_Publisher.cxx \
+	src/rtps/vehicle_command_ack_Publisher.h \
+	src/rtps/vehicle_command_ack_PubSubTypes.cxx \
+	src/rtps/vehicle_command_ack_PubSubTypes.h \
+	src/rtps/vehicle_command_.cxx \
+	src/rtps/vehicle_command_.h \
+	src/rtps/vehicle_command_PubSubTypes.cxx \
+	src/rtps/vehicle_command_PubSubTypes.h \
+	src/rtps/vehicle_command_Subscriber.cxx \
+	src/rtps/vehicle_command_Subscriber.h
+
+rtpsd_LDFLAGS = -lfastcdr -lfastrtps
+
+noinst_PROGRAMS += rtps_command
+
+rtps_command_SOURCES = \
+	examples/rtps/command/vehicle_command_.cxx \
+	examples/rtps/command/vehicle_command_.h \
+	examples/rtps/command/vehicle_command_Publisher.cxx \
+	examples/rtps/command/vehicle_command_Publisher.h \
+	examples/rtps/command/vehicle_command_PubSubMain.cxx \
+	examples/rtps/command/vehicle_command_PubSubTypes.cxx \
+	examples/rtps/command/vehicle_command_PubSubTypes.h
+
+rtps_command_LDFLAGS = -lfastcdr -lfastrtps
+
+noinst_PROGRAMS += rtps_sensor_combined
+
+rtps_sensor_combined_SOURCES = \
+	examples/rtps/sensor-combined/sensor_combined_.cxx \
+	examples/rtps/sensor-combined/sensor_combined_.h \
+	examples/rtps/sensor-combined/sensor_combined_PubSubMain.cxx \
+	examples/rtps/sensor-combined/sensor_combined_PubSubTypes.cxx \
+	examples/rtps/sensor-combined/sensor_combined_PubSubTypes.h \
+	examples/rtps/sensor-combined/sensor_combined_Subscriber.cxx \
+	examples/rtps/sensor-combined/sensor_combined_Subscriber.h
+
+rtps_sensor_combined_LDFLAGS = -lfastcdr -lfastrtps
+endif
 
 noinst_PROGRAMS += heartbeat-print
 heartbeat_print_SOURCES = \
 	examples/heartbeat-print.cpp
+
+heartbeat_print_CPPFLAGS = ${AM_CPPFLAGS}
+heartbeat_print_CPPFLAGS += \
+	-I$(top_builddir)/include/mavlink \
+	-I$(top_builddir)/include/mavlink/ardupilotmega
 
 SED_PROCESS = $(AM_V_GEN) $(MKDIR_P) $(dir $@) && \
 	 $(SED) -e 's,@bindir\@,$(bindir),g' \
