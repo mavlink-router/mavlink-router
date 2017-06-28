@@ -1,5 +1,5 @@
 # mavlink-router configuration file is composed of sections,
-# each section have some keys and values. They
+# each section has some keys and values. They
 # are case insensitive, so `Key=Value` is the same as `key=value`.
 #
 # [This-is-a-section name-of-section]
@@ -47,6 +47,12 @@
 #   Baud
 #       Numeric value stating baudrate of UART device
 #       Default: 115200
+#
+#   FlowControl
+#       Boolean value <true> or <false> case insensitive, or <0> or <1>
+#       defining if flow control should be enabled
+#       Default: false
+#
 #
 # Section [UdpEndpoint]: This section must have a name
 #

@@ -114,6 +114,7 @@ struct endpoint_config {
         struct {
             char *device;
             std::vector<unsigned long> *bauds;
+            bool flowcontrol;
         };
     };
 };
