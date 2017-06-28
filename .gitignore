@@ -28,6 +28,12 @@
 /perf.data
 /perf.data.old
 /stamp-h1
+/test-suite.log
+/tests/routing_test.log
+/tests/routing_test.trs
+/unit_test
+/unit_test.log
+/unit_test.trs
 
 *~
 .*.swp
