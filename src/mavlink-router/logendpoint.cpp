@@ -30,9 +30,10 @@
 
 #include <memory>
 
-#include "log.h"
+#include <common/log.h>
+#include <common/util.h>
+
 #include "mainloop.h"
-#include "util.h"
 
 #define ALIVE_TIMEOUT 5
 #define MAX_RETRIES 10

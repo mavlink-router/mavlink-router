@@ -17,8 +17,9 @@
  */
 #include "autolog.h"
 
+#include <common/log.h>
+
 #include "binlog.h"
-#include "log.h"
 #include "ulog.h"
 
 int AutoLog::write_msg(const struct buffer *buffer)

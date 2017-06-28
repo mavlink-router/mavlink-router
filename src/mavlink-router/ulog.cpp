@@ -23,8 +23,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "log.h"
-#include "util.h"
+#include <common/log.h>
+#include <common/util.h>
 
 #define ULOG_HEADER_SIZE 16
 #define ULOG_MAGIC                               \

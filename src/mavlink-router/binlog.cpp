@@ -23,9 +23,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "log.h"
+#include <common/log.h>
+#include <common/util.h>
+
 #include "mainloop.h"
-#include "util.h"
 
 bool BinLog::_start_timeout()
 {

@@ -24,13 +24,14 @@
 #include <stdio.h>
 #include <sys/stat.h>
 
+#include <common/conf_file.h>
+#include <common/dbg.h>
+#include <common/log.h>
+#include <common/util.h>
+
 #include "comm.h"
-#include "conf_file.h"
-#include "dbg.h"
 #include "endpoint.h"
-#include "log.h"
 #include "mainloop.h"
-#include "util.h"
 
 #define MAVLINK_TCP_PORT 5760
 #define DEFAULT_BAUDRATE 115200U

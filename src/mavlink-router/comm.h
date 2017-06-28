@@ -22,7 +22,7 @@
 #include <errno.h>
 #include <inttypes.h>
 
-#include "macro.h"
+#include <common/macro.h>
 
 struct buffer {
     unsigned int len;

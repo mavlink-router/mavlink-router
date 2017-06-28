@@ -18,15 +18,17 @@
 #include "mainloop.h"
 
 #include <assert.h>
-#include <memory>
 #include <signal.h>
 #include <sys/epoll.h>
 #include <sys/timerfd.h>
 #include <unistd.h>
 
+#include <memory>
+
+#include <common/log.h>
+#include <common/util.h>
+
 #include "autolog.h"
-#include "log.h"
-#include "util.h"
 
 static volatile bool should_exit = false;
 

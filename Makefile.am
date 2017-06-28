@@ -37,9 +37,7 @@ systemdsystemunit_DATA = mavlink-router.service
 AM_CPPFLAGS = \
 	-include $(top_builddir)/config.h \
 	-I$(top_builddir) \
-	-I$(top_srcdir) \
-	-I$(top_srcdir)/src/mavlink-router \
-	-I$(top_srcdir)/src/common \
+	-I$(top_srcdir)/src \
 	-I$(top_builddir)/include/mavlink \
 	-I$(top_builddir)/include/mavlink/ardupilotmega \
 	-DSYSCONFDIR=\""$(sysconfdir)"\"

@@ -30,10 +30,11 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "log.h"
+#include <common/log.h>
+#include <common/util.h>
+#include <common/xtermios.h>
+
 #include "mainloop.h"
-#include "util.h"
-#include "xtermios.h"
 
 #define RX_BUF_MAX_SIZE (MAVLINK_MAX_PACKET_LEN * 4)
 #define TX_BUF_MAX_SIZE (8U * 1024U)
