@@ -181,7 +181,7 @@ PY_LOG_COMPILER = $(PYTHON)
 # ------------------------------------------------------------------------------
 # gtest
 # ------------------------------------------------------------------------------
-GTEST_ROOT = $(top_builddir)/modules/gtest/googletest
+GTEST_ROOT = $(top_srcdir)/modules/gtest/googletest
 GTEST_CPPFLAGS = -isystem $(GTEST_ROOT)/include
 GTEST_CXXFLAGS = -g -Wall -Wextra -pthread
 GTEST_SRCS_ = $(GTEST_ROOT)/src/*.cc $(GTEST_ROOT)/src/*.h $(GTEST_HEADERS)
@@ -193,7 +193,7 @@ gtest-all.o: $(GTEST_SRCS_)
 gtest.a : gtest-all.o
 	$(AR) $(ARFLAGS) $@ $^
 
-unit_test: $(top_builddir)/tests/*.cpp gtest.a $(GTEST_HEADERS)
+unit_test: $(top_srcdir)/tests/*.cpp gtest.a $(GTEST_HEADERS)
 	$(CXX) $(GTEST_CPPFLAGS) $(GTEST_CXXFLAGS) -lpthread $^ -o $@
 
 # ------------------------------------------------------------------------------
