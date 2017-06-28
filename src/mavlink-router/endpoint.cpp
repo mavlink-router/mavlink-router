@@ -461,6 +461,35 @@ int UartEndpoint::set_speed(speed_t baudrate)
     return 0;
 }
 
+int UartEndpoint::set_flow_control(bool enabled)
+{
+    struct termios2 tc;
+
+    if (fd < 0) {
+        return -1;
+    }
+
+    bzero(&tc, sizeof(tc));
+    if (ioctl(fd, TCGETS2, &tc) == -1) {
+        log_error("Could not get termios2 (%m)");
+        return -1;
+    }
+
+    if (enabled)
+        tc.c_cflag |= CRTSCTS;
+    else
+        tc.c_cflag &= ~CRTSCTS;
+
+    if (ioctl(fd, TCSETS2, &tc) == -1) {
+        log_error("Could not set terminal attributes (%m)");
+        return -1;
+    }
+
+    log_info("UART [%d] flowcontrol = %s", fd, enabled ? "enabled" : "disabled");
+
+    return 0;
+}
+
 int UartEndpoint::open(const char *path)
 {
     struct termios2 tc;

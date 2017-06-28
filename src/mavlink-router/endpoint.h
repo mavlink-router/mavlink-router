@@ -142,6 +142,7 @@ public:
 
     int open(const char *path);
     int set_speed(speed_t baudrate);
+    int set_flow_control(bool enabled);
     int add_speeds(std::vector<unsigned long> baudrates);
 
 protected:
