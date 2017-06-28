@@ -90,7 +90,12 @@ public:
     uint8_t get_trimmed_zeros(const struct buffer *buffer);
 
     bool has_sys_id(unsigned sysid);
-    bool has_sys_comp_id(unsigned sysid, unsigned compid);
+    bool has_sys_comp_id(unsigned sys_comp_id);
+    bool has_sys_comp_id(unsigned sysid, unsigned compid) {
+        uint16_t sys_comp_id = ((sysid & 0xff) << 8) | (compid & 0xff);
+        return has_sys_comp_id(sys_comp_id);
+    }
+
     bool accept_msg(int target_sysid, int target_compid, uint8_t src_sysid, uint8_t src_compid);
 
     struct buffer rx_buf;

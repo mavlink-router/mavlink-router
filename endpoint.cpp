@@ -282,10 +282,9 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
 
 void Endpoint::_add_sys_comp_id(uint16_t sys_comp_id)
 {
-    for (auto it = _sys_comp_ids.begin(); it != _sys_comp_ids.end(); it++) {
-        if (sys_comp_id == *it)
-            return;
-    }
+    if (has_sys_comp_id(sys_comp_id))
+        return;
+
     _sys_comp_ids.push_back(sys_comp_id);
 }
 
@@ -298,9 +297,8 @@ bool Endpoint::has_sys_id(unsigned sysid)
     return false;
 }
 
-bool Endpoint::has_sys_comp_id(unsigned sysid, unsigned compid)
+bool Endpoint::has_sys_comp_id(unsigned sys_comp_id)
 {
-    uint16_t sys_comp_id = ((sysid & 0xff) << 8) | (compid & 0xff);
     for (auto it = _sys_comp_ids.begin(); it != _sys_comp_ids.end(); it++) {
         if (sys_comp_id == *it)
             return true;
