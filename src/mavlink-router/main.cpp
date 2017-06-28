@@ -301,7 +301,7 @@ error:
 }
 
 static int add_uart_endpoint(const char *name, size_t name_len, const char *uart_device,
-                             const char *bauds)
+                             const char *bauds, bool flowcontrol)
 {
     int ret;
 
@@ -329,6 +329,8 @@ static int add_uart_endpoint(const char *name, size_t name_len, const char *uart
         ret = -EINVAL;
         goto fail;
     }
+
+    conf->flowcontrol = flowcontrol;
 
     conf->next = opt.endpoints;
     opt.endpoints = conf;
@@ -478,7 +480,7 @@ static int parse_argv(int argc, char *argv[])
 
             add_endpoint_address(NULL, 0, base, number, true);
         } else {
-            int ret = add_uart_endpoint(NULL, 0, base, base + strlen(base) + 1);
+            int ret = add_uart_endpoint(NULL, 0, base, base + strlen(base) + 1, false);
             if (ret < 0)
                 return ret;
         }
@@ -610,10 +612,12 @@ static int parse_confs(ConfFile &conf)
     struct option_uart {
         char *device;
         char *bauds;
+        bool flowcontrol;
     };
     static const ConfFile::OptionsTable option_table_uart[] = {
-        {"baud",    false,  ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_uart, bauds)},
-        {"device",  true,   ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_uart, device)},
+        {"baud",        false,  ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_uart, bauds)},
+        {"device",      true,   ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_uart, device)},
+        {"FlowControl", false,  ConfFile::parse_bool,       OPTIONS_TABLE_STRUCT_FIELD(option_uart, flowcontrol)},
     };
 
     struct option_udp {
@@ -651,7 +655,7 @@ static int parse_confs(ConfFile &conf)
                                    &opt_uart);
         if (ret == 0)
             ret = add_uart_endpoint(iter.name + offset, iter.name_len - offset, opt_uart.device,
-                                    opt_uart.bauds);
+                                    opt_uart.bauds, opt_uart.flowcontrol);
         free(opt_uart.device);
         free(opt_uart.bauds);
         if (ret < 0)

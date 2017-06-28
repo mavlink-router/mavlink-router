@@ -380,6 +380,11 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
                     return false;
             }
 
+            if (conf->flowcontrol) {
+                if (uart->set_flow_control(true) < 0)
+                    return false;
+            }
+
             g_endpoints[i] = uart.release();
             mainloop.add_fd(g_endpoints[i]->fd, g_endpoints[i], EPOLLIN);
             i++;
