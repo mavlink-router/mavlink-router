@@ -126,7 +126,7 @@ if __name__ == "__main__":
     proc = subprocess.Popen(
         [
             "./mavlink-routerd", "-e", "127.0.0.1:10100", "-e",
-            "127.0.0.1:10101", "127.0.0.1:10000"
+            "127.0.0.1:10101", "127.0.0.1:10000", "-c", "/nonexistent"
         ],
         stderr=sys.stdout.fileno(),
         stdout=sys.stdout.fileno())
