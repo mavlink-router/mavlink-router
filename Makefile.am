@@ -161,6 +161,11 @@ noinst_PROGRAMS += heartbeat-print
 heartbeat_print_SOURCES = \
 	examples/heartbeat-print.cpp
 
+noinst_PROGRAMS += px4-offboard-mode
+px4_offboard_mode_SOURCES = \
+	examples/px4-offboard-mode.cpp \
+	src/common/util.c
+
 SED_PROCESS = $(AM_V_GEN) $(MKDIR_P) $(dir $@) && \
 	 $(SED) -e 's,@bindir\@,$(bindir),g' \
 	 < $< > $@
