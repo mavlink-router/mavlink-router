@@ -480,7 +480,8 @@ static int parse_argv(int argc, char *argv[])
 
             add_endpoint_address(NULL, 0, base, number, true);
         } else {
-            int ret = add_uart_endpoint(NULL, 0, base, base + strlen(base) + 1, false);
+            const char *bauds = number != ULONG_MAX ? base + strlen(base) + 1 : NULL;
+            int ret = add_uart_endpoint(NULL, 0, base, bauds, false);
             if (ret < 0)
                 return ret;
         }
