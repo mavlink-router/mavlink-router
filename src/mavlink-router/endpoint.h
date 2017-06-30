@@ -87,7 +87,7 @@ public:
 
     void log_aggregate(unsigned int interval_sec);
 
-    uint8_t get_trimmed_zeros(const struct buffer *buffer);
+    uint8_t get_trimmed_zeros(const mavlink_msg_entry_t *msg_entry, const struct buffer *buffer);
 
     bool has_sys_id(unsigned sysid);
     bool has_sys_comp_id(unsigned sys_comp_id);

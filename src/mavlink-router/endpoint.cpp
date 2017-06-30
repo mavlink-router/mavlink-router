@@ -389,18 +389,13 @@ void Endpoint::print_statistics()
     printf("\n}\n");
 }
 
-uint8_t Endpoint::get_trimmed_zeros(const struct buffer *buffer)
+uint8_t Endpoint::get_trimmed_zeros(const mavlink_msg_entry_t *msg_entry, const struct buffer *buffer)
 {
     struct mavlink_router_mavlink2_header *msg
         = (struct mavlink_router_mavlink2_header *)buffer->data;
-    const mavlink_msg_entry_t *msg_entry;
 
     /* Only MAVLink 2 trim zeros */
     if (buffer->data[0] != MAVLINK_STX)
-        return 0;
-
-    msg_entry = mavlink_get_msg_entry(msg->msgid);
-    if (!msg_entry)
         return 0;
 
     /* Should never happen but if happens it will cause stack overflow */
