@@ -97,11 +97,20 @@ int BinLog::write_msg(const struct buffer *buffer)
         return buffer->len;
     }
 
+    const mavlink_msg_entry_t *msg_entry = mavlink_get_msg_entry(msg_id);
+    if (!msg_entry) {
+        return buffer->len;
+    }
+
+    if (payload_len > msg_entry->msg_len) {
+        payload_len = msg_entry->msg_len;
+    }
+
     uint8_t *payload;
 
     if (mavlink2) {
         payload = buffer->data + sizeof(struct mavlink_router_mavlink2_header);
-        trimmed_zeros = get_trimmed_zeros(buffer);
+        trimmed_zeros = get_trimmed_zeros(msg_entry, buffer);
     } else {
         payload = buffer->data + sizeof(struct mavlink_router_mavlink1_header);
         trimmed_zeros = 0;
