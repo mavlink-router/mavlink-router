@@ -25,6 +25,12 @@
 #define _pure_ __attribute__((pure))
 #define _packed_ __attribute__((packed))
 
+#if __has_cpp_attribute(fallthrough)
+#define _fall_through_ [[fallthrough]]
+#else
+#define _fall_through_
+#endif
+
 #define IOVEC_SET_STRING(i, s)          \
     do {                                \
         struct iovec *_i = &(i);        \
