@@ -37,6 +37,7 @@
 #include <poll.h>
 #include <signal.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <sys/timerfd.h>
 #include <sys/socket.h>
@@ -57,10 +58,10 @@
 
 static volatile bool g_should_exit;
 
-static int tcp_fd;
+static int tcp_fd = -1;
 static struct sockaddr_in sockaddr;
 
-static int timeout_fd;
+static int timeout_fd = -1;
 
 enum px4_modes {
     PX4_MODE_UNKNOWN = 0,
@@ -83,14 +84,18 @@ static void exit_signal_handler(int signum)
     g_should_exit = true;
 }
 
-static void setup_signal_handlers()
+static int setup_signal_handlers()
 {
     struct sigaction sa = { };
 
     sa.sa_flags = SA_NOCLDSTOP;
     sa.sa_handler = exit_signal_handler;
-    sigaction(SIGTERM, &sa, NULL);
-    sigaction(SIGINT, &sa, NULL);
+
+    if (sigaction(SIGTERM, &sa, NULL) != 0 ||
+        sigaction(SIGINT, &sa, NULL) != 0)
+        return -1;
+
+    return 0;
 }
 
 static int msg_send(mavlink_message_t *msg)
@@ -270,49 +275,62 @@ static void loop()
     }
 }
 
-int main(int argc, char *argv[])
+static int setup_connection()
 {
     const char *ip = "127.0.0.1";
-    int port = 5760;
-    int ret;
-    struct itimerspec ts;
+    const int port = 5760;
 
     tcp_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (tcp_fd == -1) {
         fprintf(stderr, "Could not create socket (%m)\n");
-        return 1;
+        return -1;
     }
 
     sockaddr.sin_family = AF_INET;
     sockaddr.sin_addr.s_addr = inet_addr(ip);
     sockaddr.sin_port = htons(port);
 
-    ret = connect(tcp_fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
-    if (ret) {
+    if (connect(tcp_fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) != 0) {
         fprintf(stderr, "Could not connect to socket (%m)\n");
-        goto connect_error;
+        return -1;
     }
 
     if (fcntl(tcp_fd, F_SETFL, O_NONBLOCK | O_ASYNC) < 0) {
         fprintf(stderr, "Error setting socket tcp_fd as non-blocking");
-        goto network_fcntl_error;
+        return -1;
     }
+
+    printf("Connected to TCP:%s:%u\n", ip, port);
+
+    return 0;
+}
+
+static int setup_timeout()
+{
+    struct itimerspec ts = {};
 
     timeout_fd = timerfd_create(CLOCK_MONOTONIC, 0);
     if (timeout_fd < 0) {
         fprintf(stderr, "Unable to create timerfd (%m)\n");
-        goto timerfd_error;
+        return -1;
     }
 
     ts.it_interval.tv_sec = 0;
     ts.it_interval.tv_nsec = NSEC_PER_MSEC * 50;
     ts.it_value.tv_sec = ts.it_interval.tv_sec;
     ts.it_value.tv_nsec = ts.it_interval.tv_nsec;
+
     timerfd_settime(timeout_fd, 0, &ts, NULL);
 
-    setup_signal_handlers();
+    return 0;
+}
 
-    printf("Connected to TCP:%s:%u\n", ip, port);
+int main(int argc, char *argv[])
+{
+    if (setup_connection() < 0 ||
+        setup_timeout() < 0 ||
+        setup_signal_handlers() < 0)
+        goto fail;
 
     loop();
 
@@ -321,9 +339,11 @@ int main(int argc, char *argv[])
 
     return 0;
 
-timerfd_error:
-network_fcntl_error:
-connect_error:
-    close(tcp_fd);
-    return -1;
+fail:
+    if (tcp_fd >= 0)
+        close(tcp_fd);
+    if (timeout_fd >=0)
+        close(timeout_fd);
+
+    return EXIT_FAILURE;
 }
