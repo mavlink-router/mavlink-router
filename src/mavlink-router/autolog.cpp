@@ -73,6 +73,7 @@ void AutoLog::stop()
 bool AutoLog::start()
 {
     _system_id = LOG_ENDPOINT_SYSTEM_ID;
+    _add_sys_comp_id(LOG_ENDPOINT_SYSTEM_ID << 8);
 
     return true;
 }
