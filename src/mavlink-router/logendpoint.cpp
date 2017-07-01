@@ -176,6 +176,8 @@ bool LogEndpoint::start()
 
     log_info("Logging target system_id=%u on %s", _target_system_id, filename);
 
+    _add_sys_comp_id(LOG_ENDPOINT_SYSTEM_ID << 8);
+
     return true;
 
 timeout_error:
