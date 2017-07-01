@@ -28,8 +28,8 @@
 
 class LogEndpoint : public Endpoint {
 public:
-    LogEndpoint(const char *logs_dir)
-        : Endpoint{"BinLog", false}
+    LogEndpoint(const char *name, const char *logs_dir)
+        : Endpoint{name, false}
         , _logs_dir{logs_dir}
     {
         assert(_logs_dir);
