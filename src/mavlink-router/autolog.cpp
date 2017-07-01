@@ -31,20 +31,23 @@ int AutoLog::write_msg(const struct buffer *buffer)
     const bool mavlink2 = buffer->data[0] == MAVLINK_STX;
     uint32_t msg_id;
     uint8_t *payload;
+    uint8_t source_system_id;
 
     if (mavlink2) {
         struct mavlink_router_mavlink2_header *hdr
             = (struct mavlink_router_mavlink2_header *)buffer->data;
         msg_id = hdr->msgid;
         payload = buffer->data + sizeof(*hdr);
+        source_system_id = hdr->sysid;
     } else {
         struct mavlink_router_mavlink1_header *hdr
             = (struct mavlink_router_mavlink1_header *)buffer->data;
         msg_id = hdr->msgid;
         payload = buffer->data + sizeof(*hdr);
+        source_system_id = hdr->sysid;
     }
 
-    if (msg_id != MAVLINK_MSG_ID_HEARTBEAT) {
+    if (msg_id != MAVLINK_MSG_ID_HEARTBEAT || source_system_id != LOG_ENDPOINT_TARGET_SYSTEM_ID) {
         return buffer->len;
     }
 
