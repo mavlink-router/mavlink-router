@@ -44,19 +44,22 @@ int AutoLog::write_msg(const struct buffer *buffer)
         payload = buffer->data + sizeof(*hdr);
     }
 
+    if (msg_id != MAVLINK_MSG_ID_HEARTBEAT) {
+        return buffer->len;
+    }
+
+    const mavlink_heartbeat_t *heartbeat = (mavlink_heartbeat_t *)payload;
+
     /* We check autopilot on heartbeat */
-    if (msg_id == MAVLINK_MSG_ID_HEARTBEAT) {
-        uint8_t autopilot = payload[5];
-        log_debug("Got autopilot %u from heartbeat", autopilot);
-        if (autopilot == MAV_AUTOPILOT_PX4) {
-            _logger = std::unique_ptr<LogEndpoint>(new ULog(_logs_dir));
-            _logger->start();
-        } else if (autopilot == MAV_AUTOPILOT_ARDUPILOTMEGA) {
-            _logger = std::unique_ptr<LogEndpoint>(new BinLog(_logs_dir));
-            _logger->start();
-        } else {
-            log_warning("Unidentified autopilot, cannot start flight stack logging");
-        }
+    log_debug("Got autopilot %u from heartbeat", heartbeat->autopilot);
+    if (heartbeat->autopilot == MAV_AUTOPILOT_PX4) {
+        _logger = std::unique_ptr<LogEndpoint>(new ULog(_logs_dir));
+        _logger->start();
+    } else if (heartbeat->autopilot == MAV_AUTOPILOT_ARDUPILOTMEGA) {
+        _logger = std::unique_ptr<LogEndpoint>(new BinLog(_logs_dir));
+        _logger->start();
+    } else {
+        log_warning("Unidentified autopilot, cannot start flight stack logging");
     }
 
     return buffer->len;
