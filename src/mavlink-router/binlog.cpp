@@ -32,7 +32,7 @@ bool BinLog::_start_timeout()
 {
     mavlink_message_t msg;
 
-    mavlink_msg_remote_log_block_status_pack(_system_id, MAV_COMP_ID_ALL, &msg, _target_system_id,
+    mavlink_msg_remote_log_block_status_pack(LOG_ENDPOINT_SYSTEM_ID, MAV_COMP_ID_ALL, &msg, _target_system_id,
                                              MAV_COMP_ID_ALL, MAV_REMOTE_LOG_DATA_BLOCK_START, 1);
     _send_msg(&msg, _target_system_id);
 
@@ -46,7 +46,6 @@ bool BinLog::start()
     }
 
     _last_acked_seqno = 0;
-    _system_id = LOG_ENDPOINT_SYSTEM_ID;
 
     return true;
 }
@@ -67,7 +66,7 @@ void BinLog::_send_stop()
 {
     mavlink_message_t msg;
 
-    mavlink_msg_remote_log_block_status_pack(_system_id, MAV_COMP_ID_ALL, &msg, _target_system_id,
+    mavlink_msg_remote_log_block_status_pack(LOG_ENDPOINT_SYSTEM_ID, MAV_COMP_ID_ALL, &msg, _target_system_id,
                                              MAV_COMP_ID_ALL, MAV_REMOTE_LOG_DATA_BLOCK_STOP, 1);
     _send_msg(&msg, _target_system_id);
 }
@@ -152,7 +151,7 @@ void BinLog::_send_ack(uint32_t seqno)
 
     // Message filled a gap, or is duplicated. just send the ack
     if (seqno < _last_acked_seqno) {
-        mavlink_msg_remote_log_block_status_pack(_system_id, MAV_COMP_ID_ALL, &msg,
+        mavlink_msg_remote_log_block_status_pack(LOG_ENDPOINT_SYSTEM_ID, MAV_COMP_ID_ALL, &msg,
                                                  _target_system_id, MAV_COMP_ID_ALL, seqno, 1);
         _send_msg(&msg, _target_system_id);
         return;
@@ -162,13 +161,13 @@ void BinLog::_send_ack(uint32_t seqno)
     // TODO send ack to source only?
     // Send nacks regarding unseen seqno
     for (uint32_t i = _last_acked_seqno; i < seqno; i++) {
-        mavlink_msg_remote_log_block_status_pack(_system_id, MAV_COMP_ID_ALL, &msg,
+        mavlink_msg_remote_log_block_status_pack(LOG_ENDPOINT_SYSTEM_ID, MAV_COMP_ID_ALL, &msg,
                                                  _target_system_id, MAV_COMP_ID_ALL, seqno, 0);
         _send_msg(&msg, _target_system_id);
     }
 
     // Send ack to seen seqno
-    mavlink_msg_remote_log_block_status_pack(_system_id, MAV_COMP_ID_ALL, &msg, _target_system_id,
+    mavlink_msg_remote_log_block_status_pack(LOG_ENDPOINT_SYSTEM_ID, MAV_COMP_ID_ALL, &msg, _target_system_id,
                                              MAV_COMP_ID_ALL, seqno, 1);
     _send_msg(&msg, _target_system_id);
     _last_acked_seqno = seqno;

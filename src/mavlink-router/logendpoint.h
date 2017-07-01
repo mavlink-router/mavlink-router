@@ -42,7 +42,6 @@ protected:
     const char *_logs_dir;
     const int _target_system_id = LOG_ENDPOINT_TARGET_SYSTEM_ID;
     int _file = -1;
-    uint8_t _system_id;
 
     Timeout *_logging_start_timeout = nullptr;
     Timeout *_alive_check_timeout = nullptr;

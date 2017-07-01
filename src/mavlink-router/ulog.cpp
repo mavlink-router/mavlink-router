@@ -49,7 +49,7 @@ bool ULog::_start_timeout()
     cmd.target_component = MAV_COMP_ID_ALL;
     cmd.target_system = _target_system_id;
 
-    mavlink_msg_command_long_encode(_system_id, MAV_COMP_ID_ALL, &msg, &cmd);
+    mavlink_msg_command_long_encode(LOG_ENDPOINT_SYSTEM_ID, MAV_COMP_ID_ALL, &msg, &cmd);
     _send_msg(&msg, _target_system_id);
 
     return true;
@@ -67,7 +67,6 @@ bool ULog::start()
     _buffer_len = 0;
     _buffer_index = 0;
     _buffer_partial_len = 0;
-    _system_id = LOG_ENDPOINT_SYSTEM_ID;
 
     return true;
 }
@@ -87,7 +86,7 @@ void ULog::stop()
     cmd.target_component = MAV_COMP_ID_ALL;
     cmd.target_system = _target_system_id;
 
-    mavlink_msg_command_long_encode(_system_id, MAV_COMP_ID_ALL, &msg, &cmd);
+    mavlink_msg_command_long_encode(LOG_ENDPOINT_SYSTEM_ID, MAV_COMP_ID_ALL, &msg, &cmd);
     _send_msg(&msg, _target_system_id);
 
     _buffer_len = 0;
@@ -174,7 +173,7 @@ int ULog::write_msg(const struct buffer *buffer)
         ack.sequence = ulog_data_acked->sequence;
         ack.target_component = MAV_COMP_ID_ALL;
         ack.target_system = _target_system_id;
-        mavlink_msg_logging_ack_encode(_system_id, MAV_COMP_ID_ALL, &msg, &ack);
+        mavlink_msg_logging_ack_encode(LOG_ENDPOINT_SYSTEM_ID, MAV_COMP_ID_ALL, &msg, &ack);
         _send_msg(&msg, _target_system_id);
         /* no break needed, message will be handled by MAVLINK_MSG_ID_LOGGING_DATA case */
         _fall_through_;
