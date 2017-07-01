@@ -81,7 +81,7 @@ public:
     int handle_read() override;
     bool handle_canwrite() override;
 
-    void print_statistics();
+    virtual void print_statistics();
     virtual int write_msg(const struct buffer *pbuf) = 0;
     virtual int flush_pending_msgs() = 0;
 

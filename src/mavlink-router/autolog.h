@@ -34,6 +34,7 @@ public:
 
     bool start() override;
     void stop() override;
+    void print_statistics() override;
 
 protected:
     ssize_t _read_msg(uint8_t *buf, size_t len) { return 0; }

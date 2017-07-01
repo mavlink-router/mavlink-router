@@ -80,3 +80,12 @@ bool AutoLog::start()
 
     return true;
 }
+
+void AutoLog::print_statistics()
+{
+    if (_logger) {
+        _logger->print_statistics();
+    } else {
+        Endpoint::print_statistics();
+    }
+}
