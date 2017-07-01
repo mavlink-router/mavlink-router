@@ -24,7 +24,7 @@
 class ULog : public LogEndpoint {
 public:
     ULog(const char *logs_dir)
-        : LogEndpoint{logs_dir}
+        : LogEndpoint{"ULog", logs_dir}
     {
     }
 
