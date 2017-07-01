@@ -149,7 +149,6 @@ void LogEndpoint::stop()
     fsync(_file);
     close(_file);
     _file = -1;
-    _system_id = 0;
 }
 
 bool LogEndpoint::start()
