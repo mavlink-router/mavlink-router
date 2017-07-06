@@ -37,7 +37,7 @@ public:
     void print_statistics() override;
 
 protected:
-    ssize_t _read_msg(uint8_t *buf, size_t len) { return 0; }
+    ssize_t _read_msg(uint8_t *buf, size_t len) override { return 0; }
 
     // These functions should never be called
     const char *_get_logfile_extension() override { return ""; };
