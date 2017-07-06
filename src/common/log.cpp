@@ -102,7 +102,11 @@ void Log::logv(Level level, const char *format, va_list ap)
         IOVEC_SET_STRING(iovec[n++], color);
 
     errno = save_errno;
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-nonliteral"
     vsnprintf(buffer, sizeof(buffer), format, ap);
+#pragma GCC diagnostic pop
 
     IOVEC_SET_STRING(iovec[n++], buffer);
 
