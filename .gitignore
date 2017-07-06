@@ -28,6 +28,7 @@
 /mavlink-router.service
 /perf.data
 /perf.data.old
+/px4-offboard-mode
 /stamp-h1
 /test-suite.log
 /tests/routing_test.log
