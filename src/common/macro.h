@@ -25,9 +25,13 @@
 #define _pure_ __attribute__((pure))
 #define _packed_ __attribute__((packed))
 
+#ifdef __has_cpp_attribute
 #if __has_cpp_attribute(fallthrough)
 #define _fall_through_ [[fallthrough]]
-#else
+#endif
+#endif
+
+#ifndef _fall_through_
 #define _fall_through_
 #endif
 
