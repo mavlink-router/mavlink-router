@@ -439,6 +439,7 @@ static int parse_argv(int argc, char *argv[])
             }
             if (port == ULONG_MAX) {
                 log_error("Missing port in argument: %s", optarg);
+                free(ip);
                 help(stderr);
                 return -EINVAL;
             }
@@ -482,8 +483,10 @@ static int parse_argv(int argc, char *argv[])
         } else {
             const char *bauds = number != ULONG_MAX ? base + strlen(base) + 1 : NULL;
             int ret = add_uart_endpoint(NULL, 0, base, bauds, false);
-            if (ret < 0)
+            if (ret < 0) {
+                free(base);
                 return ret;
+            }
         }
         free(base);
         optind++;
