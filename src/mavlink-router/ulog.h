@@ -35,10 +35,10 @@ public:
     int flush_pending_msgs() override { return -ENOSYS; }
 
 protected:
-    ssize_t _read_msg(uint8_t *buf, size_t len) { return 0; };
+    ssize_t _read_msg(uint8_t *buf, size_t len) override { return 0; };
     bool _start_timeout() override;
 
-    const char *_get_logfile_extension() { return "ulg"; };
+    const char *_get_logfile_extension() override { return "ulg"; };
 private:
     uint16_t _expected_seq = 0;
     bool _waiting_header = true;

@@ -38,10 +38,10 @@ public:
     int flush_pending_msgs() override { return -ENOSYS; }
 
 protected:
-    ssize_t _read_msg(uint8_t *buf, size_t len) { return 0; };
+    ssize_t _read_msg(uint8_t *buf, size_t len) override { return 0; };
     bool _start_timeout() override;
 
-    const char *_get_logfile_extension() { return "bin"; };
+    const char *_get_logfile_extension() override { return "bin"; };
 private:
     uint32_t _last_acked_seqno = 0;
 
