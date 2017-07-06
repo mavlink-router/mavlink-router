@@ -103,7 +103,12 @@ static int msg_send(mavlink_message_t *msg)
     uint8_t data[MAVLINK_MAX_PACKET_LEN];
 
     uint16_t len = mavlink_msg_to_send_buffer(data, msg);
-    return sendto(tcp_fd, data, len, 0, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
+    int r = sendto(tcp_fd, data, len, 0, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
+    if (r < 0) {
+        fprintf(stderr, "Could not send to %d: r=%d (%m)\n", tcp_fd, r);
+    }
+
+    return r;
 }
 
 static void handle_command_ack(mavlink_command_ack_t *ack)
