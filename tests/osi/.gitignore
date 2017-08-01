@@ -1,2 +1,3 @@
 /.mkosi-*
+/mkosi.cache
 /rootfs
