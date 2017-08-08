@@ -17,18 +17,22 @@
  */
 
 /*
- * This example shows how to change to offboard mode in PX4.
+ * This example shows how to fly in offboard mode in PX4.
  *
  * PX4 will only change to offboard mode and keep it in this mode if it is
  * receiving one of this messages: mavlink_set_position_target_local_ned_t,
  * mavlink_set_actuator_control_target_t or mavlink_set_attitude_target_t
  * at least at 0.5 hz.
  *
- * At each 50msec this example will request to the vehicle to move
- * 0 meters in X, 0 meters in Y, 0 meters in Z and 0 rads in yaw
- * (position_set_send(0, 0, 0, 0)) from the actual position of the vehicle and
- * if the actual mode is not offboard it will request PX4 to change to this
- * mode.
+ * At each 50msec this example will send to PX4 a
+ * mavlink_set_position_target_local_ned_t, also in the same callback it will
+ * handle each item of the task list, changing the parameters of
+ * mavlink_set_position_target_local_ned_t and sending another messages when
+ * needed.
+ *
+ * The task list bellow will wait for the basic information need and check
+ * if the state is good, then change to offboard mode, arm the vehicle, takeoff,
+ * fly the vehicle in a square shaped path then land and disarm.
  */
 
 #include <arpa/inet.h>
@@ -56,6 +60,8 @@
 
 #define POLL_ERROR_EVENTS (POLLERR | POLLHUP | POLLNVAL)
 
+#define SETPOINT_RANGE 0.25f
+
 static volatile bool g_should_exit;
 
 static int tcp_fd = -1;
@@ -65,19 +71,69 @@ static int timeout_fd = -1;
 
 enum px4_modes {
     PX4_MODE_UNKNOWN = 0,
-    PX4_MODE_STABILIZED,
     PX4_MODE_OFFBOARD,
     PX4_MODE_LAST
 };
 
 static const char * mode_names[] = {
     "unknown",
-    "stabilized",
     "offboard"
 };
 
-static enum px4_modes target_mode = PX4_MODE_UNKNOWN;
-static enum px4_modes target_mode_requested = PX4_MODE_UNKNOWN;
+static enum px4_modes current_mode = PX4_MODE_UNKNOWN;
+static bool armed = false;
+static bool in_the_air = false;
+static bool landing = false;
+static float vehicle_x, vehicle_y, vehicle_z;
+
+#define BASIC_INFO_HEARTBEAT_BIT (1 << 0)
+#define BASIC_INFO_LOCAL_POSITION_NED_BIT (1 << 1)
+#define BASIC_INFO_EXTENDED_SYS_STATE_BIT (1 << 2)
+#define BASIC_INFO_HOME_POSITION (1 << 3)
+#define BASIC_INFO_ALL_BITS (BASIC_INFO_HEARTBEAT_BIT | BASIC_INFO_LOCAL_POSITION_NED_BIT | BASIC_INFO_EXTENDED_SYS_STATE_BIT | BASIC_INFO_HOME_POSITION)
+
+static uint8_t have_basic_info_mask = 0;
+
+enum actions {
+    ARM_DISARM = 0,
+    SET_MODE,
+    MOVE_X,
+    MOVE_Y,
+    MOVE_Z,
+    WAIT_MOVE,
+    LAND,
+    WAIT_LAND,
+    CHECK_STATE,
+    END
+};
+
+struct tasks {
+    enum actions action;
+    int32_t param1;
+};
+
+static struct tasks list[] = {
+    { .action = CHECK_STATE },
+    { .action = SET_MODE },
+    { .action = ARM_DISARM, .param1 = 1 },
+    // Z is inverted in NED https://dev.px4.io/en/ros/external_position_estimation.html#asserting-on-reference-frames
+    { .action = MOVE_Z, .param1 = -5 },
+    { .action = WAIT_MOVE },
+    { .action = MOVE_X, .param1 = 5 },
+    { .action = WAIT_MOVE },
+    { .action = MOVE_Y, .param1 = 5 },
+    { .action = WAIT_MOVE },
+    { .action = MOVE_X, .param1 = -5 },
+    { .action = WAIT_MOVE },
+    { .action = MOVE_Y, .param1 = -5 },
+    { .action = WAIT_MOVE },
+    { .action = LAND },
+    { .action = WAIT_LAND },
+    { .action = ARM_DISARM, .param1 = 0 },
+    { .action = END }
+};
+
+static uint8_t task_list_index = 0;
 
 static void exit_signal_handler(int signum)
 {
@@ -115,11 +171,13 @@ static void handle_command_ack(mavlink_command_ack_t *ack)
 {
     switch (ack->command) {
     case MAV_CMD_DO_SET_MODE:
-        if (ack->result == MAV_RESULT_ACCEPTED) {
-            printf("Mode %s set\n", mode_names[target_mode_requested]);
-            target_mode = target_mode_requested;
-        } else {
-            printf("Error setting vehicle to mode %s, actual mode is %s\n", mode_names[target_mode_requested], mode_names[target_mode]);
+        if (ack->result != MAV_RESULT_ACCEPTED) {
+            printf("Set mode has failed\n");
+        }
+        break;
+    case MAV_CMD_COMPONENT_ARM_DISARM:
+        if (ack->result != MAV_RESULT_ACCEPTED) {
+            printf("Arm or disarm command has failed\n");
         }
         break;
     default:
@@ -127,13 +185,106 @@ static void handle_command_ack(mavlink_command_ack_t *ack)
     }
 }
 
+static void handle_heartbeat(mavlink_heartbeat_t *heartbeat)
+{
+    if (heartbeat->base_mode & MAV_MODE_FLAG_SAFETY_ARMED) {
+        if (!armed) {
+            printf("Status: Vehicle armed\n");
+        }
+        armed = true;
+    } else {
+        if (armed) {
+            printf("Status: Vehicle disarmed\n");
+        }
+        armed = false;
+    }
+
+    if (heartbeat->base_mode & MAV_MODE_FLAG_CUSTOM_MODE_ENABLED) {
+        enum px4_modes mode = PX4_MODE_UNKNOWN;
+        const uint8_t base_custom_mode = heartbeat->custom_mode >> 16;
+
+        if (base_custom_mode == PX4_CUSTOM_MODE_OFFBOARD) {
+            mode = PX4_MODE_OFFBOARD;
+        }
+
+        if (mode != current_mode) {
+            printf("Status: Current mode %s\n", mode_names[mode]);
+        }
+
+        current_mode = mode;
+    }
+}
+
+static void handle_extended_sys_state(mavlink_extended_sys_state_t *extended_sys_state)
+{
+    switch (extended_sys_state->landed_state) {
+    case MAV_LANDED_STATE_IN_AIR:
+        if (!in_the_air) {
+            printf("Status: Vehicle in the air\n");
+        }
+        in_the_air = true;
+        landing = false;
+        break;
+    case MAV_LANDED_STATE_ON_GROUND:
+        if (in_the_air) {
+            printf("Status: Vehicle in the ground\n");
+        }
+        in_the_air = false;
+        landing = false;
+        break;
+    case MAV_LANDED_STATE_LANDING:
+        if (!landing) {
+            printf("Status: Landing started\n");
+        }
+        landing = true;
+        break;
+    }
+}
+
+static void handle_home_position(mavlink_home_position_t *home)
+{
+    static bool first = true;
+
+    if (first) {
+        printf("Status: Got home position\n");
+        first = false;
+    }
+}
+
 static void handle_new_message(const mavlink_message_t *msg)
 {
     switch (msg->msgid) {
+    case MAVLINK_MSG_ID_HEARTBEAT:
+        mavlink_heartbeat_t heartbeat;
+        mavlink_msg_heartbeat_decode(msg, &heartbeat);
+        handle_heartbeat(&heartbeat);
+        have_basic_info_mask |= BASIC_INFO_HEARTBEAT_BIT;
+        break;
     case MAVLINK_MSG_ID_COMMAND_ACK:
         mavlink_command_ack_t ack;
         mavlink_msg_command_ack_decode(msg, &ack);
         handle_command_ack(&ack);
+        break;
+    case MAVLINK_MSG_ID_LOCAL_POSITION_NED:
+        mavlink_local_position_ned_t ned;
+        mavlink_msg_local_position_ned_decode(msg, &ned);
+
+        vehicle_x = ned.x;
+        vehicle_y = ned.y;
+        vehicle_z = ned.z;
+        have_basic_info_mask |= BASIC_INFO_LOCAL_POSITION_NED_BIT;
+        break;
+    case MAVLINK_MSG_ID_EXTENDED_SYS_STATE:
+        mavlink_extended_sys_state_t extended_sys_state;
+        mavlink_msg_extended_sys_state_decode(msg, &extended_sys_state);
+        handle_extended_sys_state(&extended_sys_state);
+        have_basic_info_mask |= BASIC_INFO_EXTENDED_SYS_STATE_BIT;
+        break;
+    case MAVLINK_MSG_ID_HOME_POSITION:
+        mavlink_home_position_t home;
+        mavlink_msg_home_position_decode(msg, &home);
+        handle_home_position(&home);
+        have_basic_info_mask |= BASIC_INFO_HOME_POSITION;
         break;
     default:
         break;
@@ -181,26 +332,187 @@ static void set_mode_send(enum px4_modes mode)
     case PX4_MODE_OFFBOARD:
         cmd.param1 = PX4_MAIN_MODE_CUSTOM;
         cmd.param2 = PX4_CUSTOM_MODE_OFFBOARD;
-        target_mode_requested = mode;
         break;
-    case PX4_MODE_STABILIZED:
     default:
-        cmd.param1 = MAV_MODE_STABILIZE_ARMED;
-        target_mode_requested = PX4_MODE_STABILIZED;
-        break;
+        printf("Error: Mode not handled\n");
+        return;
     }
 
     mavlink_msg_command_long_encode(SYSTEM_ID, MAV_COMP_ID_ALL, &msg, &cmd);
     msg_send(&msg);
 }
 
+static void next_action_print(struct tasks *t)
+{
+    switch (t->action) {
+    case ARM_DISARM:
+        printf("Requesting %s...\n", t->param1 ? "arm" : "disarm");
+        break;
+    case SET_MODE:
+        printf("Requesting mode %s...\n", mode_names[PX4_MODE_OFFBOARD]);
+        break;
+    case MOVE_X:
+        printf("Moving %i meters in X....\n", t->param1);
+        break;
+    case MOVE_Y:
+        printf("Moving %i meters in Y....\n", t->param1);
+        break;
+    case MOVE_Z:
+        printf("Moving %i meters in Z....\n", t->param1);
+        break;
+    case WAIT_MOVE:
+        break;
+    case LAND:
+        printf("Requesting land...\n");
+        break;
+    case WAIT_LAND:
+        printf("Waiting landing...\n");
+        break;
+    case END:
+        printf("Offboard mission completed\n");
+        break;
+    default:
+        printf("Unknown action action id=%u\n", t->action);
+    }
+}
+
 static void timeout_callback()
 {
-    position_set_send(0, 0, 0, 0);
+    static float x = 0, y = 0, z = 0, yaw = 0;
+    struct tasks *t;
 
-    if (target_mode != PX4_MODE_OFFBOARD) {
-        printf("Requesting mode %s...\n", mode_names[PX4_MODE_OFFBOARD]);
+    if (task_list_index >= (sizeof(list) / sizeof(struct tasks))) {
+        return;
+    }
+    t = &list[task_list_index];
+
+    switch (t->action) {
+    case CHECK_STATE:
+            /*
+             * It will only go the next task when we got all basic info.
+             * note: home position is not necessary but this is useful to know
+             * when PX4 got a GPS fix.
+             */
+            if (have_basic_info_mask == BASIC_INFO_ALL_BITS) {
+                if (!armed && !in_the_air) {
+                    task_list_index++;
+                } else {
+                    printf("Invalid initial state, please land and disarm\n");
+                }
+            } else {
+                static uint8_t count = 15;
+
+                if (count == 15) {
+                    printf("Waiting for:\n");
+                    if (!(have_basic_info_mask & BASIC_INFO_HEARTBEAT_BIT)) {
+                        printf("\t- heartbeat\n");
+                    }
+                    if (!(have_basic_info_mask & BASIC_INFO_LOCAL_POSITION_NED_BIT)) {
+                        printf("\t- local position NED\n");
+                    }
+                    if (!(have_basic_info_mask & BASIC_INFO_EXTENDED_SYS_STATE_BIT)) {
+                        printf("\t- basic extended info\n");
+                    }
+                    if (!(have_basic_info_mask & BASIC_INFO_HOME_POSITION)) {
+                        printf("\t- home position(GPS fix)\n");
+                    }
+                    count = 0;
+                } else {
+                    count++;
+                }
+            }
+            break;
+    case SET_MODE:
+        if (current_mode == PX4_MODE_OFFBOARD) {
+            task_list_index++;
+            break;
+        }
+
         set_mode_send(PX4_MODE_OFFBOARD);
+        break;
+    case ARM_DISARM: {
+        if (armed == t->param1) {
+            task_list_index++;
+            break;
+        }
+
+        mavlink_message_t msg;
+        mavlink_command_long_t cmd = {};
+
+        cmd.command = MAV_CMD_COMPONENT_ARM_DISARM;
+        cmd.target_system = TARGET_SYSTEM_ID;
+        cmd.target_component = MAV_COMP_ID_ALL;
+        cmd.param1 = t->param1;
+
+        mavlink_msg_command_long_encode(SYSTEM_ID, MAV_COMP_ID_ALL, &msg, &cmd);
+        msg_send(&msg);
+        break;
+    }
+    case LAND: {
+        if (landing) {
+            task_list_index++;
+            break;
+        }
+
+        mavlink_message_t msg;
+        mavlink_command_long_t cmd = {};
+
+        cmd.command =  MAV_CMD_NAV_LAND;
+        cmd.target_system = TARGET_SYSTEM_ID;
+        cmd.target_component = MAV_COMP_ID_ALL;
+        cmd.param1 = NAN;
+        cmd.param2 = NAN;
+        cmd.param3 = NAN;
+        cmd.param4 = NAN;
+        cmd.param5 = NAN;
+        cmd.param6 = NAN;
+        cmd.param7 = NAN;
+
+        mavlink_msg_command_long_encode(SYSTEM_ID, MAV_COMP_ID_ALL, &msg, &cmd);
+        msg_send(&msg);
+        break;
+    }
+    case WAIT_LAND: {
+        if (!in_the_air) {
+            task_list_index++;
+        }
+
+        break;
+    }
+    case MOVE_Z: {
+        z += t->param1;
+        task_list_index++;
+        break;
+    }
+    case MOVE_X: {
+        x += t->param1;
+        task_list_index++;
+        break;
+    }
+    case MOVE_Y: {
+        y += t->param1;
+        task_list_index++;
+        break;
+    }
+    case WAIT_MOVE: {
+        if (abs(vehicle_z - z) < SETPOINT_RANGE
+            && abs(vehicle_y - y) < SETPOINT_RANGE
+            && abs(vehicle_x - x) < SETPOINT_RANGE) {
+            task_list_index++;
+            printf("Target reached\n");
+        }
+        break;
+    }
+    default:
+    case END:
+        break;
+    };
+
+    position_set_send(x, y, z, yaw);
+
+    // print next action
+    if (t != &list[task_list_index]) {
+        next_action_print(&list[task_list_index]);
     }
 }
 
