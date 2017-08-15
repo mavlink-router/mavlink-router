@@ -592,11 +592,8 @@ static void loop()
     }
 }
 
-static int setup_connection()
+static int setup_connection(const char *ip, int port)
 {
-    const char *ip = "127.0.0.1";
-    const int port = 5760;
-
     tcp_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (tcp_fd == -1) {
         fprintf(stderr, "Could not create socket (%m)\n");
@@ -606,6 +603,8 @@ static int setup_connection()
     sockaddr.sin_family = AF_INET;
     sockaddr.sin_addr.s_addr = inet_addr(ip);
     sockaddr.sin_port = htons(port);
+
+    printf("Connecting to TCP: %s:%i\n", ip, port);
 
     if (connect(tcp_fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) != 0) {
         fprintf(stderr, "Could not connect to socket (%m)\n");
@@ -617,7 +616,7 @@ static int setup_connection()
         return -1;
     }
 
-    printf("Connected to TCP:%s:%u\n", ip, port);
+    printf("Connected\n");
 
     return 0;
 }
@@ -644,7 +643,19 @@ static int setup_timeout()
 
 int main(int argc, char *argv[])
 {
-    if (setup_connection() < 0 ||
+    char *ip = (char *)"127.0.0.1";
+    int port = 5760;
+
+    if (argc > 1) {
+        ip = strdup(argv[1]);
+        char *portstr = strchrnul(ip, ':');
+        if (portstr && *portstr) {
+            *portstr = '\0';
+            port = atoi(portstr + 1);
+        }
+    }
+
+    if (setup_connection(ip, port) < 0 ||
         setup_timeout() < 0 ||
         setup_signal_handlers() < 0)
         goto fail;
@@ -653,6 +664,10 @@ int main(int argc, char *argv[])
 
     close(timeout_fd);
     close(tcp_fd);
+
+    if (argc > 1) {
+        free(ip);
+    }
 
     return 0;
 
