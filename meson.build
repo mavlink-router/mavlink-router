@@ -56,5 +56,6 @@ exe_mavlink_router = executable(
                 dep_thread,
         ],
         install: true,
-        include_directories: include_directories('mavlink', 'mavlink/ardupilotmega', 'src'),
+        include_directories: [include_directories('mavlink', 'mavlink/ardupilotmega', is_build_only: true),
+                              include_directories('src')]
 )
