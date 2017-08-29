@@ -35,8 +35,13 @@ using namespace eprosima::fastcdr::exception;
 
 vehicle_command_ack_::vehicle_command_ack_()
 {
+    m_result_param2 = 0;
     m_command = 0;
     m_result = 0;
+    m_from_external = 0;
+    m_result_param1 = 0;
+    m_target_system = 0;
+    m_target_component = 0;
 }
 
 vehicle_command_ack_::~vehicle_command_ack_()
@@ -45,28 +50,48 @@ vehicle_command_ack_::~vehicle_command_ack_()
 
 vehicle_command_ack_::vehicle_command_ack_(const vehicle_command_ack_ &x)
 {
+    m_result_param2 = x.m_result_param2;
     m_command = x.m_command;
     m_result = x.m_result;
+    m_from_external = x.m_from_external;
+    m_result_param1 = x.m_result_param1;
+    m_target_system = x.m_target_system;
+    m_target_component = x.m_target_component;
 }
 
 vehicle_command_ack_::vehicle_command_ack_(vehicle_command_ack_ &&x)
 {
+    m_result_param2 = x.m_result_param2;
     m_command = x.m_command;
     m_result = x.m_result;
+    m_from_external = x.m_from_external;
+    m_result_param1 = x.m_result_param1;
+    m_target_system = x.m_target_system;
+    m_target_component = x.m_target_component;
 }
 
 vehicle_command_ack_& vehicle_command_ack_::operator=(const vehicle_command_ack_ &x)
 {
+    m_result_param2 = x.m_result_param2;
     m_command = x.m_command;
     m_result = x.m_result;
+    m_from_external = x.m_from_external;
+    m_result_param1 = x.m_result_param1;
+    m_target_system = x.m_target_system;
+    m_target_component = x.m_target_component;
     
     return *this;
 }
 
 vehicle_command_ack_& vehicle_command_ack_::operator=(vehicle_command_ack_ &&x)
 {
+    m_result_param2 = x.m_result_param2;
     m_command = x.m_command;
     m_result = x.m_result;
+    m_from_external = x.m_from_external;
+    m_result_param1 = x.m_result_param1;
+    m_target_system = x.m_target_system;
+    m_target_component = x.m_target_component;
     
     return *this;
 }
@@ -75,7 +100,17 @@ size_t vehicle_command_ack_::getMaxCdrSerializedSize(size_t current_alignment)
 {
     size_t initial_alignment = current_alignment;
             
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
     current_alignment += 2 + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
+
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
 
     current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
 
@@ -87,7 +122,17 @@ size_t vehicle_command_ack_::getCdrSerializedSize(const vehicle_command_ack_& da
 {
     size_t initial_alignment = current_alignment;
             
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
     current_alignment += 2 + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
+
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
 
     current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
 
@@ -97,22 +142,42 @@ size_t vehicle_command_ack_::getCdrSerializedSize(const vehicle_command_ack_& da
 
 void vehicle_command_ack_::serialize(eprosima::fastcdr::Cdr &scdr) const
 {
+    scdr << m_result_param2;
+
     scdr << m_command;
 
     scdr << m_result;
+
+    scdr << m_from_external;
+
+    scdr << m_result_param1;
+
+    scdr << m_target_system;
+
+    scdr << m_target_component;
 
 }
 
 void vehicle_command_ack_::deserialize(eprosima::fastcdr::Cdr &dcdr)
 {
+    dcdr >> m_result_param2;
     dcdr >> m_command;
     dcdr >> m_result;
+    dcdr >> m_from_external;
+    dcdr >> m_result_param1;
+    dcdr >> m_target_system;
+    dcdr >> m_target_component;
 }
 
 size_t vehicle_command_ack_::getKeyMaxCdrSerializedSize(size_t current_alignment)
 {
 	size_t current_align = current_alignment;
             
+
+
+
+
+
 
 
 
@@ -126,6 +191,11 @@ bool vehicle_command_ack_::isKeyDefined()
 
 void vehicle_command_ack_::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 {
+	 
+	 
+	 
+	 
+	 
 	 
 	 
 }

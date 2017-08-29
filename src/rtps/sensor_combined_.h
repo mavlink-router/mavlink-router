@@ -142,7 +142,7 @@ public:
      * @brief This function sets a value in member gyro_integral_dt
      * @param _gyro_integral_dt New value for member gyro_integral_dt
      */
-    inline eProsima_user_DllExport void gyro_integral_dt(float _gyro_integral_dt)
+    inline eProsima_user_DllExport void gyro_integral_dt(uint32_t _gyro_integral_dt)
     {
         m_gyro_integral_dt = _gyro_integral_dt;
     }
@@ -151,7 +151,7 @@ public:
      * @brief This function returns the value of member gyro_integral_dt
      * @return Value of member gyro_integral_dt
      */
-    inline eProsima_user_DllExport float gyro_integral_dt() const
+    inline eProsima_user_DllExport uint32_t gyro_integral_dt() const
     {
         return m_gyro_integral_dt;
     }
@@ -160,7 +160,7 @@ public:
      * @brief This function returns a reference to member gyro_integral_dt
      * @return Reference to member gyro_integral_dt
      */
-    inline eProsima_user_DllExport float& gyro_integral_dt()
+    inline eProsima_user_DllExport uint32_t& gyro_integral_dt()
     {
         return m_gyro_integral_dt;
     }
@@ -229,7 +229,7 @@ public:
      * @brief This function sets a value in member accelerometer_integral_dt
      * @param _accelerometer_integral_dt New value for member accelerometer_integral_dt
      */
-    inline eProsima_user_DllExport void accelerometer_integral_dt(float _accelerometer_integral_dt)
+    inline eProsima_user_DllExport void accelerometer_integral_dt(uint32_t _accelerometer_integral_dt)
     {
         m_accelerometer_integral_dt = _accelerometer_integral_dt;
     }
@@ -238,7 +238,7 @@ public:
      * @brief This function returns the value of member accelerometer_integral_dt
      * @return Value of member accelerometer_integral_dt
      */
-    inline eProsima_user_DllExport float accelerometer_integral_dt() const
+    inline eProsima_user_DllExport uint32_t accelerometer_integral_dt() const
     {
         return m_accelerometer_integral_dt;
     }
@@ -247,7 +247,7 @@ public:
      * @brief This function returns a reference to member accelerometer_integral_dt
      * @return Reference to member accelerometer_integral_dt
      */
-    inline eProsima_user_DllExport float& accelerometer_integral_dt()
+    inline eProsima_user_DllExport uint32_t& accelerometer_integral_dt()
     {
         return m_accelerometer_integral_dt;
     }
@@ -443,10 +443,10 @@ public:
     
 private:
     std::array<float, 3> m_gyro_rad;
-    float m_gyro_integral_dt;
+    uint32_t m_gyro_integral_dt;
     int32_t m_accelerometer_timestamp_relative;
     std::array<float, 3> m_accelerometer_m_s2;
-    float m_accelerometer_integral_dt;
+    uint32_t m_accelerometer_integral_dt;
     int32_t m_magnetometer_timestamp_relative;
     std::array<float, 3> m_magnetometer_ga;
     int32_t m_baro_timestamp_relative;

@@ -170,27 +170,27 @@ rtpsd_SOURCES = \
 	src/common/util.c \
 	src/common/util.h \
 	src/rtps/main.cpp \
-	src/rtps/RtpsTopics.cxx \
+	src/rtps/RtpsTopics.cpp \
 	src/rtps/RtpsTopics.h \
-	src/rtps/sensor_combined_.cxx \
+	src/rtps/sensor_combined_.cpp \
 	src/rtps/sensor_combined_.h \
-	src/rtps/sensor_combined_Publisher.cxx \
+	src/rtps/sensor_combined_Publisher.cpp \
 	src/rtps/sensor_combined_Publisher.h \
-	src/rtps/sensor_combined_PubSubTypes.cxx \
+	src/rtps/sensor_combined_PubSubTypes.cpp \
 	src/rtps/sensor_combined_PubSubTypes.h \
-	src/rtps/UART_node.cxx \
+	src/rtps/UART_node.cpp \
 	src/rtps/UART_node.h \
-	src/rtps/vehicle_command_ack_.cxx \
+	src/rtps/vehicle_command_ack_.cpp \
 	src/rtps/vehicle_command_ack_.h \
-	src/rtps/vehicle_command_ack_Publisher.cxx \
+	src/rtps/vehicle_command_ack_Publisher.cpp \
 	src/rtps/vehicle_command_ack_Publisher.h \
-	src/rtps/vehicle_command_ack_PubSubTypes.cxx \
+	src/rtps/vehicle_command_ack_PubSubTypes.cpp \
 	src/rtps/vehicle_command_ack_PubSubTypes.h \
-	src/rtps/vehicle_command_.cxx \
+	src/rtps/vehicle_command_.cpp \
 	src/rtps/vehicle_command_.h \
-	src/rtps/vehicle_command_PubSubTypes.cxx \
+	src/rtps/vehicle_command_PubSubTypes.cpp \
 	src/rtps/vehicle_command_PubSubTypes.h \
-	src/rtps/vehicle_command_Subscriber.cxx \
+	src/rtps/vehicle_command_Subscriber.cpp \
 	src/rtps/vehicle_command_Subscriber.h
 
 rtpsd_LDFLAGS = -lfastcdr -lfastrtps
@@ -198,12 +198,12 @@ rtpsd_LDFLAGS = -lfastcdr -lfastrtps
 noinst_PROGRAMS += rtps_command
 
 rtps_command_SOURCES = \
-	examples/rtps/command/vehicle_command_.cxx \
+	examples/rtps/command/vehicle_command_.cpp \
 	examples/rtps/command/vehicle_command_.h \
-	examples/rtps/command/vehicle_command_Publisher.cxx \
+	examples/rtps/command/vehicle_command_Publisher.cpp \
 	examples/rtps/command/vehicle_command_Publisher.h \
 	examples/rtps/command/vehicle_command_PubSubMain.cxx \
-	examples/rtps/command/vehicle_command_PubSubTypes.cxx \
+	examples/rtps/command/vehicle_command_PubSubTypes.cpp \
 	examples/rtps/command/vehicle_command_PubSubTypes.h
 
 rtps_command_LDFLAGS = -lfastcdr -lfastrtps
@@ -211,12 +211,12 @@ rtps_command_LDFLAGS = -lfastcdr -lfastrtps
 noinst_PROGRAMS += rtps_sensor_combined
 
 rtps_sensor_combined_SOURCES = \
-	examples/rtps/sensor-combined/sensor_combined_.cxx \
+	examples/rtps/sensor-combined/sensor_combined_.cpp \
 	examples/rtps/sensor-combined/sensor_combined_.h \
 	examples/rtps/sensor-combined/sensor_combined_PubSubMain.cxx \
-	examples/rtps/sensor-combined/sensor_combined_PubSubTypes.cxx \
+	examples/rtps/sensor-combined/sensor_combined_PubSubTypes.cpp \
 	examples/rtps/sensor-combined/sensor_combined_PubSubTypes.h \
-	examples/rtps/sensor-combined/sensor_combined_Subscriber.cxx \
+	examples/rtps/sensor-combined/sensor_combined_Subscriber.cpp \
 	examples/rtps/sensor-combined/sensor_combined_Subscriber.h
 
 rtps_sensor_combined_LDFLAGS = -lfastcdr -lfastrtps

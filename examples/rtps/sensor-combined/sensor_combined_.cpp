@@ -36,10 +36,10 @@ using namespace eprosima::fastcdr::exception;
 sensor_combined_::sensor_combined_()
 {
 
-    m_gyro_integral_dt = 0.0;
+    m_gyro_integral_dt = 0;
     m_accelerometer_timestamp_relative = 0;
 
-    m_accelerometer_integral_dt = 0.0;
+    m_accelerometer_integral_dt = 0;
     m_magnetometer_timestamp_relative = 0;
 
     m_baro_timestamp_relative = 0;

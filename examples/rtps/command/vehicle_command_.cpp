@@ -48,6 +48,7 @@ vehicle_command_::vehicle_command_()
     m_source_system = 0;
     m_source_component = 0;
     m_confirmation = 0;
+    m_from_external = 0;
 }
 
 vehicle_command_::~vehicle_command_()
@@ -69,6 +70,7 @@ vehicle_command_::vehicle_command_(const vehicle_command_ &x)
     m_source_system = x.m_source_system;
     m_source_component = x.m_source_component;
     m_confirmation = x.m_confirmation;
+    m_from_external = x.m_from_external;
 }
 
 vehicle_command_::vehicle_command_(vehicle_command_ &&x)
@@ -86,6 +88,7 @@ vehicle_command_::vehicle_command_(vehicle_command_ &&x)
     m_source_system = x.m_source_system;
     m_source_component = x.m_source_component;
     m_confirmation = x.m_confirmation;
+    m_from_external = x.m_from_external;
 }
 
 vehicle_command_& vehicle_command_::operator=(const vehicle_command_ &x)
@@ -103,6 +106,7 @@ vehicle_command_& vehicle_command_::operator=(const vehicle_command_ &x)
     m_source_system = x.m_source_system;
     m_source_component = x.m_source_component;
     m_confirmation = x.m_confirmation;
+    m_from_external = x.m_from_external;
     
     return *this;
 }
@@ -122,6 +126,7 @@ vehicle_command_& vehicle_command_::operator=(vehicle_command_ &&x)
     m_source_system = x.m_source_system;
     m_source_component = x.m_source_component;
     m_confirmation = x.m_confirmation;
+    m_from_external = x.m_from_external;
     
     return *this;
 }
@@ -144,15 +149,17 @@ size_t vehicle_command_::getMaxCdrSerializedSize(size_t current_alignment)
 
     current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
 
-    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+    current_alignment += 2 + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
 
-    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
 
-    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
 
-    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
 
-    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
 
     current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
 
@@ -178,15 +185,17 @@ size_t vehicle_command_::getCdrSerializedSize(const vehicle_command_& data, size
 
     current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
 
-    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+    current_alignment += 2 + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
 
-    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
 
-    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
 
-    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
 
-    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
 
     current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
 
@@ -222,6 +231,8 @@ void vehicle_command_::serialize(eprosima::fastcdr::Cdr &scdr) const
 
     scdr << m_confirmation;
 
+    scdr << m_from_external;
+
 }
 
 void vehicle_command_::deserialize(eprosima::fastcdr::Cdr &dcdr)
@@ -239,12 +250,14 @@ void vehicle_command_::deserialize(eprosima::fastcdr::Cdr &dcdr)
     dcdr >> m_source_system;
     dcdr >> m_source_component;
     dcdr >> m_confirmation;
+    dcdr >> m_from_external;
 }
 
 size_t vehicle_command_::getKeyMaxCdrSerializedSize(size_t current_alignment)
 {
 	size_t current_align = current_alignment;
             
+
 
 
 
@@ -269,6 +282,7 @@ bool vehicle_command_::isKeyDefined()
 
 void vehicle_command_::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 {
+	 
 	 
 	 
 	 

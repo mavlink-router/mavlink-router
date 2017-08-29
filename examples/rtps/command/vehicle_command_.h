@@ -289,7 +289,7 @@ public:
      * @brief This function sets a value in member command
      * @param _command New value for member command
      */
-    inline eProsima_user_DllExport void command(uint32_t _command)
+    inline eProsima_user_DllExport void command(uint16_t _command)
     {
         m_command = _command;
     }
@@ -298,7 +298,7 @@ public:
      * @brief This function returns the value of member command
      * @return Value of member command
      */
-    inline eProsima_user_DllExport uint32_t command() const
+    inline eProsima_user_DllExport uint16_t command() const
     {
         return m_command;
     }
@@ -307,7 +307,7 @@ public:
      * @brief This function returns a reference to member command
      * @return Reference to member command
      */
-    inline eProsima_user_DllExport uint32_t& command()
+    inline eProsima_user_DllExport uint16_t& command()
     {
         return m_command;
     }
@@ -315,7 +315,7 @@ public:
      * @brief This function sets a value in member target_system
      * @param _target_system New value for member target_system
      */
-    inline eProsima_user_DllExport void target_system(uint32_t _target_system)
+    inline eProsima_user_DllExport void target_system(uint8_t _target_system)
     {
         m_target_system = _target_system;
     }
@@ -324,7 +324,7 @@ public:
      * @brief This function returns the value of member target_system
      * @return Value of member target_system
      */
-    inline eProsima_user_DllExport uint32_t target_system() const
+    inline eProsima_user_DllExport uint8_t target_system() const
     {
         return m_target_system;
     }
@@ -333,7 +333,7 @@ public:
      * @brief This function returns a reference to member target_system
      * @return Reference to member target_system
      */
-    inline eProsima_user_DllExport uint32_t& target_system()
+    inline eProsima_user_DllExport uint8_t& target_system()
     {
         return m_target_system;
     }
@@ -341,7 +341,7 @@ public:
      * @brief This function sets a value in member target_component
      * @param _target_component New value for member target_component
      */
-    inline eProsima_user_DllExport void target_component(uint32_t _target_component)
+    inline eProsima_user_DllExport void target_component(uint8_t _target_component)
     {
         m_target_component = _target_component;
     }
@@ -350,7 +350,7 @@ public:
      * @brief This function returns the value of member target_component
      * @return Value of member target_component
      */
-    inline eProsima_user_DllExport uint32_t target_component() const
+    inline eProsima_user_DllExport uint8_t target_component() const
     {
         return m_target_component;
     }
@@ -359,7 +359,7 @@ public:
      * @brief This function returns a reference to member target_component
      * @return Reference to member target_component
      */
-    inline eProsima_user_DllExport uint32_t& target_component()
+    inline eProsima_user_DllExport uint8_t& target_component()
     {
         return m_target_component;
     }
@@ -367,7 +367,7 @@ public:
      * @brief This function sets a value in member source_system
      * @param _source_system New value for member source_system
      */
-    inline eProsima_user_DllExport void source_system(uint32_t _source_system)
+    inline eProsima_user_DllExport void source_system(uint8_t _source_system)
     {
         m_source_system = _source_system;
     }
@@ -376,7 +376,7 @@ public:
      * @brief This function returns the value of member source_system
      * @return Value of member source_system
      */
-    inline eProsima_user_DllExport uint32_t source_system() const
+    inline eProsima_user_DllExport uint8_t source_system() const
     {
         return m_source_system;
     }
@@ -385,7 +385,7 @@ public:
      * @brief This function returns a reference to member source_system
      * @return Reference to member source_system
      */
-    inline eProsima_user_DllExport uint32_t& source_system()
+    inline eProsima_user_DllExport uint8_t& source_system()
     {
         return m_source_system;
     }
@@ -393,7 +393,7 @@ public:
      * @brief This function sets a value in member source_component
      * @param _source_component New value for member source_component
      */
-    inline eProsima_user_DllExport void source_component(uint32_t _source_component)
+    inline eProsima_user_DllExport void source_component(uint8_t _source_component)
     {
         m_source_component = _source_component;
     }
@@ -402,7 +402,7 @@ public:
      * @brief This function returns the value of member source_component
      * @return Value of member source_component
      */
-    inline eProsima_user_DllExport uint32_t source_component() const
+    inline eProsima_user_DllExport uint8_t source_component() const
     {
         return m_source_component;
     }
@@ -411,7 +411,7 @@ public:
      * @brief This function returns a reference to member source_component
      * @return Reference to member source_component
      */
-    inline eProsima_user_DllExport uint32_t& source_component()
+    inline eProsima_user_DllExport uint8_t& source_component()
     {
         return m_source_component;
     }
@@ -440,6 +440,32 @@ public:
     inline eProsima_user_DllExport uint8_t& confirmation()
     {
         return m_confirmation;
+    }
+    /*!
+     * @brief This function sets a value in member from_external
+     * @param _from_external New value for member from_external
+     */
+    inline eProsima_user_DllExport void from_external(uint8_t _from_external)
+    {
+        m_from_external = _from_external;
+    }
+
+    /*!
+     * @brief This function returns the value of member from_external
+     * @return Value of member from_external
+     */
+    inline eProsima_user_DllExport uint8_t from_external() const
+    {
+        return m_from_external;
+    }
+
+    /*!
+     * @brief This function returns a reference to member from_external
+     * @return Reference to member from_external
+     */
+    inline eProsima_user_DllExport uint8_t& from_external()
+    {
+        return m_from_external;
     }
     
     /*!
@@ -500,12 +526,13 @@ private:
     float m_param3;
     float m_param4;
     float m_param7;
-    uint32_t m_command;
-    uint32_t m_target_system;
-    uint32_t m_target_component;
-    uint32_t m_source_system;
-    uint32_t m_source_component;
+    uint16_t m_command;
+    uint8_t m_target_system;
+    uint8_t m_target_component;
+    uint8_t m_source_system;
+    uint8_t m_source_component;
     uint8_t m_confirmation;
+    uint8_t m_from_external;
 };
 
 #endif // _vehicle_command__H_

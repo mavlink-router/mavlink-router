@@ -131,7 +131,7 @@ static int setup_udp(unsigned port)
 static void loop(int epollfd, int uart_fd, int udp_fd, UART_node uart_node, RtpsTopics &topics)
 {
     unsigned bytes_read = 0, bytes_sent = 0;
-    char topic_ID = 255;
+    uint8_t topic_ID = 255;
 
     struct timespec begin;
     bool measuring = false;
@@ -206,12 +206,15 @@ static void loop(int epollfd, int uart_fd, int udp_fd, UART_node uart_node, Rtps
         // Send subscribed topics over UART
         eprosima::fastcdr::FastBuffer cdrbuffer(data_buffer, sizeof(data_buffer));
         eprosima::fastcdr::Cdr scdr(cdrbuffer);
-        while (topics.nextMsg(&topic_ID, scdr)) {
-            size_t len = scdr.getSerializedDataLength();
-            r = uart_node.writeRTPStoUART(topic_ID, scdr.getBufferPointer(), len);
-            if (r > 0)
-                bytes_sent += r;
-        }
+        while (topics.hasMsg(&topic_ID)) {
+	    if(topics.getMsg(topic_ID, scdr))
+	    {
+            	size_t len = scdr.getSerializedDataLength();
+                r = uart_node.writeRTPStoUART(topic_ID, scdr.getBufferPointer(), len);
+        	if (r > 0)
+                    bytes_sent += r;
+            }
+	}
 
         if (measuring) {
             struct timespec end;

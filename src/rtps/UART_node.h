@@ -24,11 +24,11 @@ public:
 
     int init_uart(const char *uart_name, uint32_t baudrate);
     uint8_t close_uart();
-    int writeRTPStoUART(const char topic_ID, char buffer[], uint16_t length);
+    int writeRTPStoUART(const uint8_t topic_ID, char buffer[], uint16_t length);
     int writeMavlinkToUART(char buffer[], uint16_t length);
     int read();
     int parseMavlinkFromUART(char buffer[], size_t buflen);
-    int parseRTPSfromUART(char *topic_ID, uint8_t *seq, char buffer[], size_t buflen);
+    int parseRTPSfromUART(uint8_t *topic_ID, uint8_t *seq, char buffer[], size_t buflen);
 
 protected:
     uint16_t crc16_byte(uint16_t crc, const uint8_t data);

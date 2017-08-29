@@ -20,7 +20,7 @@
 
 #include <asm/termbits.h>
 #include <sys/ioctl.h>
-
+#include <iostream>
 #include "UART_node.h"
 #include "log.h"
 
@@ -209,7 +209,7 @@ int UART_node::parseMavlinkFromUART(char buffer[], size_t buflen)
     return packet_len;
 }
 
-int UART_node::parseRTPSfromUART(char *topic_ID, uint8_t *seq, char buffer[], size_t buflen)
+int UART_node::parseRTPSfromUART(uint8_t *topic_ID, uint8_t *seq, char buffer[], size_t buflen)
 {
     size_t start = 0;
     uint16_t len;
@@ -257,7 +257,7 @@ int UART_node::parseRTPSfromUART(char *topic_ID, uint8_t *seq, char buffer[], si
     return len;
 }
 
-int UART_node::writeRTPStoUART(const char topic_ID, char buffer[], uint16_t length)
+int UART_node::writeRTPStoUART(const uint8_t topic_ID, char buffer[], uint16_t length)
 {
     static struct Header header {
         .marker = { '>', '>', '>' }
@@ -281,6 +281,7 @@ int UART_node::writeRTPStoUART(const char topic_ID, char buffer[], uint16_t leng
     ret = write(m_uart_filestream, &header, sizeof(header));
     if (ret < 0 || ret != sizeof(header))
         goto err;
+    std::cout << "Topic ID:" << topic_ID << std::endl;
 
     ret = write(m_uart_filestream, buffer, length);
     if (ret < 0 || (unsigned)ret != length)
