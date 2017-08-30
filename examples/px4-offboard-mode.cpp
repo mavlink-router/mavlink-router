@@ -510,6 +510,7 @@ static void timeout_callback()
     }
     default:
     case END:
+        g_should_exit = true;
         break;
     };
 
