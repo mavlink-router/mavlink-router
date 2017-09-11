@@ -253,6 +253,11 @@ static void handle_home_position(mavlink_home_position_t *home)
 
 static void handle_new_message(const mavlink_message_t *msg)
 {
+    // we only care about message coming from vehicle
+    if (msg->sysid != TARGET_SYSTEM_ID) {
+        return;
+    }
+
     switch (msg->msgid) {
     case MAVLINK_MSG_ID_HEARTBEAT:
         mavlink_heartbeat_t heartbeat;
@@ -505,6 +510,7 @@ static void timeout_callback()
     }
     default:
     case END:
+        g_should_exit = true;
         break;
     };
 
