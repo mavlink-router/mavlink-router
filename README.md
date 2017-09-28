@@ -138,7 +138,7 @@ For instance:
 
     $ python examples/sender.py 127.0.0.1:3000 100 0
 
-Will send mavlink *pings* to UDP port 300. Those pings will have `100` as
+Will send mavlink *pings* to UDP port 3000. Those pings will have `100` as
 source system and will have `0` as target-system (`0` as target means broadcast).
 Receiver could be set as:
 
