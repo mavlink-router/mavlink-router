@@ -1,0 +1,9 @@
+mavlink-router 1
+================
+
+    - Route mavlink messages between endpoints
+    - Support UART and UDP endpoints for flight stack (both ArduPilot and PX4)
+      and UART, UDP and TCP endpoints for other components
+    - TCP endpoints are automatically added/removed upon connection
+    - Save flight stack logs for ArduPilot (binlog) and PX4 (ulog)
+    - Minimal/opportunistic parsing on MAVLink messages to avoid overhead
