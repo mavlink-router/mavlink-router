@@ -2,10 +2,13 @@
 
 [![Build Status](https://travis-ci.org/01org/mavlink-router.svg?branch=master)](https://travis-ci.org/01org/mavlink-router) [![Coverity Scan Build Status](https://scan.coverity.com/projects/11557/badge.svg)](https://scan.coverity.com/projects/11557)
 
-Route mavlink packets between endpoints (WIP)
+Route mavlink packets between endpoints.
 
-In its current state it acts as a bridge between one "master" endpoint on UART
-and other endpoints on UDP.
+There's one "master" endpoint that should be the flight stack (either on UART or UDP)
+and other components that can be on UDP or TCP endpoints.
+
+TCP endpoints are added automatically if the TCP server is enabled, allowing clients
+to simply connect to mavlink-router without changing its configuration.
 
 ### Compilation and installation ###
 
