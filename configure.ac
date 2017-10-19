@@ -3,7 +3,7 @@ AC_INIT([mavlink-router],
 	[1],
 	[],
 	[mavlink-router],
-	[])
+	[https://github.com/01org/mavlink-router])
 
 AC_CONFIG_SRCDIR([configure.ac])
 AC_CONFIG_MACRO_DIR([m4])
