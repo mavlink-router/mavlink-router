@@ -649,7 +649,7 @@ static int setup_timeout()
 
 int main(int argc, char *argv[])
 {
-    char *ip = (char *)"127.0.0.1";
+    char *ip = strdup("127.0.0.1");
     int port = 5760;
 
     if (argc > 1) {
@@ -666,18 +666,18 @@ int main(int argc, char *argv[])
         setup_signal_handlers() < 0)
         goto fail;
 
+    free(ip);
+
     loop();
 
     close(timeout_fd);
     close(tcp_fd);
 
-    if (argc > 1) {
-        free(ip);
-    }
-
     return 0;
 
 fail:
+    free(ip);
+
     if (tcp_fd >= 0)
         close(tcp_fd);
     if (timeout_fd >=0)
