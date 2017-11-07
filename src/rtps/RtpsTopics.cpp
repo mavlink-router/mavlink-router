@@ -41,6 +41,13 @@ bool RtpsTopics::init()
         std::cout << "ERROR starting vehicle_command subscriber" << std::endl;
         return false;
     }
+    
+    if (_optical_flow_sub.init()) {
+        std::cout << "optical_flow subscriber started" << std::endl;
+    } else {
+        std::cout << "ERROR starting optical_flow subscriber" << std::endl;
+        return false;
+    }
 
     // Initialise publishers
     if (_sensor_combined_pub.init()) {
@@ -98,6 +105,7 @@ bool RtpsTopics::hasMsg(uint8_t *topic_ID)
         switch (_sub_topics[_next_sub_idx])
         {
             case 80: if (_vehicle_command_sub.hasMsg()) *topic_ID = 80; break;
+            case 45: if (_optical_flow_sub.hasMsg()) *topic_ID = 45; break;
             default:
                 printf("Unexpected topic ID to check hasMsg\n");
             break;
@@ -127,6 +135,13 @@ bool RtpsTopics::getMsg(const uint8_t topic_ID, eprosima::fastcdr::Cdr &scdr)
                 ret = true;
             }
         break;
+        case 45: // optical_flow
+            if (_optical_flow_sub.hasMsg())
+            {
+                optical_flow_ msg = _optical_flow_sub.getMsg();
+                msg.serialize(scdr);
+                ret = true;
+            }
         default:
             printf("Unexpected topic ID '%hhu' to getMsg\n", topic_ID);
         break;

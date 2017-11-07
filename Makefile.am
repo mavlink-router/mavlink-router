@@ -191,7 +191,13 @@ rtpsd_SOURCES = \
 	src/rtps/vehicle_command_PubSubTypes.cpp \
 	src/rtps/vehicle_command_PubSubTypes.h \
 	src/rtps/vehicle_command_Subscriber.cpp \
-	src/rtps/vehicle_command_Subscriber.h
+	src/rtps/vehicle_command_Subscriber.h \
+	src/rtps/optical_flow_.cpp \
+	src/rtps/optical_flow_.h \
+	src/rtps/optical_flow_PubSubTypes.cpp \
+	src/rtps/optical_flow_PubSubTypes.h \
+	src/rtps/optical_flow_Subscriber.cpp \
+	src/rtps/optical_flow_Subscriber.h
 
 rtpsd_LDFLAGS = -lfastcdr -lfastrtps
 
