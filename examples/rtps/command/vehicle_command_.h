@@ -445,7 +445,7 @@ public:
      * @brief This function sets a value in member from_external
      * @param _from_external New value for member from_external
      */
-    inline eProsima_user_DllExport void from_external(uint8_t _from_external)
+    inline eProsima_user_DllExport void from_external(bool _from_external)
     {
         m_from_external = _from_external;
     }
@@ -454,7 +454,7 @@ public:
      * @brief This function returns the value of member from_external
      * @return Value of member from_external
      */
-    inline eProsima_user_DllExport uint8_t from_external() const
+    inline eProsima_user_DllExport bool from_external() const
     {
         return m_from_external;
     }
@@ -463,7 +463,7 @@ public:
      * @brief This function returns a reference to member from_external
      * @return Reference to member from_external
      */
-    inline eProsima_user_DllExport uint8_t& from_external()
+    inline eProsima_user_DllExport bool& from_external()
     {
         return m_from_external;
     }
@@ -532,7 +532,7 @@ private:
     uint8_t m_source_system;
     uint8_t m_source_component;
     uint8_t m_confirmation;
-    uint8_t m_from_external;
+    bool m_from_external;
 };
 
 #endif // _vehicle_command__H_

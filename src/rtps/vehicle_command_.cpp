@@ -48,7 +48,7 @@ vehicle_command_::vehicle_command_()
     m_source_system = 0;
     m_source_component = 0;
     m_confirmation = 0;
-    m_from_external = 0;
+    m_from_external = false;
 }
 
 vehicle_command_::~vehicle_command_()

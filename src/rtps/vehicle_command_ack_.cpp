@@ -38,7 +38,7 @@ vehicle_command_ack_::vehicle_command_ack_()
     m_result_param2 = 0;
     m_command = 0;
     m_result = 0;
-    m_from_external = 0;
+    m_from_external = false;
     m_result_param1 = 0;
     m_target_system = 0;
     m_target_component = 0;

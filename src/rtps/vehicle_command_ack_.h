@@ -185,7 +185,7 @@ public:
      * @brief This function sets a value in member from_external
      * @param _from_external New value for member from_external
      */
-    inline eProsima_user_DllExport void from_external(uint8_t _from_external)
+    inline eProsima_user_DllExport void from_external(bool _from_external)
     {
         m_from_external = _from_external;
     }
@@ -194,7 +194,7 @@ public:
      * @brief This function returns the value of member from_external
      * @return Value of member from_external
      */
-    inline eProsima_user_DllExport uint8_t from_external() const
+    inline eProsima_user_DllExport bool from_external() const
     {
         return m_from_external;
     }
@@ -203,7 +203,7 @@ public:
      * @brief This function returns a reference to member from_external
      * @return Reference to member from_external
      */
-    inline eProsima_user_DllExport uint8_t& from_external()
+    inline eProsima_user_DllExport bool& from_external()
     {
         return m_from_external;
     }
@@ -340,7 +340,7 @@ private:
     int32_t m_result_param2;
     uint16_t m_command;
     uint8_t m_result;
-    uint8_t m_from_external;
+    bool m_from_external;
     uint8_t m_result_param1;
     uint8_t m_target_system;
     uint8_t m_target_component;

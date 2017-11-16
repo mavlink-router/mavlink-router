@@ -47,7 +47,7 @@ struct options {
 };
 
 static struct options _options
-    = {.device = "/dev/ttyS1", .baudrate = 460800, .port = 13800, .report_stats = false};
+    = {.device = "/dev/ttyS1", .baudrate = 921600, .port = 13800, .report_stats = false};
 
 static struct sockaddr_in _sockaddr;
 
