@@ -100,7 +100,7 @@ bool RtpsTopics::hasMsg(uint8_t *topic_ID)
     if (nullptr == topic_ID) return false;
 
     *topic_ID = 0;
-    while (_next_sub_idx < 1 && 0 == *topic_ID)
+    while (_next_sub_idx < 2 && 0 == *topic_ID)
     {
         switch (_sub_topics[_next_sub_idx])
         {
@@ -142,6 +142,7 @@ bool RtpsTopics::getMsg(const uint8_t topic_ID, eprosima::fastcdr::Cdr &scdr)
                 msg.serialize(scdr);
                 ret = true;
             }
+	break;
         default:
             printf("Unexpected topic ID '%hhu' to getMsg\n", topic_ID);
         break;

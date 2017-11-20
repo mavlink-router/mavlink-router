@@ -220,16 +220,19 @@ int UART_node::parseRTPSfromUART(uint8_t *topic_ID, uint8_t *seq, char buffer[],
         return 0;
 
     // look for starting ">>>"
-    while (start <= (_buf_size - sizeof(struct Header)) && memcmp(_buf + start, ">>>", 3) != 0) {
-        start++;
+    for (start = 0; start + sizeof(struct Header) <= _buf_size; ++start) {
+        if ('>' == _buf[start] && memcmp(_buf + start, ">>>", 3) == 0) {
+            break;
+        }
     }
+
     if (start >= (_buf_size - sizeof(struct Header))) {
         return 0;
     }
 
     struct Header *header = (struct Header*)&_buf[start];
     len = ((uint16_t)header->payload_len_h << 8) | header->payload_len_l;
-    if (start + len > _buf_size)
+    if (start + len + sizeof(struct Header) > _buf_size)
         return 0; // we don't have a complete msg yet
 
     // cerr << "rtps parse. message len " << (int)len << " on: " << start << endl;
@@ -281,7 +284,6 @@ int UART_node::writeRTPStoUART(const uint8_t topic_ID, char buffer[], uint16_t l
     ret = write(m_uart_filestream, &header, sizeof(header));
     if (ret < 0 || ret != sizeof(header))
         goto err;
-    std::cout << "Topic ID:" << topic_ID << std::endl;
 
     ret = write(m_uart_filestream, buffer, length);
     if (ret < 0 || (unsigned)ret != length)
