@@ -1,6 +1,6 @@
 ## MAVLink Router ##
 
-[![Build Status](https://travis-ci.org/01org/mavlink-router.svg?branch=master)](https://travis-ci.org/01org/mavlink-router) [![Coverity Scan Build Status](https://scan.coverity.com/projects/11557/badge.svg)](https://scan.coverity.com/projects/11557)
+[![Build Status](https://travis-ci.org/intel/mavlink-router.svg?branch=master)](https://travis-ci.org/intel/mavlink-router) [![Coverity Scan Build Status](https://scan.coverity.com/projects/11557/badge.svg)](https://scan.coverity.com/projects/11557)
 
 Route mavlink packets between endpoints.
 
