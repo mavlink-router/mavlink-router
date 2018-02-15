@@ -102,6 +102,7 @@ void sensor_combined_Subscriber::SubListener::onNewDataMessage(Subscriber* sub)
             {
                 // Print your structure data here.
                 ++n_msg;
+		std::cout << "Got new message" << std::endl;
                 //std::cout << "Sample received, count=" << n_msg << std::endl;
                 has_msg = true;
 

@@ -35,6 +35,7 @@ using namespace eprosima::fastcdr::exception;
 
 optical_flow_::optical_flow_()
 {
+    m_timestamp = 0;
     m_pixel_flow_x_integral = 0.0;
     m_pixel_flow_y_integral = 0.0;
     m_gyro_x_rate_integral = 0.0;
@@ -55,6 +56,7 @@ optical_flow_::~optical_flow_()
 
 optical_flow_::optical_flow_(const optical_flow_ &x)
 {
+    m_timestamp = x.m_timestamp;
     m_pixel_flow_x_integral = x.m_pixel_flow_x_integral;
     m_pixel_flow_y_integral = x.m_pixel_flow_y_integral;
     m_gyro_x_rate_integral = x.m_gyro_x_rate_integral;
@@ -71,6 +73,7 @@ optical_flow_::optical_flow_(const optical_flow_ &x)
 
 optical_flow_::optical_flow_(optical_flow_ &&x)
 {
+    m_timestamp = x.m_timestamp;
     m_pixel_flow_x_integral = x.m_pixel_flow_x_integral;
     m_pixel_flow_y_integral = x.m_pixel_flow_y_integral;
     m_gyro_x_rate_integral = x.m_gyro_x_rate_integral;
@@ -87,6 +90,7 @@ optical_flow_::optical_flow_(optical_flow_ &&x)
 
 optical_flow_& optical_flow_::operator=(const optical_flow_ &x)
 {
+    m_timestamp = x.m_timestamp;
     m_pixel_flow_x_integral = x.m_pixel_flow_x_integral;
     m_pixel_flow_y_integral = x.m_pixel_flow_y_integral;
     m_gyro_x_rate_integral = x.m_gyro_x_rate_integral;
@@ -105,6 +109,7 @@ optical_flow_& optical_flow_::operator=(const optical_flow_ &x)
 
 optical_flow_& optical_flow_::operator=(optical_flow_ &&x)
 {
+    m_timestamp = x.m_timestamp;
     m_pixel_flow_x_integral = x.m_pixel_flow_x_integral;
     m_pixel_flow_y_integral = x.m_pixel_flow_y_integral;
     m_gyro_x_rate_integral = x.m_gyro_x_rate_integral;
@@ -125,6 +130,8 @@ size_t optical_flow_::getMaxCdrSerializedSize(size_t current_alignment)
 {
     size_t initial_alignment = current_alignment;
             
+    current_alignment += 8 + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+
     current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
 
     current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
@@ -157,6 +164,8 @@ size_t optical_flow_::getCdrSerializedSize(const optical_flow_& data, size_t cur
 {
     size_t initial_alignment = current_alignment;
             
+    current_alignment += 8 + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+
     current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
 
     current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
@@ -187,6 +196,8 @@ size_t optical_flow_::getCdrSerializedSize(const optical_flow_& data, size_t cur
 
 void optical_flow_::serialize(eprosima::fastcdr::Cdr &scdr) const
 {
+    scdr << m_timestamp;
+
     scdr << m_pixel_flow_x_integral;
 
     scdr << m_pixel_flow_y_integral;
@@ -215,6 +226,7 @@ void optical_flow_::serialize(eprosima::fastcdr::Cdr &scdr) const
 
 void optical_flow_::deserialize(eprosima::fastcdr::Cdr &dcdr)
 {
+    dcdr >> m_timestamp;
     dcdr >> m_pixel_flow_x_integral;
     dcdr >> m_pixel_flow_y_integral;
     dcdr >> m_gyro_x_rate_integral;
@@ -246,6 +258,7 @@ size_t optical_flow_::getKeyMaxCdrSerializedSize(size_t current_alignment)
 
 
 
+
     return current_align;
 }
 
@@ -256,6 +269,7 @@ bool optical_flow_::isKeyDefined()
 
 void optical_flow_::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 {
+	 
 	 
 	 
 	 

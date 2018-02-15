@@ -104,6 +104,32 @@ public:
     eProsima_user_DllExport vehicle_command_& operator=(vehicle_command_ &&x);
     
     /*!
+     * @brief This function sets a value in member timestamp
+     * @param _timestamp New value for member timestamp
+     */
+    inline eProsima_user_DllExport void timestamp(uint64_t _timestamp)
+    {
+        m_timestamp = _timestamp;
+    }
+
+    /*!
+     * @brief This function returns the value of member timestamp
+     * @return Value of member timestamp
+     */
+    inline eProsima_user_DllExport uint64_t timestamp() const
+    {
+        return m_timestamp;
+    }
+
+    /*!
+     * @brief This function returns a reference to member timestamp
+     * @return Reference to member timestamp
+     */
+    inline eProsima_user_DllExport uint64_t& timestamp()
+    {
+        return m_timestamp;
+    }
+    /*!
      * @brief This function sets a value in member param5
      * @param _param5 New value for member param5
      */
@@ -519,6 +545,7 @@ public:
     eProsima_user_DllExport void serializeKey(eprosima::fastcdr::Cdr &cdr) const;
     
 private:
+    uint64_t m_timestamp;
     double m_param5;
     double m_param6;
     float m_param1;

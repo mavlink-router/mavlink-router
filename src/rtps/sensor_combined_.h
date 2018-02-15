@@ -104,6 +104,32 @@ public:
     eProsima_user_DllExport sensor_combined_& operator=(sensor_combined_ &&x);
     
     /*!
+     * @brief This function sets a value in member timestamp
+     * @param _timestamp New value for member timestamp
+     */
+    inline eProsima_user_DllExport void timestamp(uint64_t _timestamp)
+    {
+        m_timestamp = _timestamp;
+    }
+
+    /*!
+     * @brief This function returns the value of member timestamp
+     * @return Value of member timestamp
+     */
+    inline eProsima_user_DllExport uint64_t timestamp() const
+    {
+        return m_timestamp;
+    }
+
+    /*!
+     * @brief This function returns a reference to member timestamp
+     * @return Reference to member timestamp
+     */
+    inline eProsima_user_DllExport uint64_t& timestamp()
+    {
+        return m_timestamp;
+    }
+    /*!
      * @brief This function copies the value in member gyro_rad
      * @param _gyro_rad New value to be copied in member gyro_rad
      */
@@ -442,6 +468,7 @@ public:
     eProsima_user_DllExport void serializeKey(eprosima::fastcdr::Cdr &cdr) const;
     
 private:
+    uint64_t m_timestamp;
     std::array<float, 3> m_gyro_rad;
     uint32_t m_gyro_integral_dt;
     int32_t m_accelerometer_timestamp_relative;

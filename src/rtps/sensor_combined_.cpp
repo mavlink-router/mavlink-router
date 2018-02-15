@@ -35,6 +35,7 @@ using namespace eprosima::fastcdr::exception;
 
 sensor_combined_::sensor_combined_()
 {
+    m_timestamp = 0;
 
     m_gyro_integral_dt = 0;
     m_accelerometer_timestamp_relative = 0;
@@ -53,6 +54,7 @@ sensor_combined_::~sensor_combined_()
 
 sensor_combined_::sensor_combined_(const sensor_combined_ &x)
 {
+    m_timestamp = x.m_timestamp;
     m_gyro_rad = x.m_gyro_rad;
     m_gyro_integral_dt = x.m_gyro_integral_dt;
     m_accelerometer_timestamp_relative = x.m_accelerometer_timestamp_relative;
@@ -67,6 +69,7 @@ sensor_combined_::sensor_combined_(const sensor_combined_ &x)
 
 sensor_combined_::sensor_combined_(sensor_combined_ &&x)
 {
+    m_timestamp = x.m_timestamp;
     m_gyro_rad = std::move(x.m_gyro_rad);
     m_gyro_integral_dt = x.m_gyro_integral_dt;
     m_accelerometer_timestamp_relative = x.m_accelerometer_timestamp_relative;
@@ -81,6 +84,7 @@ sensor_combined_::sensor_combined_(sensor_combined_ &&x)
 
 sensor_combined_& sensor_combined_::operator=(const sensor_combined_ &x)
 {
+    m_timestamp = x.m_timestamp;
     m_gyro_rad = x.m_gyro_rad;
     m_gyro_integral_dt = x.m_gyro_integral_dt;
     m_accelerometer_timestamp_relative = x.m_accelerometer_timestamp_relative;
@@ -97,6 +101,7 @@ sensor_combined_& sensor_combined_::operator=(const sensor_combined_ &x)
 
 sensor_combined_& sensor_combined_::operator=(sensor_combined_ &&x)
 {
+    m_timestamp = x.m_timestamp;
     m_gyro_rad = std::move(x.m_gyro_rad);
     m_gyro_integral_dt = x.m_gyro_integral_dt;
     m_accelerometer_timestamp_relative = x.m_accelerometer_timestamp_relative;
@@ -115,6 +120,8 @@ size_t sensor_combined_::getMaxCdrSerializedSize(size_t current_alignment)
 {
     size_t initial_alignment = current_alignment;
             
+    current_alignment += 8 + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+
     current_alignment += ((3) * 4) + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
 
     current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
@@ -143,6 +150,8 @@ size_t sensor_combined_::getCdrSerializedSize(const sensor_combined_& data, size
 {
     size_t initial_alignment = current_alignment;
             
+    current_alignment += 8 + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+
     current_alignment += ((3) * 4) + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
     current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
 
@@ -166,6 +175,8 @@ size_t sensor_combined_::getCdrSerializedSize(const sensor_combined_& data, size
 
 void sensor_combined_::serialize(eprosima::fastcdr::Cdr &scdr) const
 {
+    scdr << m_timestamp;
+
     scdr << m_gyro_rad;
 
     scdr << m_gyro_integral_dt;
@@ -190,6 +201,7 @@ void sensor_combined_::serialize(eprosima::fastcdr::Cdr &scdr) const
 
 void sensor_combined_::deserialize(eprosima::fastcdr::Cdr &dcdr)
 {
+    dcdr >> m_timestamp;
     dcdr >> m_gyro_rad;
     dcdr >> m_gyro_integral_dt;
     dcdr >> m_accelerometer_timestamp_relative;
@@ -217,6 +229,7 @@ size_t sensor_combined_::getKeyMaxCdrSerializedSize(size_t current_alignment)
 
 
 
+
     return current_align;
 }
 
@@ -227,6 +240,7 @@ bool sensor_combined_::isKeyDefined()
 
 void sensor_combined_::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 {
+	 
 	 
 	 
 	 

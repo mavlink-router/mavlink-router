@@ -104,6 +104,32 @@ public:
     eProsima_user_DllExport optical_flow_& operator=(optical_flow_ &&x);
     
     /*!
+     * @brief This function sets a value in member timestamp
+     * @param _timestamp New value for member timestamp
+     */
+    inline eProsima_user_DllExport void timestamp(uint64_t _timestamp)
+    {
+        m_timestamp = _timestamp;
+    }
+
+    /*!
+     * @brief This function returns the value of member timestamp
+     * @return Value of member timestamp
+     */
+    inline eProsima_user_DllExport uint64_t timestamp() const
+    {
+        return m_timestamp;
+    }
+
+    /*!
+     * @brief This function returns a reference to member timestamp
+     * @return Reference to member timestamp
+     */
+    inline eProsima_user_DllExport uint64_t& timestamp()
+    {
+        return m_timestamp;
+    }
+    /*!
      * @brief This function sets a value in member pixel_flow_x_integral
      * @param _pixel_flow_x_integral New value for member pixel_flow_x_integral
      */
@@ -467,6 +493,7 @@ public:
     eProsima_user_DllExport void serializeKey(eprosima::fastcdr::Cdr &cdr) const;
     
 private:
+    uint64_t m_timestamp;
     float m_pixel_flow_x_integral;
     float m_pixel_flow_y_integral;
     float m_gyro_x_rate_integral;

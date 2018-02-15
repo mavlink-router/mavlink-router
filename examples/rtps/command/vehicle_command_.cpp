@@ -35,6 +35,7 @@ using namespace eprosima::fastcdr::exception;
 
 vehicle_command_::vehicle_command_()
 {
+    m_timestamp = 0;
     m_param5 = 0.0;
     m_param6 = 0.0;
     m_param1 = 0.0;
@@ -57,6 +58,7 @@ vehicle_command_::~vehicle_command_()
 
 vehicle_command_::vehicle_command_(const vehicle_command_ &x)
 {
+    m_timestamp = x.m_timestamp;
     m_param5 = x.m_param5;
     m_param6 = x.m_param6;
     m_param1 = x.m_param1;
@@ -75,6 +77,7 @@ vehicle_command_::vehicle_command_(const vehicle_command_ &x)
 
 vehicle_command_::vehicle_command_(vehicle_command_ &&x)
 {
+    m_timestamp = x.m_timestamp;
     m_param5 = x.m_param5;
     m_param6 = x.m_param6;
     m_param1 = x.m_param1;
@@ -93,6 +96,7 @@ vehicle_command_::vehicle_command_(vehicle_command_ &&x)
 
 vehicle_command_& vehicle_command_::operator=(const vehicle_command_ &x)
 {
+    m_timestamp = x.m_timestamp;
     m_param5 = x.m_param5;
     m_param6 = x.m_param6;
     m_param1 = x.m_param1;
@@ -113,6 +117,7 @@ vehicle_command_& vehicle_command_::operator=(const vehicle_command_ &x)
 
 vehicle_command_& vehicle_command_::operator=(vehicle_command_ &&x)
 {
+    m_timestamp = x.m_timestamp;
     m_param5 = x.m_param5;
     m_param6 = x.m_param6;
     m_param1 = x.m_param1;
@@ -135,6 +140,8 @@ size_t vehicle_command_::getMaxCdrSerializedSize(size_t current_alignment)
 {
     size_t initial_alignment = current_alignment;
             
+    current_alignment += 8 + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+
     current_alignment += 8 + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
 
     current_alignment += 8 + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
@@ -175,6 +182,8 @@ size_t vehicle_command_::getCdrSerializedSize(const vehicle_command_& data, size
 
     current_alignment += 8 + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
 
+    current_alignment += 8 + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+
     current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
 
     current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
@@ -205,6 +214,8 @@ size_t vehicle_command_::getCdrSerializedSize(const vehicle_command_& data, size
 
 void vehicle_command_::serialize(eprosima::fastcdr::Cdr &scdr) const
 {
+    scdr << m_timestamp;
+
     scdr << m_param5;
 
     scdr << m_param6;
@@ -237,6 +248,7 @@ void vehicle_command_::serialize(eprosima::fastcdr::Cdr &scdr) const
 
 void vehicle_command_::deserialize(eprosima::fastcdr::Cdr &dcdr)
 {
+    dcdr >> m_timestamp;
     dcdr >> m_param5;
     dcdr >> m_param6;
     dcdr >> m_param1;
@@ -272,6 +284,7 @@ size_t vehicle_command_::getKeyMaxCdrSerializedSize(size_t current_alignment)
 
 
 
+
     return current_align;
 }
 
@@ -282,6 +295,7 @@ bool vehicle_command_::isKeyDefined()
 
 void vehicle_command_::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 {
+	 
 	 
 	 
 	 
