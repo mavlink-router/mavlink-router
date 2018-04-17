@@ -50,7 +50,7 @@ Install:
     $ # or... to another root directory:
     $ make DESTDIR=/tmp/root/dir install
 
-### Running ###
+### Routing ###
 
 To route mavlink packets from master `ttyS1` to 2 other UDP endpoints, do as
 following:
