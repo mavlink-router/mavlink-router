@@ -77,7 +77,7 @@ void ULog::stop()
     mavlink_command_long_t cmd;
 
     if (_file == -1) {
-        log_error("ULog not started");
+        log_info("ULog not started");
         return;
     }
 
@@ -103,20 +103,33 @@ int ULog::write_msg(const struct buffer *buffer)
 {
     const bool mavlink2 = buffer->data[0] == MAVLINK_STX;
     uint32_t msg_id;
+    uint8_t *payload;
     uint16_t payload_len;
     uint8_t trimmed_zeros;
+    uint8_t source_system_id;
+    uint8_t source_component_id;
+
 
     if (mavlink2) {
         struct mavlink_router_mavlink2_header *msg
             = (struct mavlink_router_mavlink2_header *)buffer->data;
         msg_id = msg->msgid;
+        payload = buffer->data + sizeof(struct mavlink_router_mavlink2_header);
         payload_len = msg->payload_len;
+        source_system_id = msg->sysid;
+        source_component_id = msg->compid;
     } else {
         struct mavlink_router_mavlink1_header *msg
             = (struct mavlink_router_mavlink1_header *)buffer->data;
         msg_id = msg->msgid;
+        payload = buffer->data + sizeof(struct mavlink_router_mavlink1_header);
         payload_len = msg->payload_len;
+        source_system_id = msg->sysid;
+        source_component_id = msg->compid;
     }
+
+    /* Check if we should start or stop logging */
+    _handle_auto_start_stop(msg_id, source_system_id, source_component_id, payload);
 
     /* Check if we are interested in this msg_id */
     if (msg_id != MAVLINK_MSG_ID_COMMAND_ACK && msg_id != MAVLINK_MSG_ID_LOGGING_DATA_ACKED
@@ -133,13 +146,9 @@ int ULog::write_msg(const struct buffer *buffer)
         payload_len = msg_entry->msg_len;
     }
 
-    uint8_t *payload;
-
     if (mavlink2) {
-        payload = buffer->data + sizeof(struct mavlink_router_mavlink2_header);
         trimmed_zeros = get_trimmed_zeros(msg_entry, buffer);
     } else {
-        payload = buffer->data + sizeof(struct mavlink_router_mavlink1_header);
         trimmed_zeros = 0;
     }
 

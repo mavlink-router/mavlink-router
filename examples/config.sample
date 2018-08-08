@@ -31,6 +31,12 @@
 #       Path to directory where to store flightstack log.
 #       No default value. If absent, no flightstack log will be stored.
 #
+#   LogMode
+#       One of <always>, <while_armed>
+#       Default: always, log from start until mavlink-router is stopped.
+#       If set to while_armed, a new log file is created whenever the vehicle is
+#       armed, and closed when disarmed.
+#
 #   DebugLogLevel
 #       One of <error>, <warning>, <info> or <debug>. Which debug log
 #       level is being used by mavlink-router, with <debug> being the

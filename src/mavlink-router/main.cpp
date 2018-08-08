@@ -46,6 +46,7 @@ static struct options opt = {
         .tcp_port = ULONG_MAX,
         .report_msg_statistics = false,
         .logs_dir = nullptr,
+        .log_mode = LogMode::always,
         .debug_log_level = (int)Log::Level::INFO,
         .mavlink_dialect = Auto
 };
@@ -582,6 +583,35 @@ static int parse_log_level(const char *val, size_t val_len, void *storage, size_
 }
 #undef MAX_LOG_LEVEL_SIZE
 
+#define MAX_LOG_MODE_SIZE 20
+static int parse_log_mode(const char *val, size_t val_len, void *storage, size_t storage_len)
+{
+    assert(val);
+    assert(storage);
+    assert(val_len);
+
+    if (storage_len < sizeof(options::log_mode))
+        return -ENOBUFS;
+    if (val_len > MAX_LOG_MODE_SIZE)
+        return -EINVAL;
+
+    const char *log_mode_str = strndupa(val, val_len);
+    LogMode log_mode;
+    if (strcaseeq(log_mode_str, "always"))
+        log_mode = LogMode::always;
+    else if (strcaseeq(log_mode_str, "while_armed"))
+        log_mode = LogMode::while_armed;
+    else {
+        log_error("Invalid argument for LogMode = %s", log_mode_str);
+        return -EINVAL;
+    }
+    *((LogMode *)storage) = log_mode;
+
+    return 0;
+}
+#undef MAX_LOG_MODE_SIZE
+
+
 static int parse_mode(const char *val, size_t val_len, void *storage, size_t storage_len)
 {
     assert(val);
@@ -618,6 +648,7 @@ static int parse_confs(ConfFile &conf)
         {"ReportStats",     false, ConfFile::parse_bool,    OPTIONS_TABLE_STRUCT_FIELD(options, report_msg_statistics)},
         {"MavlinkDialect",  false, parse_mavlink_dialect,   OPTIONS_TABLE_STRUCT_FIELD(options, mavlink_dialect)},
         {"Log",             false, ConfFile::parse_str_dup, OPTIONS_TABLE_STRUCT_FIELD(options, logs_dir)},
+        {"LogMode",         false, parse_log_mode,          OPTIONS_TABLE_STRUCT_FIELD(options, log_mode)},
         {"DebugLogLevel",   false, parse_log_level,         OPTIONS_TABLE_STRUCT_FIELD(options, debug_log_level)},
     };
 

@@ -126,6 +126,7 @@ struct options {
     unsigned long tcp_port;
     bool report_msg_statistics;
     char *logs_dir;
+    LogMode log_mode;
     int debug_log_level;
     enum mavlink_dialect mavlink_dialect;
 };

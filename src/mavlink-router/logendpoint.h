@@ -26,13 +26,24 @@
 #define LOG_ENDPOINT_SYSTEM_ID 2
 #define LOG_ENDPOINT_TARGET_SYSTEM_ID 1
 
+
+enum class LogMode {
+    always = 0,         ///< Log from start until mavlink-router exits
+    while_armed,        ///< Start logging when the vehicle is armed until it's disarmed
+
+    disabled            ///< Do not try to start logging (only used internally)
+};
+
+
 class LogEndpoint : public Endpoint {
 public:
-    LogEndpoint(const char *name, const char *logs_dir)
+    LogEndpoint(const char *name, const char *logs_dir, LogMode mode)
         : Endpoint{name, false}
         , _logs_dir{logs_dir}
+        , _mode(mode)
     {
         assert(_logs_dir);
+        _add_sys_comp_id(LOG_ENDPOINT_SYSTEM_ID << 8);
     }
 
     virtual bool start();
@@ -42,6 +53,7 @@ protected:
     const char *_logs_dir;
     const int _target_system_id = LOG_ENDPOINT_TARGET_SYSTEM_ID;
     int _file = -1;
+    LogMode _mode;
 
     Timeout *_logging_start_timeout = nullptr;
     Timeout *_alive_check_timeout = nullptr;
@@ -55,6 +67,9 @@ protected:
 
     virtual bool _start_timeout() = 0;
     virtual bool _alive_timeout();
+
+    void _handle_auto_start_stop(uint32_t msg_id, uint8_t source_system_id,
+            uint8_t source_component_id, uint8_t *payload);
 
 private:
     int _get_file(const char *extension);
