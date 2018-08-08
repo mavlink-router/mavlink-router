@@ -88,7 +88,7 @@ DIR *LogEndpoint::_open_or_create_dir(const char *name)
     return dir;
 }
 
-int LogEndpoint::_get_file(const char *extension, char *filename, size_t filename_size)
+int LogEndpoint::_get_file(const char *extension)
 {
     time_t t = time(NULL);
     struct tm *timeinfo = localtime(&t);
@@ -107,20 +107,20 @@ int LogEndpoint::_get_file(const char *extension, char *filename, size_t filenam
     i = _get_prefix(dir);
 
     for (j = 0; j <= MAX_RETRIES; j++) {
-        r = snprintf(filename, filename_size, "%05u-%i-%02i-%02i_%02i-%02i-%02i.%s", i + j,
+        r = snprintf(_filename, sizeof(_filename), "%05u-%i-%02i-%02i_%02i-%02i-%02i.%s", i + j,
                      timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday,
                      timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec, extension);
 
-        if (r < 1 || (size_t)r >= filename_size) {
+        if (r < 1 || (size_t)r >= sizeof(_filename)) {
             log_error("Error formatting Log file name: (%m)");
             return -1;
         }
 
-        r = openat(dirfd(dir), filename, O_WRONLY | O_CLOEXEC | O_CREAT | O_NONBLOCK | O_EXCL,
+        r = openat(dirfd(dir), _filename, O_WRONLY | O_CLOEXEC | O_CREAT | O_NONBLOCK | O_EXCL,
                    0644);
         if (r < 0) {
             if (errno != EEXIST) {
-                log_error("Unable to open Log file(%s): (%m)", filename);
+                log_error("Unable to open Log file(%s): (%m)", _filename);
                 return -1;
             }
             continue;
@@ -149,18 +149,22 @@ void LogEndpoint::stop()
     fsync(_file);
     close(_file);
     _file = -1;
+
+    // change file permissions to read-only to mark them as finished
+    char log_file[PATH_MAX];
+    if (snprintf(log_file, sizeof(log_file), "%s/%s", _logs_dir, _filename) < (int)sizeof(log_file)) {
+        chmod(log_file, S_IRUSR|S_IRGRP|S_IROTH);
+    }
 }
 
 bool LogEndpoint::start()
 {
-    char filename[PATH_MAX];
-
     if (_file != -1) {
         log_warning("Log already started");
         return false;
     }
 
-    _file = _get_file(_get_logfile_extension(), filename, sizeof(filename));
+    _file = _get_file(_get_logfile_extension());
     if (_file < 0) {
         _file = -1;
         return false;
@@ -173,7 +177,7 @@ bool LogEndpoint::start()
         goto timeout_error;
     }
 
-    log_info("Logging target system_id=%u on %s", _target_system_id, filename);
+    log_info("Logging target system_id=%u on %s", _target_system_id, _filename);
 
     _add_sys_comp_id(LOG_ENDPOINT_SYSTEM_ID << 8);
 
