@@ -104,8 +104,7 @@
 #Mavlink-router serves on this TCP port
 TcpServerPort=5790
 ReportStats=false
-#Which mavlink dialect is being used. Can be `common`[default] or `ardupilotmega`
-MavlinkDialect=ardupilotmega
+MavlinkDialect=auto
 
 [UdpEndpoint alfa]
 Mode = Eavesdropping
