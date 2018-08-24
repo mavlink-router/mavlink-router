@@ -258,9 +258,6 @@ void Mainloop::loop()
 
     setup_signal_handlers();
 
-    if (_log_endpoint)
-        _log_endpoint->start();
-
     add_timeout(LOG_AGGREGATE_INTERVAL_SEC * MSEC_PER_SEC,
                 std::bind(&Mainloop::_log_aggregate_timeout, this, std::placeholders::_1), this);
 
@@ -431,11 +428,11 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
 
     if (opt->logs_dir) {
         if (opt->mavlink_dialect == Ardupilotmega) {
-            _log_endpoint = new BinLog(opt->logs_dir);
+            _log_endpoint = new BinLog(opt->logs_dir, opt->log_mode);
         } else if (opt->mavlink_dialect == Common) {
-            _log_endpoint = new ULog(opt->logs_dir);
+            _log_endpoint = new ULog(opt->logs_dir, opt->log_mode);
         } else {
-            _log_endpoint = new AutoLog(opt->logs_dir);
+            _log_endpoint = new AutoLog(opt->logs_dir, opt->log_mode);
         }
         g_endpoints[i] = _log_endpoint;
     }

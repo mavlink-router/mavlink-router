@@ -121,6 +121,7 @@ public:
     // Helpers
     static int parse_bool(const char *val, size_t val_len, void *storage, size_t storage_len);
     static int parse_str_dup(const char *val, size_t val_len, void *storage, size_t storage_len);
+    static int parse_log_mode(const char *val, size_t val_len, void *storage, size_t storage_len);
     static int parse_str_buf(const char *val, size_t val_len, void *storage, size_t storage_len);
 
 #define DECLARE_PARSE_INT(_type) \

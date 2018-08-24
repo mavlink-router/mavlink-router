@@ -56,11 +56,9 @@ int AutoLog::write_msg(const struct buffer *buffer)
     /* We check autopilot on heartbeat */
     log_debug("Got autopilot %u from heartbeat", heartbeat->autopilot);
     if (heartbeat->autopilot == MAV_AUTOPILOT_PX4) {
-        _logger = std::unique_ptr<LogEndpoint>(new ULog(_logs_dir));
-        _logger->start();
+        _logger = std::unique_ptr<LogEndpoint>(new ULog(_logs_dir, _mode));
     } else if (heartbeat->autopilot == MAV_AUTOPILOT_ARDUPILOTMEGA) {
-        _logger = std::unique_ptr<LogEndpoint>(new BinLog(_logs_dir));
-        _logger->start();
+        _logger = std::unique_ptr<LogEndpoint>(new BinLog(_logs_dir, _mode));
     } else {
         log_warning("Unidentified autopilot, cannot start flight stack logging");
     }
@@ -76,8 +74,6 @@ void AutoLog::stop()
 
 bool AutoLog::start()
 {
-    _add_sys_comp_id(LOG_ENDPOINT_SYSTEM_ID << 8);
-
     return true;
 }
 

@@ -88,7 +88,7 @@ DIR *LogEndpoint::_open_or_create_dir(const char *name)
     return dir;
 }
 
-int LogEndpoint::_get_file(const char *extension, char *filename, size_t filename_size)
+int LogEndpoint::_get_file(const char *extension)
 {
     time_t t = time(NULL);
     struct tm *timeinfo = localtime(&t);
@@ -107,20 +107,20 @@ int LogEndpoint::_get_file(const char *extension, char *filename, size_t filenam
     i = _get_prefix(dir);
 
     for (j = 0; j <= MAX_RETRIES; j++) {
-        r = snprintf(filename, filename_size, "%05u-%i-%02i-%02i_%02i-%02i-%02i.%s", i + j,
+        r = snprintf(_filename, sizeof(_filename), "%05u-%i-%02i-%02i_%02i-%02i-%02i.%s", i + j,
                      timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday,
                      timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec, extension);
 
-        if (r < 1 || (size_t)r >= filename_size) {
+        if (r < 1 || (size_t)r >= sizeof(_filename)) {
             log_error("Error formatting Log file name: (%m)");
             return -1;
         }
 
-        r = openat(dirfd(dir), filename, O_WRONLY | O_CLOEXEC | O_CREAT | O_NONBLOCK | O_EXCL,
+        r = openat(dirfd(dir), _filename, O_WRONLY | O_CLOEXEC | O_CREAT | O_NONBLOCK | O_EXCL,
                    0644);
         if (r < 0) {
             if (errno != EEXIST) {
-                log_error("Unable to open Log file(%s): (%m)", filename);
+                log_error("Unable to open Log file(%s): (%m)", _filename);
                 return -1;
             }
             continue;
@@ -149,18 +149,22 @@ void LogEndpoint::stop()
     fsync(_file);
     close(_file);
     _file = -1;
+
+    // change file permissions to read-only to mark them as finished
+    char log_file[PATH_MAX];
+    if (snprintf(log_file, sizeof(log_file), "%s/%s", _logs_dir, _filename) < (int)sizeof(log_file)) {
+        chmod(log_file, S_IRUSR|S_IRGRP|S_IROTH);
+    }
 }
 
 bool LogEndpoint::start()
 {
-    char filename[PATH_MAX];
-
     if (_file != -1) {
         log_warning("Log already started");
         return false;
     }
 
-    _file = _get_file(_get_logfile_extension(), filename, sizeof(filename));
+    _file = _get_file(_get_logfile_extension());
     if (_file < 0) {
         _file = -1;
         return false;
@@ -173,9 +177,7 @@ bool LogEndpoint::start()
         goto timeout_error;
     }
 
-    log_info("Logging target system_id=%u on %s", _target_system_id, filename);
-
-    _add_sys_comp_id(LOG_ENDPOINT_SYSTEM_ID << 8);
+    log_info("Logging target system_id=%u on %s", _target_system_id, _filename);
 
     return true;
 
@@ -208,4 +210,27 @@ bool LogEndpoint::_start_alive_timeout()
     _alive_check_timeout = Mainloop::get_instance().add_timeout(
         MSEC_PER_SEC * ALIVE_TIMEOUT, std::bind(&LogEndpoint::_alive_timeout, this), this);
     return !!_alive_check_timeout;
+}
+
+void LogEndpoint::_handle_auto_start_stop(uint32_t msg_id, uint8_t source_system_id,
+        uint8_t source_component_id, uint8_t *payload)
+{
+    if (_mode == LogMode::always) {
+        if (_file == -1) {
+            if (!start()) _mode = LogMode::disabled;
+        }
+    } else if (_mode == LogMode::while_armed) {
+        if (msg_id == MAVLINK_MSG_ID_HEARTBEAT &&
+                source_system_id == LOG_ENDPOINT_TARGET_SYSTEM_ID && source_component_id == MAV_COMP_ID_AUTOPILOT1) {
+
+            const mavlink_heartbeat_t *heartbeat = (mavlink_heartbeat_t *)payload;
+            const bool is_armed = heartbeat->system_status == MAV_STATE_ACTIVE;
+
+            if (_file == -1 && is_armed) {
+                if (!start()) _mode = LogMode::disabled;
+            } else if (_file != -1 && !is_armed) {
+                stop();
+            }
+        }
+    }
 }

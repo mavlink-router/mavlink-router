@@ -24,8 +24,9 @@
 
 class AutoLog : public LogEndpoint {
 public:
-    AutoLog(const char *logs_dir)
-        : LogEndpoint{"AutoLog", logs_dir}
+
+    AutoLog(const char *logs_dir, LogMode mode)
+        : LogEndpoint{"AutoLog", logs_dir, mode}
     {
     }
 
