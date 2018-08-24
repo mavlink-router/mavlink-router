@@ -1,0 +1,14 @@
+struct sensor_combined_
+{
+	float gyro_rad[3];
+	float gyro_integral_dt;
+	long accelerometer_timestamp_relative;
+	float accelerometer_m_s2[3];
+	float accelerometer_integral_dt;
+	long magnetometer_timestamp_relative;
+	float magnetometer_ga[3];
+	long baro_timestamp_relative;
+	float baro_alt_meter;
+	float baro_temp_celcius;
+
+}; // struct sensor_combined_
