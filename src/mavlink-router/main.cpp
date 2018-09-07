@@ -599,7 +599,7 @@ static int parse_log_mode(const char *val, size_t val_len, void *storage, size_t
     LogMode log_mode;
     if (strcaseeq(log_mode_str, "always"))
         log_mode = LogMode::always;
-    else if (strcaseeq(log_mode_str, "while_armed"))
+    else if (strcaseeq(log_mode_str, "while-armed"))
         log_mode = LogMode::while_armed;
     else {
         log_error("Invalid argument for LogMode = %s", log_mode_str);
