@@ -4,8 +4,11 @@
 
 Route mavlink packets between endpoints.
 
-There's one "master" endpoint that should be the flight stack (either on UART or UDP)
-and other components that can be on UDP or TCP endpoints.
+The usual configuration is to have one "master" endpoint that is the flight
+stack (either on UART or UDP) and other components that can be on UDP or TCP
+endpoints. This is not strictly required and other configurations are possible:
+mavlink-router mainly routes mavlink packets from on endpoint without
+differentiating what they are.
 
 TCP endpoints are added automatically if the TCP server is enabled, allowing clients
 to simply connect to mavlink-router without changing its configuration.
