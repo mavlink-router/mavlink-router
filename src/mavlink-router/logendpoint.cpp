@@ -215,13 +215,16 @@ bool LogEndpoint::_start_alive_timeout()
 void LogEndpoint::_handle_auto_start_stop(uint32_t msg_id, uint8_t source_system_id,
         uint8_t source_component_id, uint8_t *payload)
 {
+    if (_target_system_id == -1) { // wait until initialized
+        return;
+    }
     if (_mode == LogMode::always) {
         if (_file == -1) {
             if (!start()) _mode = LogMode::disabled;
         }
     } else if (_mode == LogMode::while_armed) {
-        if (msg_id == MAVLINK_MSG_ID_HEARTBEAT &&
-                source_system_id == LOG_ENDPOINT_TARGET_SYSTEM_ID && source_component_id == MAV_COMP_ID_AUTOPILOT1) {
+        if (msg_id == MAVLINK_MSG_ID_HEARTBEAT && source_system_id == _target_system_id
+            && source_component_id == MAV_COMP_ID_AUTOPILOT1) {
 
             const mavlink_heartbeat_t *heartbeat = (mavlink_heartbeat_t *)payload;
             const bool is_armed = heartbeat->system_status == MAV_STATE_ACTIVE;
