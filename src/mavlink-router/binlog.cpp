@@ -100,6 +100,12 @@ int BinLog::write_msg(const struct buffer *buffer)
         source_component_id = msg->compid;
     }
 
+    /* set the expected system id to the first autopilot that we get a heartbeat from */
+    if (_target_system_id == -1 && msg_id == MAVLINK_MSG_ID_HEARTBEAT
+        && source_component_id == MAV_COMP_ID_AUTOPILOT1) {
+        _target_system_id = source_system_id;
+    }
+
     /* Check if we should start or stop logging */
     _handle_auto_start_stop(msg_id, source_system_id, source_component_id, payload);
 
