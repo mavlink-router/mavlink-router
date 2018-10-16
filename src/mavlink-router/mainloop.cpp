@@ -475,12 +475,15 @@ int Mainloop::tcp_open(unsigned long tcp_port)
 {
     int fd;
     struct sockaddr_in sockaddr = { };
+    int val = 1;
 
     fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
     if (fd == -1) {
         log_error("Could not create tcp socket (%m)");
         return -1;
     }
+
+    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
 
     sockaddr.sin_family = AF_INET;
     sockaddr.sin_port = htons(tcp_port);
