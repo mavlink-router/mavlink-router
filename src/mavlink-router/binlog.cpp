@@ -133,7 +133,7 @@ int BinLog::write_msg(const struct buffer *buffer)
         binlog_data
             = (mavlink_remote_log_data_block_t *)alloca(sizeof(mavlink_remote_log_data_block_t));
         memcpy(binlog_data, payload, payload_len);
-        memset(binlog_data + payload_len, 0, trimmed_zeros);
+        memset((uint8_t*)binlog_data + payload_len, 0, trimmed_zeros);
     } else {
         binlog_data = (mavlink_remote_log_data_block_t *)payload;
     }
