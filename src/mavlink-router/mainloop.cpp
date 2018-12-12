@@ -288,6 +288,13 @@ void Mainloop::loop()
                     mod_fd(p->fd, p, EPOLLIN);
                 }
             }
+            if (events[i].events & EPOLLERR) {
+                log_error("poll error for fd %i, closing it", p->fd);
+                remove_fd(p->fd);
+                // make poll errors fatal so that an external component can
+                // restart mavlink-router
+                should_exit = true;
+            }
         }
 
         if (should_process_tcp_hangups) {
