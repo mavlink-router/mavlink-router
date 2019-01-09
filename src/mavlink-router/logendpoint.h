@@ -48,6 +48,8 @@ public:
     virtual bool start();
     virtual void stop();
 
+    bool has_active_stop_timeout() { return _logging_stop_timeout != nullptr; }
+
 protected:
     const char *_logs_dir;
     int _target_system_id = -1;
@@ -55,6 +57,7 @@ protected:
     LogMode _mode;
 
     Timeout *_logging_start_timeout = nullptr;
+    Timeout *_logging_stop_timeout = nullptr;
     Timeout *_alive_check_timeout = nullptr;
     uint32_t _timeout_write_total = 0;
 
@@ -62,9 +65,11 @@ protected:
 
     void _send_msg(const mavlink_message_t *msg, int target_sysid);
     void _remove_start_timeout();
+    void _remove_stop_timeout();
     bool _start_alive_timeout();
 
     virtual bool _start_timeout() = 0;
+    virtual bool _stop_timeout() = 0;
     virtual bool _alive_timeout();
 
     void _handle_auto_start_stop(uint32_t msg_id, uint8_t source_system_id,
