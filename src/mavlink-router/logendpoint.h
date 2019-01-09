@@ -43,6 +43,8 @@ public:
     virtual bool start();
     virtual void stop();
 
+    bool has_active_stop_timeout() {return _logging_stop_timeout != nullptr;}
+
     /**
      * Check existing log files and mark logs as read-only if needed.
      * This handles the case where the system (or mavlink-router) crashed or
@@ -59,6 +61,7 @@ protected:
     LogMode _mode;
 
     Timeout *_logging_start_timeout = nullptr;
+    Timeout *_logging_stop_timeout = nullptr;
     Timeout *_fsync_timeout = nullptr;
     Timeout *_alive_check_timeout = nullptr;
     uint32_t _timeout_write_total = 0;
@@ -68,9 +71,11 @@ protected:
 
     void _send_msg(const mavlink_message_t *msg, int target_sysid);
     void _remove_start_timeout();
+    void _remove_stop_timeout();
     bool _start_alive_timeout();
 
     virtual bool _start_timeout() = 0;
+    virtual bool _stop_timeout() = 0;
     virtual bool _alive_timeout();
 
     bool _fsync();

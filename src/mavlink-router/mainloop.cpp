@@ -35,6 +35,9 @@
 #include "autolog.h"
 
 static std::atomic<bool> should_exit {false};
+#define TIMEOUT_LOG_SHUTDOWN_US     5000000ULL // number of microseconds we wait until we give up trying to stop log streaming
+                                        // after a shutdown of mavlink router was requested
+
 
 Mainloop Mainloop::_instance{};
 bool Mainloop::_initialized = false;
@@ -294,6 +297,7 @@ void Mainloop::loop()
     add_timeout(LOG_AGGREGATE_INTERVAL_SEC * MSEC_PER_SEC,
                 std::bind(&Mainloop::_log_aggregate_timeout, this, std::placeholders::_1), this);
 
+    usec_t timestamp_stop_requested = 0;
     while (!should_exit.load(std::memory_order_relaxed)) {
         int i;
 
@@ -329,6 +333,16 @@ void Mainloop::loop()
                 // make poll errors fatal so that an external component can
                 // restart mavlink-router
                 request_exit();
+            }
+
+            // we should exit the router, make sure to stop the logendpoint properly (e.g. wait for ACK)
+            // we will try for max TIMEOUT_LOG_SHUTDOWN_US to shut down the log stream before we give up and exit anyways
+            if (should_exit.load(std::memory_order_relaxed)) {
+                if (_log_endpoint && timestamp_stop_requested == 0) {
+                    // log streaming is active, start timing
+                    timestamp_stop_requested = now_usec();
+                    _log_endpoint->stop();
+                }
             }
         }
 

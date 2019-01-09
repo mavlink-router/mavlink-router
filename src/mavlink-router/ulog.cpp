@@ -42,10 +42,24 @@ struct _packed_ ulog_msg_header {
 bool ULog::_start_timeout()
 {
     mavlink_message_t msg;
-    mavlink_command_long_t cmd;
+    mavlink_command_long_t cmd{};
 
-    bzero(&cmd, sizeof(cmd));
     cmd.command = MAV_CMD_LOGGING_START;
+    cmd.target_component = MAV_COMP_ID_ALL;
+    cmd.target_system = _target_system_id;
+
+    mavlink_msg_command_long_encode(LOG_ENDPOINT_SYSTEM_ID, MAV_COMP_ID_ALL, &msg, &cmd);
+    _send_msg(&msg, _target_system_id);
+
+    return true;
+}
+
+bool ULog::_stop_timeout()
+{
+    mavlink_message_t msg;
+    mavlink_command_long_t cmd{};
+
+    cmd.command = MAV_CMD_LOGGING_STOP;
     cmd.target_component = MAV_COMP_ID_ALL;
     cmd.target_system = _target_system_id;
 
@@ -73,21 +87,10 @@ bool ULog::start()
 
 void ULog::stop()
 {
-    mavlink_message_t msg;
-    mavlink_command_long_t cmd;
-
     if (_file == -1) {
         log_info("ULog not started");
         return;
     }
-
-    bzero(&cmd, sizeof(cmd));
-    cmd.command = MAV_CMD_LOGGING_STOP;
-    cmd.target_component = MAV_COMP_ID_ALL;
-    cmd.target_system = _target_system_id;
-
-    mavlink_msg_command_long_encode(LOG_ENDPOINT_SYSTEM_ID, MAV_COMP_ID_ALL, &msg, &cmd);
-    _send_msg(&msg, _target_system_id);
 
     _buffer_len = 0;
     /* Write the last partial message to avoid corrupt the end of the file */
@@ -167,17 +170,24 @@ int ULog::write_msg(const struct buffer *buffer)
         if (trimmed_zeros)
             memset(((uint8_t *)&cmd) + payload_len, 0, trimmed_zeros);
 
-        if (!_logging_start_timeout || cmd.command != MAV_CMD_LOGGING_START)
+        if ((!_logging_start_timeout || cmd.command != MAV_CMD_LOGGING_START) &&
+                (!_logging_stop_timeout || cmd.command != MAV_CMD_LOGGING_STOP))
             return buffer->len;
 
         if (cmd.result == MAV_RESULT_ACCEPTED) {
-            _remove_start_timeout();
-            if (!_start_alive_timeout()) {
+            if (_logging_start_timeout && cmd.command == MAV_CMD_LOGGING_START) {
+                _remove_start_timeout();
+
+                if (!_start_alive_timeout()) {
                 log_warning("Could not start liveness timeout - mavlink router log won't be able "
                             "to detect if flight stack stopped");
+                }
+            } else if (_logging_stop_timeout && cmd.command == MAV_CMD_LOGGING_STOP) {
+                _remove_stop_timeout();
             }
+
         } else
-            log_error("MAV_CMD_LOGGING_START result(%u) is different than accepted", cmd.result);
+            log_error("MAV_CMD_LOGGING_%s result(%u) is different than accepted",cmd.command==MAV_CMD_LOGGING_START ? "START" : "STOP", cmd.result);
         break;
     }
     case MAVLINK_MSG_ID_LOGGING_DATA_ACKED: {

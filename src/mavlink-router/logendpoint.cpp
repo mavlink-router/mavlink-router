@@ -304,6 +304,11 @@ int LogEndpoint::_get_file(const char *extension)
 
 void LogEndpoint::stop()
 {
+    if (_logging_stop_timeout) {
+        // a stop was already requested
+        return;
+    }
+
     Mainloop &mainloop = Mainloop::get_instance();
     if (_logging_start_timeout) {
         mainloop.del_timeout(_logging_start_timeout);
@@ -330,10 +335,22 @@ void LogEndpoint::stop()
     if (snprintf(log_file, sizeof(log_file), "%s/%s", _logs_dir, _filename) < (int)sizeof(log_file)) {
         chmod(log_file, S_IRUSR|S_IRGRP|S_IROTH);
     }
+
+    _logging_stop_timeout = Mainloop::get_instance().add_timeout(
+        MSEC_PER_SEC, std::bind(&LogEndpoint::_stop_timeout, this), this);
+    if (!_logging_stop_timeout) {
+        log_error("Unable to add timeout for stopping log streaming");
+    }
+
+    _stop_timeout();
 }
 
 bool LogEndpoint::start()
 {
+    if (_logging_stop_timeout) {
+        return false;
+    }
+
     if (_file != -1) {
         log_warning("Log already started");
         return false;
@@ -414,6 +431,12 @@ void LogEndpoint::_remove_start_timeout()
     _logging_start_timeout = nullptr;
 }
 
+void LogEndpoint::_remove_stop_timeout()
+{
+    Mainloop::get_instance().del_timeout(_logging_stop_timeout);
+    _logging_stop_timeout = nullptr;
+}
+
 bool LogEndpoint::_start_alive_timeout()
 {
     _alive_check_timeout = Mainloop::get_instance().add_timeout(
@@ -429,7 +452,7 @@ void LogEndpoint::_handle_auto_start_stop(uint32_t msg_id, uint8_t source_system
     }
     if (_mode == LogMode::always) {
         if (_file == -1) {
-            if (!start()) _mode = LogMode::disabled;
+            if (!start() && !_logging_stop_timeout) _mode = LogMode::disabled;
         }
     } else if (_mode == LogMode::while_armed) {
         if (msg_id == MAVLINK_MSG_ID_HEARTBEAT && source_system_id == _target_system_id
@@ -438,7 +461,7 @@ void LogEndpoint::_handle_auto_start_stop(uint32_t msg_id, uint8_t source_system
             const mavlink_heartbeat_t *heartbeat = (mavlink_heartbeat_t *)payload;
             const bool is_armed = heartbeat->base_mode & MAV_MODE_FLAG_SAFETY_ARMED;
 
-            if (_file == -1 && is_armed) {
+            if (_file == -1 && is_armed && !_logging_stop_timeout) {
                 if (!start()) _mode = LogMode::disabled;
             } else if (_file != -1 && !is_armed) {
                 stop();
