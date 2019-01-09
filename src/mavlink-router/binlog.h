@@ -40,6 +40,7 @@ public:
 protected:
     ssize_t _read_msg(uint8_t *buf, size_t len) override { return 0; };
     bool _start_timeout() override;
+    bool _stop_timeout() override;
 
     const char *_get_logfile_extension() override { return "bin"; };
 private:
