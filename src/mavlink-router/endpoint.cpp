@@ -486,11 +486,22 @@ int UartEndpoint::set_flow_control(bool enabled)
     return 0;
 }
 
+int UartEndpoint::reopen()
+{
+    if (fd >= 0) {
+      ::close(fd);
+    }
+    return open(_path.c_str(), _baudrates, _flowcontrol);
+}
+
 int UartEndpoint::open(const char *path, std::vector<unsigned long> baudrates, bool flowcontrol)
 {
     struct termios2 tc;
     const int bit_dtr = TIOCM_DTR;
     const int bit_rts = TIOCM_RTS;
+
+    _path = path;
+    _flowcontrol = flowcontrol;
 
     fd = ::open(path, O_RDWR|O_NONBLOCK|O_CLOEXEC|O_NOCTTY);
     if (fd < 0) {
@@ -643,13 +654,13 @@ int UartEndpoint::add_speeds(std::vector<unsigned long> bauds)
         return -EINVAL;
     }
 
+    _baudrates = bauds;
+
     set_speed(bauds[0]);
 
     if (bauds.size() == 1) {
         return 0;
     }
-
-    _baudrates = bauds;
 
     _change_baud_timeout = Mainloop::get_instance().add_timeout(
         MSEC_PER_SEC * UART_BAUD_RETRY_SEC,

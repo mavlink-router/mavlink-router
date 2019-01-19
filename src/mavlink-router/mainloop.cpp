@@ -289,11 +289,18 @@ void Mainloop::loop()
                 }
             }
             if (events[i].events & EPOLLERR) {
-                log_error("poll error for fd %i, closing it", p->fd);
                 remove_fd(p->fd);
-                // make poll errors fatal so that an external component can
-                // restart mavlink-router
-                should_exit = true;
+
+                if (g_endpoints[i]->reopen()) {
+                    log_error("poll error for fd %i, reopening it", p->fd);
+                    add_fd(g_endpoints[i]->fd, g_endpoints[i], EPOLLIN);
+                } else {
+                    log_error("poll error for fd %i, closing it", p->fd);
+                    // Exit if we cannot reopen so that an external component
+                    // can restart mavlink-router
+                    should_exit = true;
+                }
+
             }
         }
 
