@@ -140,10 +140,7 @@ public:
     int write_msg(const struct buffer *pbuf) override;
     int flush_pending_msgs() override { return -ENOSYS; }
 
-    int open(const char *path);
-    int set_speed(speed_t baudrate);
-    int set_flow_control(bool enabled);
-    int add_speeds(std::vector<unsigned long> baudrates);
+    int open(const char *path, std::vector<unsigned long> baudrates, bool flowcontrol);
 
 protected:
     int read_msg(struct buffer *pbuf, int *target_system, int *target_compid, uint8_t *src_sysid,
@@ -156,6 +153,10 @@ private:
     std::vector<unsigned long> _baudrates;
 
     bool _change_baud_cb(void *data);
+
+    int set_speed(speed_t baudrate);
+    int set_flow_control(bool enabled);
+    int add_speeds(std::vector<unsigned long> baudrates);
 };
 
 class UdpEndpoint : public Endpoint {

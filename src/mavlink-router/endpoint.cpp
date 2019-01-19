@@ -486,7 +486,7 @@ int UartEndpoint::set_flow_control(bool enabled)
     return 0;
 }
 
-int UartEndpoint::open(const char *path)
+int UartEndpoint::open(const char *path, std::vector<unsigned long> baudrates, bool flowcontrol)
 {
     struct termios2 tc;
     const int bit_dtr = TIOCM_DTR;
@@ -547,6 +547,18 @@ int UartEndpoint::open(const char *path)
     if (ioctl(fd, TCFLSH, TCIOFLUSH) == -1) {
         log_error("Could not flush terminal (%m)");
         goto fail;
+    }
+
+    if (add_speeds(baudrates) < 0) {
+        log_error("Could not set baud rate (%m)");
+        goto fail;
+    }
+
+    if (flowcontrol) {
+        if (set_flow_control(true) < 0) {
+            log_error("Could not set flow control (%m)");
+            goto fail;
+        }
     }
 
     log_info("Open UART [%d] %s *", fd, path);
@@ -627,12 +639,17 @@ int UartEndpoint::write_msg(const struct buffer *pbuf)
 
 int UartEndpoint::add_speeds(std::vector<unsigned long> bauds)
 {
-    if (!bauds.size())
+    if (!bauds.size()) {
         return -EINVAL;
+    }
+
+    set_speed(bauds[0]);
+
+    if (bauds.size() == 1) {
+        return 0;
+    }
 
     _baudrates = bauds;
-
-    set_speed(_baudrates[0]);
 
     _change_baud_timeout = Mainloop::get_instance().add_timeout(
         MSEC_PER_SEC * UART_BAUD_RETRY_SEC,
