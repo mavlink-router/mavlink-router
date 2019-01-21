@@ -24,6 +24,8 @@
 #include <unistd.h>
 
 #include <memory>
+#include <thread>
+#include <chrono>
 
 #include <common/log.h>
 #include <common/util.h>
@@ -265,8 +267,10 @@ void Mainloop::loop()
         int i;
 
         r = epoll_wait(epollfd, events, max_events, -1);
-        if (r < 0 && errno == EINTR)
+        if (r < 0 && errno == EINTR) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
             continue;
+        }
 
         for (i = 0; i < r; i++) {
             if (events[i].data.ptr == &g_tcp_fd) {
