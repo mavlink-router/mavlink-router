@@ -267,7 +267,7 @@ void Mainloop::loop()
         int i;
 
         r = epoll_wait(epollfd, events, max_events, -1);
-        if (r < 0 && errno == EINTR) {
+        if (r <= 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
             continue;
         }
@@ -294,17 +294,22 @@ void Mainloop::loop()
             }
             if (events[i].events & EPOLLERR) {
                 remove_fd(p->fd);
-
-                if (g_endpoints[i]->reopen() >= 0) {
-                    log_error("poll error for fd %i, reopening it", p->fd);
-                    add_fd(g_endpoints[i]->fd, g_endpoints[i], EPOLLIN);
-                } else {
+                bool succeeded = false;
+                for (int retries = 1; retries <= 10; retries++) {
+                    log_error("poll error for fd %i, reopening it. Retry: %d", p->fd, retries);
+                    if (g_endpoints[i]->reopen() >= 0) {
+                        add_fd(g_endpoints[i]->fd, g_endpoints[i], EPOLLIN);
+                        succeeded = true;
+                        break;
+                    }
+                    std::this_thread::sleep_for(std::chrono::milliseconds(222));
+                }
+                if (!succeeded) {
                     log_error("poll error for fd %i, closing it", p->fd);
                     // Exit if we cannot reopen so that an external component
                     // can restart mavlink-router
                     should_exit = true;
                 }
-
             }
         }
 
