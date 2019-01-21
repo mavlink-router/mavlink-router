@@ -295,7 +295,7 @@ void Mainloop::loop()
             if (events[i].events & EPOLLERR) {
                 remove_fd(p->fd);
 
-                if (g_endpoints[i]->reopen()) {
+                if (g_endpoints[i]->reopen() >= 0) {
                     log_error("poll error for fd %i, reopening it", p->fd);
                     add_fd(g_endpoints[i]->fd, g_endpoints[i], EPOLLIN);
                 } else {
