@@ -302,7 +302,7 @@ void Mainloop::loop()
                         succeeded = true;
                         break;
                     }
-                    std::this_thread::sleep_for(std::chrono::milliseconds(222));
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
                 }
                 if (!succeeded) {
                     log_error("poll error for fd %i, closing it", p->fd);
