@@ -72,7 +72,7 @@ int Endpoint::handle_read()
     uint8_t src_sysid, src_compid;
     struct buffer buf{};
 
-    while ((r = read_msg(&buf, &target_sysid, &target_compid, &src_sysid, &src_compid)) > 0)
+    if ((r = read_msg(&buf, &target_sysid, &target_compid, &src_sysid, &src_compid)) > 0)
         Mainloop::get_instance().route_msg(&buf, target_sysid, target_compid, src_sysid,
                                            src_compid);
 
@@ -486,11 +486,22 @@ int UartEndpoint::set_flow_control(bool enabled)
     return 0;
 }
 
-int UartEndpoint::open(const char *path)
+int UartEndpoint::reopen()
+{
+    if (fd >= 0) {
+      ::close(fd);
+    }
+    return open(_path.c_str(), _baudrates, _flowcontrol);
+}
+
+int UartEndpoint::open(const char *path, std::vector<unsigned long> baudrates, bool flowcontrol)
 {
     struct termios2 tc;
     const int bit_dtr = TIOCM_DTR;
     const int bit_rts = TIOCM_RTS;
+
+    _path = path;
+    _flowcontrol = flowcontrol;
 
     fd = ::open(path, O_RDWR|O_NONBLOCK|O_CLOEXEC|O_NOCTTY);
     if (fd < 0) {
@@ -547,6 +558,18 @@ int UartEndpoint::open(const char *path)
     if (ioctl(fd, TCFLSH, TCIOFLUSH) == -1) {
         log_error("Could not flush terminal (%m)");
         goto fail;
+    }
+
+    if (add_speeds(baudrates) < 0) {
+        log_error("Could not set baud rate (%m)");
+        goto fail;
+    }
+
+    if (flowcontrol) {
+        if (set_flow_control(true) < 0) {
+            log_error("Could not set flow control (%m)");
+            goto fail;
+        }
     }
 
     log_info("Open UART [%d] %s *", fd, path);
@@ -627,12 +650,17 @@ int UartEndpoint::write_msg(const struct buffer *pbuf)
 
 int UartEndpoint::add_speeds(std::vector<unsigned long> bauds)
 {
-    if (!bauds.size())
+    if (!bauds.size()) {
         return -EINVAL;
+    }
 
     _baudrates = bauds;
 
-    set_speed(_baudrates[0]);
+    set_speed(bauds[0]);
+
+    if (bauds.size() == 1) {
+        return 0;
+    }
 
     _change_baud_timeout = Mainloop::get_instance().add_timeout(
         MSEC_PER_SEC * UART_BAUD_RETRY_SEC,

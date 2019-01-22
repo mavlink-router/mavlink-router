@@ -24,6 +24,8 @@
 #include <unistd.h>
 
 #include <memory>
+#include <thread>
+#include <chrono>
 
 #include <common/log.h>
 #include <common/util.h>
@@ -265,8 +267,10 @@ void Mainloop::loop()
         int i;
 
         r = epoll_wait(epollfd, events, max_events, -1);
-        if (r < 0 && errno == EINTR)
+        if (r <= 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
             continue;
+        }
 
         for (i = 0; i < r; i++) {
             if (events[i].data.ptr == &g_tcp_fd) {
@@ -289,11 +293,23 @@ void Mainloop::loop()
                 }
             }
             if (events[i].events & EPOLLERR) {
-                log_error("poll error for fd %i, closing it", p->fd);
                 remove_fd(p->fd);
-                // make poll errors fatal so that an external component can
-                // restart mavlink-router
-                should_exit = true;
+                bool succeeded = false;
+                for (int retries = 1; retries <= 10; retries++) {
+                    log_error("poll error for fd %i, reopening it. Retry: %d", p->fd, retries);
+                    if (g_endpoints[i]->reopen() >= 0) {
+                        add_fd(g_endpoints[i]->fd, g_endpoints[i], EPOLLIN);
+                        succeeded = true;
+                        break;
+                    }
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+                }
+                if (!succeeded) {
+                    log_error("poll error for fd %i, closing it", p->fd);
+                    // Exit if we cannot reopen so that an external component
+                    // can restart mavlink-router
+                    should_exit = true;
+                }
             }
         }
 
@@ -373,20 +389,8 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
         switch (conf->type) {
         case Uart: {
             std::unique_ptr<UartEndpoint> uart{new UartEndpoint{}};
-            if (uart->open(conf->device) < 0)
+            if (uart->open(conf->device, *conf->bauds, conf->flowcontrol) < 0) {
                 return false;
-
-            if (conf->bauds->size() == 1) {
-                if (uart->set_speed((*(conf->bauds))[0]) < 0)
-                    return false;
-            } else {
-                if (uart->add_speeds(*conf->bauds) < 0)
-                    return false;
-            }
-
-            if (conf->flowcontrol) {
-                if (uart->set_flow_control(true) < 0)
-                    return false;
             }
 
             g_endpoints[i] = uart.release();
