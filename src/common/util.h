@@ -56,3 +56,14 @@ int mkdir_p(const char *path, int len, mode_t mode);
 #ifdef __cplusplus
 }
 #endif
+
+#ifndef strndupa
+#define strndupa(s, n) \
+       (__extension__ ({const char *__in = (s); \
+                        size_t __len = strnlen (__in, (n)); \
+                        char *__out = (char *) alloca (__len + 1); \
+                        __out[__len] = '\0'; \
+                        (char *) memcpy (__out, __in, __len);}))
+
+#include <asm/ioctls.h>
+#endif
