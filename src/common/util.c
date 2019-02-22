@@ -120,7 +120,7 @@ int mkdir_p(const char *path, int len, mode_t mode)
 {
     char *start, *end;
 
-    start = strndupa(path, len);
+    start = strndup(path, len);
     end = start + len;
 
     /*
@@ -132,15 +132,19 @@ int mkdir_p(const char *path, int len, mode_t mode)
         if (r > 0) {
             end += strlen(end);
 
-            if (end == start + len)
+            if (end == start + len) {
+                free(start);
                 return 0;
+            }
 
             /* end != start, since it would be caught on the first
              * iteration */
             *end = '/';
             break;
-        } else if (r == 0)
+        } else if (r == 0) {
+            free(start);
             return -ENOTDIR;
+        }
 
         if (end == start)
             break;
@@ -156,12 +160,15 @@ int mkdir_p(const char *path, int len, mode_t mode)
     }
 
     for (; end < start + len;) {
-        if (mkdir(start, mode) < 0 && errno != EEXIST)
+        if (mkdir(start, mode) < 0 && errno != EEXIST) {
+            free(start);
             return -errno;
+        }
 
         end += strlen(end);
         *end = '/';
     }
 
+    free(start);
     return 0;
 }

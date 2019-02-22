@@ -515,8 +515,10 @@ int ConfFile::parse_bool(const char *val, size_t val_len, void *storage, size_t 
         if (storage_len < sizeof(_type))                                        \
             return -ENOBUFS;                                                    \
                                                                                 \
-        str = strndupa(val, val_len);                                           \
-        return _func(str, (_type *)storage);                                    \
+        str = strndup(val, val_len);                                            \
+        int res = _func(str, (_type *)storage);                                 \
+        free(str);                                                              \
+        return res;                                                             \
     }
 
 DEFINE_PARSE_INT(i, int, safe_atoi)

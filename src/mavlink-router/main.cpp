@@ -571,15 +571,18 @@ static int parse_log_level(const char *val, size_t val_len, void *storage, size_
     if (val_len > MAX_LOG_LEVEL_SIZE)
         return -EINVAL;
 
-    const char *log_level = strndupa(val, val_len);
+    int ret = 0;
+    char *log_level = strndup(val, val_len);
     int lvl = log_level_from_str(log_level);
     if (lvl == -EINVAL) {
         log_error("Invalid argument for DebugLogLevel = %s", log_level);
-        return -EINVAL;
+        ret = -EINVAL;
+    } else {
+        *((int *)storage) = lvl;
     }
-    *((int *)storage) = lvl;
+    free(log_level);
 
-    return 0;
+    return ret;
 }
 #undef MAX_LOG_LEVEL_SIZE
 
@@ -595,19 +598,24 @@ static int parse_log_mode(const char *val, size_t val_len, void *storage, size_t
     if (val_len > MAX_LOG_MODE_SIZE)
         return -EINVAL;
 
-    const char *log_mode_str = strndupa(val, val_len);
+    int ret = 0;
+    char *log_mode_str = strndup(val, val_len);
     LogMode log_mode;
-    if (strcaseeq(log_mode_str, "always"))
+    if (strcaseeq(log_mode_str, "always")) {
+        *((LogMode *)storage) = log_mode;
         log_mode = LogMode::always;
-    else if (strcaseeq(log_mode_str, "while-armed"))
+    }
+    else if (strcaseeq(log_mode_str, "while-armed")) {
+        *((LogMode *)storage) = log_mode;
         log_mode = LogMode::while_armed;
+    }
     else {
         log_error("Invalid argument for LogMode = %s", log_mode_str);
-        return -EINVAL;
+        ret = -EINVAL;
     }
-    *((LogMode *)storage) = log_mode;
+    free(log_mode_str);
 
-    return 0;
+    return ret;
 }
 #undef MAX_LOG_MODE_SIZE
 

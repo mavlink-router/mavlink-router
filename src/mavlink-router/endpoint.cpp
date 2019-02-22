@@ -41,6 +41,13 @@
 
 #define UART_BAUD_RETRY_SEC 5
 
+#ifndef TCGETS2
+#define TCGETS2 TCGETS
+#endif
+#ifndef TCSETS2
+#define TCSETS2 TCSETS
+#endif
+
 Endpoint::Endpoint(const char *name, bool crc_check_enabled)
     : _name{name}
     , _crc_check_enabled{crc_check_enabled}
