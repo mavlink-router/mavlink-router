@@ -11,14 +11,14 @@ matrix:
           packages:
             - g++-6
             - gcc-6
-            - python-pip
+            - python3-pip
 
 before_script:
-        - pip install --user future pymavlink
+        - pip3 install --user future pymavlink
         - CXX="g++-6"
         - CC="gcc-6"
 
 script:
         - ./autogen.sh c --with-systemdsystemunitdir=/usr/lib/systemd/system
         - make -j
-        - make check
+        - make check PYTHON=python3
