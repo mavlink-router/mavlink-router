@@ -34,6 +34,8 @@
 #include <common/util.h>
 #include <common/xtermios.h>
 
+#include <linux/serial.h>
+
 #include "mainloop.h"
 
 #define RX_BUF_MAX_SIZE (MAVLINK_MAX_PACKET_LEN * 4)
@@ -536,6 +538,31 @@ int UartEndpoint::open(const char *path)
         log_error("Could not set terminal attributes (%m)");
         goto fail;
     }
+
+    // For Linux, set high speed polling at the chip
+    // level. Since this routine relies on a USB latency
+    // change at the chip level it may fail on certain
+    // chip sets if their driver does not support this
+    // configuration request
+
+    {
+        struct serial_struct serial_ctl;
+
+        int result = ioctl(fd, TIOCGSERIAL, &serial_ctl);
+        if (result < 0) {
+            log_warning("Error while trying to read serial port configuration: %s", strerror(result));
+            goto set_latency_failed;
+        }
+
+        serial_ctl.flags |= ASYNC_LOW_LATENCY;
+
+        result =  ioctl(fd, TIOCSSERIAL, &serial_ctl);
+        if (result < 0) {
+            log_warning("Error while trying to write serial port latency: %s", strerror(result));
+        }
+    }
+
+set_latency_failed:
 
     /* set DTR/RTS */
     if (ioctl(fd, TIOCMBIS, &bit_dtr) == -1 ||
