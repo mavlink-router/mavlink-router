@@ -20,7 +20,6 @@
 #include <mavlink.h>
 
 #include <memory>
-#include <set>
 #include <vector>
 
 #include "comm.h"
@@ -99,7 +98,7 @@ public:
 
     bool accept_msg(int target_sysid, int target_compid, uint8_t src_sysid, uint8_t src_compid, uint32_t msg_id);
 
-    void add_message_to_filter(uint32_t msg_id) { message_filter.insert(msg_id); }
+    void add_message_to_filter(uint32_t msg_id) { _message_filter.push_back(msg_id); }
 
     struct buffer rx_buf;
     struct buffer tx_buf;
@@ -136,7 +135,7 @@ protected:
     std::vector<uint16_t> _sys_comp_ids;
 
 private:
-    std::set<uint32_t> message_filter;
+    std::vector<uint32_t> _message_filter;
 };
 
 class UartEndpoint : public Endpoint {

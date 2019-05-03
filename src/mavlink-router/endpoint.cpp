@@ -18,6 +18,7 @@
 #include "endpoint.h"
 
 #include <arpa/inet.h>
+#include <algorithm>
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -326,7 +327,10 @@ bool Endpoint::accept_msg(int target_sysid, int target_compid, uint8_t src_sysid
     if (has_sys_comp_id(src_sysid, src_compid))
         return false;
 
-    if (msg_id != UINT32_MAX && message_filter.size() > 0 && message_filter.find(msg_id) == message_filter.end()) {
+    if (msg_id != UINT32_MAX && 
+        _message_filter.size() > 0 && 
+        std::find(_message_filter.begin(), _message_filter.end(), msg_id) == _message_filter.end()) {
+
         // if filter is defined and message is not in the set then discard it
         return false;
     }
