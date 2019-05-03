@@ -36,7 +36,7 @@ public:
     int remove_fd(int fd);
     void loop();
     void route_msg(struct buffer *buf, int target_sysid, int target_compid, int sender_sysid,
-                   int sender_compid);
+                   int sender_compid, uint32_t msg_id = UINT32_MAX);
     void handle_read(Endpoint *e);
     void handle_canwrite(Endpoint *e);
     void handle_tcp_connection();
@@ -117,6 +117,7 @@ struct endpoint_config {
             bool flowcontrol;
         };
     };
+    char *filter;
 };
 
 struct options {

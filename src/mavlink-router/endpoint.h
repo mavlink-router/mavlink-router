@@ -20,6 +20,7 @@
 #include <mavlink.h>
 
 #include <memory>
+#include <set>
 #include <vector>
 
 #include "comm.h"
@@ -96,14 +97,16 @@ public:
         return has_sys_comp_id(sys_comp_id);
     }
 
-    bool accept_msg(int target_sysid, int target_compid, uint8_t src_sysid, uint8_t src_compid);
+    bool accept_msg(int target_sysid, int target_compid, uint8_t src_sysid, uint8_t src_compid, uint32_t msg_id);
+
+    void add_message_to_filter(uint32_t msg_id) { message_filter.insert(msg_id); }
 
     struct buffer rx_buf;
     struct buffer tx_buf;
 
 protected:
     virtual int read_msg(struct buffer *pbuf, int *target_system, int *target_compid,
-                         uint8_t *src_sysid, uint8_t *src_compid);
+                         uint8_t *src_sysid, uint8_t *src_compid, uint32_t *msg_id);
     virtual ssize_t _read_msg(uint8_t *buf, size_t len) = 0;
     bool _check_crc(const mavlink_msg_entry_t *msg_entry);
     void _add_sys_comp_id(uint16_t sys_comp_id);
@@ -131,6 +134,9 @@ protected:
     const bool _crc_check_enabled;
     uint32_t _incomplete_msgs = 0;
     std::vector<uint16_t> _sys_comp_ids;
+
+private:
+    std::set<uint32_t> message_filter;
 };
 
 class UartEndpoint : public Endpoint {
@@ -147,7 +153,7 @@ public:
 
 protected:
     int read_msg(struct buffer *pbuf, int *target_system, int *target_compid, uint8_t *src_sysid,
-                 uint8_t *src_compid) override;
+                 uint8_t *src_compid, uint32_t *msg_id) override;
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
 
 private:
