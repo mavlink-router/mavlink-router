@@ -215,7 +215,7 @@ static int add_endpoint_address(const char *name, size_t name_len, const char *i
     conf->type = Udp;
     conf->port = ULONG_MAX;
 
-    if (name) {
+    if (!conf->name && name) {
         conf->name = strndup(name, name_len);
         if (!conf->name) {
             ret = -ENOMEM;
@@ -224,16 +224,19 @@ static int add_endpoint_address(const char *name, size_t name_len, const char *i
     }
 
     if (ip) {
+        free(conf->address);
         conf->address = strdup(ip);
         if (!conf->address) {
             ret = -ENOMEM;
             goto fail;
         }
-    } else {
+    }
+
+    if (!conf->address) {
         ret = -EINVAL;
         goto fail;
     }
-
+    
     if (filter) {
         conf->filter = strdup(filter);
         if (!conf->filter) {
