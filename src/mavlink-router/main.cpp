@@ -168,17 +168,9 @@ static int add_tcp_endpoint_address(const char *name, size_t name_len, const cha
         }
     }
 
-    if (ip) {
-        free(conf->address);
-        conf->address = strdup(ip);
-        if (!conf->address) {
-            ret = -ENOMEM;
-            goto fail;
-        }
-    }
-
+    conf->address = strdup(ip);
     if (!conf->address) {
-        ret = -EINVAL;
+        ret = -ENOMEM;
         goto fail;
     }
 
@@ -214,10 +206,11 @@ static int add_endpoint_address(const char *name, size_t name_len, const char *i
     struct endpoint_config *conf
         = (struct endpoint_config *)calloc(1, sizeof(struct endpoint_config));
     assert_or_return(conf, -ENOMEM);
+    assert_or_return(ip != nullptr, -EINVAL);
     conf->type = Udp;
     conf->port = ULONG_MAX;
 
-    if (!conf->name && name) {
+    if (name) {
         conf->name = strndup(name, name_len);
         if (!conf->name) {
             ret = -ENOMEM;
