@@ -43,6 +43,7 @@ bool BinLog::_stop_timeout()
 {
     // TODO: Stop timeout not implemented for binlog, see example in ulog
     _remove_stop_timeout();
+    return true;
 }
 
 bool BinLog::start()
