@@ -54,6 +54,35 @@ void LogEndpoint::_send_msg(const mavlink_message_t *msg, int target_sysid)
     _stat.read.handled_bytes += buffer.len;
 }
 
+void LogEndpoint::mark_unfinished_logs()
+{
+    DIR *dir = opendir(_logs_dir);
+
+    // Assume the directory does not exist if opendir failed
+    if (!dir) {
+        return;
+    }
+
+    struct dirent *ent;
+    uint32_t u;
+
+    while ((ent = readdir(dir)) != nullptr) {
+        if (sscanf(ent->d_name, "%u-", &u) == 1) {
+            char log_file[PATH_MAX];
+            struct stat file_stat;
+            if (snprintf(log_file, sizeof(log_file), "%s/%s", _logs_dir, ent->d_name)
+                < (int)sizeof(log_file)) {
+                if (!stat(log_file, &file_stat)) {
+                    if (!S_ISDIR(file_stat.st_mode) && (file_stat.st_mode & S_IWUSR)) {
+                        log_info("File %s not read-only yet, marking as RO", ent->d_name);
+                        chmod(log_file, S_IRUSR | S_IRGRP | S_IROTH);
+                    }
+                }
+            }
+        }
+    }
+}
+
 uint32_t LogEndpoint::_get_prefix(DIR *dir)
 {
     struct dirent *ent;
