@@ -48,6 +48,13 @@ public:
     virtual bool start();
     virtual void stop();
 
+    /**
+     * Check existing log files and mark logs as read-only if needed.
+     * This handles the case where the system (or mavlink-router) crashed or
+     * lost power.
+     */
+    void mark_unfinished_logs();
+
 protected:
     const char *_logs_dir;
     int _target_system_id = -1;
