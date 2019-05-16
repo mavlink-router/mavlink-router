@@ -25,9 +25,10 @@
 class AutoLog : public LogEndpoint {
 public:
 
-    AutoLog(const char *logs_dir, LogMode mode)
-        : LogEndpoint{"AutoLog", logs_dir, mode}
+    AutoLog(const char *logs_dir, LogMode mode, bool heartbeat)
+        : LogEndpoint{"AutoLog", logs_dir, mode, heartbeat }
     {
+        _broadcast_hb = heartbeat;
     }
 
     int write_msg(const struct buffer *pbuf) override;
@@ -36,9 +37,11 @@ public:
     bool start() override;
     void stop() override;
     void print_statistics() override;
+    void _start_heartbeat() override { }
 
 protected:
     ssize_t _read_msg(uint8_t *buf, size_t len) override { return 0; }
+    bool _broadcast_hb;
 
     // These functions should never be called
     const char *_get_logfile_extension() override { return ""; };
