@@ -38,6 +38,21 @@
 #define ALIVE_TIMEOUT 5
 #define MAX_RETRIES 10
 
+bool LogEndpoint::_broadcast_log_heartbeat() {
+
+    if(_target_system_id != -1) {
+        mavlink_message_t msg = {};
+        mavlink_heartbeat_t heartbeat = {};
+
+        heartbeat.type = MAV_TYPE_ONBOARD_CONTROLLER;
+        heartbeat.system_status = _system_status;
+        mavlink_msg_heartbeat_encode(_target_system_id, MAV_COMP_ID_LOG, &msg, &heartbeat);
+        _send_msg(&msg, _target_system_id);
+    }
+
+    return true;
+}
+
 void LogEndpoint::_send_msg(const mavlink_message_t *msg, int target_sysid)
 {
     uint8_t data[MAVLINK_MAX_PACKET_LEN];
@@ -155,6 +170,13 @@ void LogEndpoint::stop()
     if (snprintf(log_file, sizeof(log_file), "%s/%s", _logs_dir, _filename) < (int)sizeof(log_file)) {
         chmod(log_file, S_IRUSR|S_IRGRP|S_IROTH);
     }
+
+    // notify the system that we are standing by
+    _system_status = MAV_STATE_STANDBY;
+}
+
+void LogEndpoint::_start_heartbeat() {
+    _heartbeat_timer = Mainloop::get_instance().add_timeout(MSEC_PER_SEC, std::bind(&ULog::_broadcast_log_heartbeat, this), this);
 }
 
 bool LogEndpoint::start()
@@ -176,6 +198,9 @@ bool LogEndpoint::start()
         log_error("Unable to add timeout");
         goto timeout_error;
     }
+
+    // notify the system that we are active
+    _system_status = MAV_STATE_ACTIVE;
 
     log_info("Logging target system_id=%u on %s", _target_system_id, _filename);
 

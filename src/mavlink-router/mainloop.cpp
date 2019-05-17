@@ -357,7 +357,7 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
 
     for (conf = opt->endpoints; conf; conf = conf->next) {
         if (conf->type != Tcp) {
-            // TCP endpoints are efemeral, that's why they don't
+            // TCP endpoints are ephemeral, that's why they don't
             // live on `g_endpoints` array, but on `g_tcp_endpoints` list
             n_endpoints++;
         }
@@ -443,11 +443,11 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
 
     if (opt->logs_dir) {
         if (opt->mavlink_dialect == Ardupilotmega) {
-            _log_endpoint = new BinLog(opt->logs_dir, opt->log_mode);
+            _log_endpoint = new BinLog(opt->logs_dir, opt->log_mode, opt->heartbeat);
         } else if (opt->mavlink_dialect == Common) {
-            _log_endpoint = new ULog(opt->logs_dir, opt->log_mode);
+            _log_endpoint = new ULog(opt->logs_dir, opt->log_mode, opt->heartbeat);
         } else {
-            _log_endpoint = new AutoLog(opt->logs_dir, opt->log_mode);
+            _log_endpoint = new AutoLog(opt->logs_dir, opt->log_mode, opt->heartbeat);
         }
         g_endpoints[i] = _log_endpoint;
     }

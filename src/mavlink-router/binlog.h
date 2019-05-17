@@ -24,8 +24,8 @@
 
 class BinLog : public LogEndpoint {
 public:
-    BinLog(const char *logs_dir, LogMode mode)
-        : LogEndpoint{"BinLog", logs_dir, mode}
+    BinLog(const char *logs_dir, LogMode mode, bool heartbeat)
+        : LogEndpoint{"BinLog", logs_dir, mode, heartbeat }
     {
     }
 

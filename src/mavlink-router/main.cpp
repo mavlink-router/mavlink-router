@@ -28,6 +28,8 @@
 #include <common/dbg.h>
 #include <common/log.h>
 #include <common/util.h>
+#include <src/common/log.h>
+#include <src/common/util.h>
 
 #include "comm.h"
 #include "endpoint.h"
@@ -48,7 +50,8 @@ static struct options opt = {
         .logs_dir = nullptr,
         .log_mode = LogMode::always,
         .debug_log_level = (int)Log::Level::INFO,
-        .mavlink_dialect = Auto
+        .mavlink_dialect = Auto,
+        .heartbeat = false
 };
 
 static const struct option long_options[] = {
@@ -60,12 +63,13 @@ static const struct option long_options[] = {
     { "tcp-endpoint",           required_argument,  NULL,   'p' },
     { "log",                    required_argument,  NULL,   'l' },
     { "debug-log-level",        required_argument,  NULL,   'g' },
+    { "heartbeat"      ,        no_argument,        NULL,   'b' },
     { "verbose",                no_argument,        NULL,   'v' },
     { "version",                no_argument,        NULL,   'V' },
     { }
 };
 
-static const char* short_options = "he:rt:c:d:l:p:g:vV";
+static const char* short_options = "he:rt:c:d:l:p:g:bvV";
 
 static void help(FILE *fp) {
     fprintf(fp,
@@ -88,6 +92,7 @@ static void help(FILE *fp) {
             "  -l --log <directory>         Enable Flight Stack logging\n"
             "  -g --debug-log-level <level> Set debug log level. Levels are\n"
             "                               <error|warning|info|debug>\n"
+            "  -b --heartbeat               Broadcast log status as heartbeat when logging is enabled\n"
             "  -v --verbose                 Verbose. Same as --debug-log-level=debug\n"
             "  -V --version                 Show version\n"
             "  -h --help                    Print this message\n"
@@ -438,6 +443,10 @@ static int parse_argv(int argc, char *argv[])
                 return -EINVAL;
             }
             opt.debug_log_level = lvl;
+            break;
+        }
+        case 'b': {
+            opt.heartbeat = true;
             break;
         }
         case 'v': {

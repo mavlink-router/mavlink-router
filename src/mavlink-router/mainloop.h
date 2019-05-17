@@ -130,4 +130,5 @@ struct options {
     LogMode log_mode;
     int debug_log_level;
     enum mavlink_dialect mavlink_dialect;
+    bool heartbeat;
 };

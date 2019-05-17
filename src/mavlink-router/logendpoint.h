@@ -36,13 +36,17 @@ enum class LogMode {
 
 class LogEndpoint : public Endpoint {
 public:
-    LogEndpoint(const char *name, const char *logs_dir, LogMode mode)
+    LogEndpoint(const char *name, const char *logs_dir, LogMode mode, bool heartbeat)
         : Endpoint{name, false}
         , _logs_dir{logs_dir}
         , _mode(mode)
     {
         assert(_logs_dir);
         _add_sys_comp_id(LOG_ENDPOINT_SYSTEM_ID << 8);
+
+        if (heartbeat) {
+            _start_heartbeat();
+        }
     }
 
     virtual bool start();
@@ -57,6 +61,12 @@ protected:
     Timeout *_logging_start_timeout = nullptr;
     Timeout *_alive_check_timeout = nullptr;
     uint32_t _timeout_write_total = 0;
+
+    /* heartbeat components */
+    uint8_t _system_status = MAV_STATE_STANDBY;
+    virtual void _start_heartbeat();
+    Timeout * _heartbeat_timer = nullptr;
+    bool _broadcast_log_heartbeat();
 
     virtual const char *_get_logfile_extension() = 0;
 
