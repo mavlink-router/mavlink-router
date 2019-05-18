@@ -18,12 +18,15 @@
 #include "mainloop.h"
 
 #include <assert.h>
+#include <fcntl.h>
 #include <signal.h>
 #include <sys/epoll.h>
+#include <sys/stat.h>
 #include <sys/timerfd.h>
 #include <unistd.h>
 
 #include <memory>
+#include <vector>
 
 #include <common/log.h>
 #include <common/util.h>
@@ -65,6 +68,8 @@ Mainloop &Mainloop::init()
     return _instance;
 }
 
+static const char* pipe_path = "/tmp/mavlink_router_pipe";
+
 int Mainloop::open()
 {
     if (epollfd != -1)
@@ -76,6 +81,17 @@ int Mainloop::open()
         log_error("%m");
         return -1;
     }
+
+    if (mkfifo(pipe_path, 0777) == -1) {
+        log_error("%m");
+    }
+
+    pipefd = ::open(pipe_path, O_RDWR);
+    if (pipefd == -1) {
+        log_error("%m");
+        return -1;
+    }
+    add_fd(pipefd, &pipefd, EPOLLIN);
 
     return 0;
 }
@@ -144,6 +160,15 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid
             log_debug("Endpoint [%d] accepted message to %d/%d from %u/%u", (*e)->fd, target_sysid,
                       target_compid, sender_sysid, sender_compid);
             write_msg(*e, buf);
+            unknown = false;
+        }
+    }
+
+    for (auto i: dynamic_endpoints) {
+        if (i.second->accept_msg(target_sysid, target_compid, sender_sysid, sender_compid, msg_id)) {
+            log_debug("Endpoint [%d] accepted message to %d/%d from %u/%u", i.second->fd, target_sysid,
+                      target_compid, sender_sysid, sender_compid);
+            write_msg(i.second, buf);
             unknown = false;
         }
     }
@@ -274,9 +299,12 @@ void Mainloop::loop()
         r = epoll_wait(epollfd, events, max_events, -1);
         if (r < 0 && errno == EINTR)
             continue;
-
         for (i = 0; i < r; i++) {
-            if (events[i].data.ptr == &g_tcp_fd) {
+            if (events[i].data.ptr == &pipefd) {
+                _handle_pipe();
+                continue;
+            }
+            else if (events[i].data.ptr == &g_tcp_fd) {
                 handle_tcp_connection();
                 continue;
             }
@@ -361,7 +389,9 @@ void Mainloop::print_statistics()
 {
     for (Endpoint **e = g_endpoints; *e != nullptr; e++)
         (*e)->print_statistics();
-
+    for (auto i: dynamic_endpoints) {
+        i.second->print_statistics();
+    }
     for (auto *t = g_tcp_endpoints; t; t = t->next)
         t->endpoint->print_statistics();
 }
@@ -370,6 +400,23 @@ static bool _print_statistics_timeout_cb(void *data)
 {
     Mainloop *mainloop = static_cast<Mainloop *>(data);
     mainloop->print_statistics();
+    return true;
+}
+
+bool Mainloop::_add_dynamic_endpoint(std::string name, Endpoint *endpoint)
+{
+    if (!endpoint) {
+        return false;
+    }
+    log_debug("Adding dynamic endpoint: %s", name.c_str());
+    auto ep = dynamic_endpoints.find(name);
+    if (ep != dynamic_endpoints.end()) {
+        remove_fd(ep->second->fd);
+        delete ep->second;
+    }
+    dynamic_endpoints[name] = endpoint;
+    add_fd(endpoint->fd, endpoint, EPOLLIN);
+
     return true;
 }
 
@@ -494,6 +541,10 @@ void Mainloop::free_endpoints(struct options *opt)
         delete t->endpoint;
         free(t);
         t = next;
+    }
+
+    for (auto ep = dynamic_endpoints.begin(); ep != dynamic_endpoints.end(); ep++) {
+        delete ep->second;
     }
 
     for (auto e = opt->endpoints; e;) {
@@ -645,4 +696,36 @@ bool Mainloop::_retry_timeout_cb(void *data)
     }
 
     return false;
+}
+
+void Mainloop::_handle_pipe()
+{
+    printf("_handle_pipe\n");
+    char buf[1024];
+    ssize_t num_read = read(pipefd, buf, sizeof(buf));
+    if (num_read > 0) {
+        buf[num_read] = 0;
+        log_debug("Read %ld bytes: %s", num_read, buf);
+        // Op UDP Name IP Port Eavesdropping
+        std::vector<std::string> a;
+        char *pch = strtok(buf, " ");
+        while (pch != NULL) {
+            a.push_back(std::string(pch));
+            pch = strtok(NULL, " \n");
+        }
+        if (a.size() < 6 || a[0] != "add" || a[1] != "udp") {
+            return;
+        }
+        int port = atoi(a[4].c_str());
+        if (port <= 0) {
+            return;
+        }
+        std::unique_ptr<UdpEndpoint> udp{new UdpEndpoint{}};
+        if (udp->open(a[3].c_str(), port, a[5]=="1") < 0) {
+            log_error("Could not open %s:%d", a[3].c_str(), port);
+            return;
+        }
+
+        _add_dynamic_endpoint(a[2], udp.release());
+    }
 }
