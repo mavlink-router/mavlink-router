@@ -286,10 +286,8 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
     pbuf->len = expected_size;
 
     if ((msg_entry != nullptr) && _sleep_interval) {
-        if (_sleep_enabled) {
-            log_warning("Endpoint \"%s\" is now awake", _name);
+        if (_sleep_enabled)
             _sleep_enabled = false;
-        }
 
         // Update the last message timestamp
         if (clock_gettime(CLOCK_MONOTONIC, &_last_message) < 0)
@@ -363,8 +361,6 @@ bool Endpoint::accept_msg(int target_sysid, int target_compid, uint8_t src_sysid
 
             if (((current_time.tv_sec + current_time.tv_nsec / 1000000000.0) - 
                     (_last_message.tv_sec + _last_message.tv_nsec / 1000000000.0)) > _sleep_interval) {
-                log_warning("Endpoint \"%s\" is now sleeping", _name);
-
                 _sleep_enabled = true;
 
                 // Discard the message, endpoint is in the sleep mode now
@@ -753,8 +749,8 @@ int UdpEndpoint::open(const char *ip, unsigned long port, bool to_bind)
 
     if (to_bind)
         sockaddr.sin_port = 0;
-    log_info("Open UDP [%d] %s:%lu %c %s", fd, ip, port, to_bind ? '*' : ' ',
-        (_sleep_interval) ? "S" : "");
+    log_info("Open UDP [%d] %s:%lu%s%s", fd, ip, port, to_bind ? " *" : "",
+        (_sleep_interval) ? " S" : "");
 
     return fd;
 
