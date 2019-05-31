@@ -82,6 +82,13 @@
 #       Default value: Increasing value, starting from 14550, when
 #       mode is `Normal`. Must be defined if on `Eavesdropping` mode.
 #
+#   SleepInterval
+#       Numeric value defining how many seconds endpoint will wait for
+#       a new message until it switches to the sleep mode. In the sleep
+#       mode all the message to the endpoint will be discarded. Any
+#       message from the endpoint will wake up the endpoint.
+#       Default value: 0 s (sleep mode is disabled).
+#
 # Section [TcpEndpoint]: This section must have a name
 #
 # Keys:

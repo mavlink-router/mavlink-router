@@ -75,7 +75,7 @@ public:
         ReadUnkownMsg,
     };
 
-    Endpoint(const char *name, bool crc_check_enabled);
+    Endpoint(const char *name, bool crc_check_enabled, unsigned long sleep_interval);
     virtual ~Endpoint();
 
     int handle_read() override;
@@ -134,13 +134,18 @@ protected:
     uint32_t _incomplete_msgs = 0;
     std::vector<uint16_t> _sys_comp_ids;
 
+    unsigned long _sleep_interval;
+
 private:
     std::vector<uint32_t> _message_filter;
+
+    bool _sleep_enabled;
+    struct timespec _last_message;  // Last message timestamp
 };
 
 class UartEndpoint : public Endpoint {
 public:
-    UartEndpoint() : Endpoint{"UART", true} { }
+    UartEndpoint() : Endpoint{"UART", true, 0} { }
     virtual ~UartEndpoint();
     int write_msg(const struct buffer *pbuf) override;
     int flush_pending_msgs() override { return -ENOSYS; }
@@ -165,7 +170,7 @@ private:
 
 class UdpEndpoint : public Endpoint {
 public:
-    UdpEndpoint();
+    UdpEndpoint(unsigned long sleep_interval);
     virtual ~UdpEndpoint() { }
 
     int write_msg(const struct buffer *pbuf) override;
