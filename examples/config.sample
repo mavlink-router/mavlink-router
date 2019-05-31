@@ -68,12 +68,14 @@
 #       route messages to (and from). If on `Eavesdropping` mode,
 #       IP of interface to which mavlink-router will listen for
 #       incoming packets. In this case, `0.0.0.0` means that
-#       mavlink-router will listen on all interfaces.
+#       mavlink-router will listen on all interfaces. In `Broadcast`
+#       mode endpoint will not change the target IP on the incoming
+#       messages.
 #       No dafault value. Must be defined.
 #
 #   Mode
-#       One of <normal> or <eavesdropping>. See `Address` for more
-#       information.
+#       One of <normal>, <eavesdropping> or <broadcast>. See `Address`
+#       for more information.
 #       No default value. Must be defined
 #
 #   Port

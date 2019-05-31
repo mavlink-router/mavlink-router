@@ -205,7 +205,8 @@ fail:
 }
 
 static int add_endpoint_address(const char *name, size_t name_len, const char *ip,
-                                long unsigned port, bool eavesdropping, const char *filter)
+                                long unsigned port, UdpEndpoint::UdpMode mode,
+                                const char *filter)
 {
     int ret;
 
@@ -253,7 +254,7 @@ static int add_endpoint_address(const char *name, size_t name_len, const char *i
         conf->port = find_next_endpoint_port(conf->address);
     }
 
-    conf->eavesdropping = eavesdropping;
+    conf->mode = mode;
 
     conf->next = opt.endpoints;
     opt.endpoints = conf;
@@ -410,7 +411,7 @@ static int parse_argv(int argc, char *argv[])
                 return -EINVAL;
             }
 
-            add_endpoint_address(NULL, 0, ip, port, false, NULL);
+            add_endpoint_address(NULL, 0, ip, port, UdpEndpoint::Normal, NULL);
             free(ip);
             break;
         }
@@ -496,7 +497,7 @@ static int parse_argv(int argc, char *argv[])
                 return -EINVAL;
             }
 
-            add_endpoint_address(NULL, 0, base, number, true, NULL);
+            add_endpoint_address(NULL, 0, base, number, UdpEndpoint::Eavesdropping, NULL);
         } else {
             const char *bauds = number != ULONG_MAX ? base + strlen(base) + 1 : NULL;
             int ret = add_uart_endpoint(NULL, 0, base, bauds, false);
@@ -631,11 +632,13 @@ static int parse_mode(const char *val, size_t val_len, void *storage, size_t sto
     if (val_len > INT_MAX)
         return -EINVAL;
 
-    bool *eavesdropping = (bool *)storage;
+    UdpEndpoint::UdpMode *mode = (UdpEndpoint::UdpMode *)storage;
     if (memcaseeq(val, val_len, "normal", sizeof("normal") - 1)) {
-        *eavesdropping = false;
+        *mode = UdpEndpoint::Normal;
     } else if (memcaseeq(val, val_len, "eavesdropping", sizeof("eavesdropping") - 1)) {
-        *eavesdropping = true;
+        *mode = UdpEndpoint::Eavesdropping;
+    } else if (memcaseeq(val, val_len, "broadcast", sizeof("broadcast") - 1)) {
+        *mode = UdpEndpoint::Broadcast;
     } else {
         log_error("Unknown 'mode' key: %.*s", (int)val_len, val);
         return -EINVAL;
@@ -673,15 +676,16 @@ static int parse_confs(ConfFile &conf)
 
     struct option_udp {
         char *addr;
-        bool eavesdropping;
+        UdpEndpoint::UdpMode mode;
         unsigned long port;
         char *filter;
+        bool broadcast;
     };
     static const ConfFile::OptionsTable option_table_udp[] = {
-        {"address", true,   ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_udp, addr)},
-        {"mode",    true,   parse_mode,                 OPTIONS_TABLE_STRUCT_FIELD(option_udp, eavesdropping)},
-        {"port",    false,  ConfFile::parse_ul,         OPTIONS_TABLE_STRUCT_FIELD(option_udp, port)},
-        {"filter",  false,  ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_udp, filter)},
+        {"address",     true,   ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_udp, addr)},
+        {"mode",        true,   parse_mode,                 OPTIONS_TABLE_STRUCT_FIELD(option_udp, mode)},
+        {"port",        false,  ConfFile::parse_ul,         OPTIONS_TABLE_STRUCT_FIELD(option_udp, port)},
+        {"filter",      false,  ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_udp, filter)}
     };
 
     struct option_tcp {
@@ -719,15 +723,15 @@ static int parse_confs(ConfFile &conf)
     pattern = "udpendpoint *";
     offset = strlen(pattern) - 1;
     while (conf.get_sections(pattern, &iter) == 0) {
-        struct option_udp opt_udp = {nullptr, false, ULONG_MAX};
+        struct option_udp opt_udp = {nullptr, UdpEndpoint::Normal, ULONG_MAX};
         ret = conf.extract_options(&iter, option_table_udp, ARRAY_SIZE(option_table_udp), &opt_udp);
         if (ret == 0) {
-            if (opt_udp.eavesdropping && opt_udp.port == ULONG_MAX) {
+            if ((opt_udp.mode == UdpEndpoint::Eavesdropping) && opt_udp.port == ULONG_MAX) {
                 log_error("Expected 'port' key for section %.*s", (int)iter.name_len, iter.name);
                 ret = -EINVAL;
             } else {
                 ret = add_endpoint_address(iter.name + offset, iter.name_len - offset, opt_udp.addr,
-                                           opt_udp.port, opt_udp.eavesdropping, opt_udp.filter);
+                                           opt_udp.port, opt_udp.mode, opt_udp.filter);
             }
         }
 
