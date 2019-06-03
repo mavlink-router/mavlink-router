@@ -353,19 +353,18 @@ bool Endpoint::accept_msg(int target_sysid, int target_compid, uint8_t src_sysid
         if (_sleep_enabled)
             // Discard the message if the endpoint is in the sleep mode
             return false;
-        else {
-            struct timespec current_time;
+        
+        struct timespec current_time;
 
-            if (clock_gettime(CLOCK_MONOTONIC, &current_time) < 0)
-                log_error("Failed to get the current time: \"%s\"", strerror(errno));
+        if (clock_gettime(CLOCK_MONOTONIC, &current_time) < 0)
+            log_error("Failed to get the current time: \"%s\"", strerror(errno));
 
-            if (((current_time.tv_sec + current_time.tv_nsec / 1000000000.0) - 
-                    (_last_message.tv_sec + _last_message.tv_nsec / 1000000000.0)) > _sleep_interval) {
-                _sleep_enabled = true;
+        if (((current_time.tv_sec + current_time.tv_nsec / 1000000000.0) - 
+                (_last_message.tv_sec + _last_message.tv_nsec / 1000000000.0)) > _sleep_interval) {
+            _sleep_enabled = true;
 
-                // Discard the message, endpoint is in the sleep mode now
-                return false;
-            }
+            // Discard the message, endpoint is in the sleep mode now
+            return false;
         }
     }
 
