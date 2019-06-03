@@ -737,7 +737,7 @@ ssize_t UdpEndpoint::_read_msg(uint8_t *buf, size_t len)
     socklen_t addrlen = sizeof(sockaddr);
     ssize_t r;
     if (_mode == UdpEndpoint::Broadcast)
-        r = ::recvfrom(fd, buf, len, 0, NULL, NULL);
+        r = ::recv(fd, buf, len, 0);
     else
         r = ::recvfrom(fd, buf, len, 0,
                                 (struct sockaddr *)&sockaddr, &addrlen);
