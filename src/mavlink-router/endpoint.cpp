@@ -45,7 +45,9 @@
 #define UART_BAUD_RETRY_SEC 5
 
 Endpoint::Endpoint(const char *name, bool crc_check_enabled)
-    : _name{name}
+    : sleep_timeout{nullptr}
+    , sleep_enabled{false}
+    , _name{name}
     , _crc_check_enabled{crc_check_enabled}
 {
     rx_buf.data = (uint8_t *) malloc(RX_BUF_MAX_SIZE);
@@ -282,6 +284,12 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
     pbuf->data = rx_buf.data;
     pbuf->len = expected_size;
 
+    if ((msg_entry != nullptr) && (sleep_timeout != nullptr)) {
+        if (sleep_timeout->restart())
+            log_error("Failed to restart sleep timeout");;
+        sleep_enabled = false;
+    }
+
     return msg_entry != nullptr ? ReadOk : ReadUnkownMsg;
 }
 
@@ -336,6 +344,10 @@ bool Endpoint::accept_msg(int target_sysid, int target_compid, uint8_t src_sysid
         // if filter is defined and message is not in the set then discard it
         return false;
     }
+
+    if (sleep_enabled)
+        // Discard the message if the endpoint is in the sleep mode
+        return false;
 
     // Message is broadcast on sysid: accept msg
     if (target_sysid == 0 || target_sysid == -1)
@@ -398,6 +410,7 @@ void Endpoint::print_statistics()
     printf("\n\t}");
     printf("\n\tTransmitted messages {");
     printf("\n\t\tTotal: %u %luKBytes", _stat.write.total, _stat.write.bytes / 1000);
+    printf("\n\tSleep mode: %s", (sleep_enabled) ? "enabled" : "disabled");
     printf("\n\t}");
     printf("\n}\n");
 }
@@ -425,6 +438,12 @@ void Endpoint::log_aggregate(unsigned int interval_sec)
                     _incomplete_msgs, interval_sec);
         _incomplete_msgs = 0;
     }
+}
+
+bool Endpoint::sleep_timeout_callback(void *data)
+{
+    sleep_enabled = true;
+    return true;
 }
 
 UartEndpoint::~UartEndpoint()
@@ -716,7 +735,8 @@ int UdpEndpoint::open(const char *ip, unsigned long port, bool to_bind)
 
     if (to_bind)
         sockaddr.sin_port = 0;
-    log_info("Open UDP [%d] %s:%lu %c", fd, ip, port, to_bind ? '*' : ' ');
+    log_info("Open UDP [%d] %s:%lu %c %s", fd, ip, port, to_bind ? '*' : ' ',
+        (sleep_timeout) ? "S" : "");
 
     return fd;
 

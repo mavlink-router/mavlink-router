@@ -30,6 +30,12 @@ public:
     int handle_read() override;
     bool handle_canwrite() override;
 
+    // Start/restart timeout
+    int restart();
+
+    // Initial timer settings
+    struct itimerspec spec;
+
 private:
     std::function<bool(void*)> _cb;
     const void *_data;

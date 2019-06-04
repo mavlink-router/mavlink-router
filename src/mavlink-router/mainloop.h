@@ -44,6 +44,7 @@ public:
     void process_tcp_hangups();
     Timeout *add_timeout(uint32_t timeout_msec, std::function<bool(void*)> cb, const void *data);
     void del_timeout(Timeout *t);
+    void free_timeouts();
 
     void free_endpoints(struct options *opt);
     bool add_endpoints(Mainloop &mainloop, struct options *opt);
@@ -118,6 +119,7 @@ struct endpoint_config {
         };
     };
     char *filter;
+    unsigned long sleep_interval;
 };
 
 struct options {

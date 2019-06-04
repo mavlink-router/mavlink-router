@@ -20,6 +20,7 @@
 #include <assert.h>
 #include <stdint.h>
 #include <unistd.h>
+#include <sys/timerfd.h>
 
 Timeout::Timeout(std::function<bool(void*)> cb, const void *data)
 {
@@ -45,4 +46,9 @@ int Timeout::handle_read()
 bool Timeout::handle_canwrite()
 {
     return false;
+}
+
+int Timeout::restart()
+{
+    return timerfd_settime(fd, 0, &spec, NULL);
 }
