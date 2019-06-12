@@ -52,11 +52,11 @@ static void setup_signal_handlers()
 
     sa.sa_flags = SA_NOCLDSTOP;
     sa.sa_handler = exit_signal_handler;
-    sigaction(SIGTERM, &sa, NULL);
-    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGTERM, &sa, nullptr);
+    sigaction(SIGINT, &sa, nullptr);
 
     sa.sa_handler = SIG_IGN;
-    sigaction(SIGPIPE, &sa, NULL);
+    sigaction(SIGPIPE, &sa, nullptr);
 }
 
 Mainloop &Mainloop::init()
@@ -86,12 +86,12 @@ int Mainloop::open()
         log_error("%m");
     }
 
-    pipefd = ::open(pipe_path, O_RDWR);
-    if (pipefd == -1) {
+    _pipefd = ::open(pipe_path, O_RDWR);
+    if (_pipefd == -1) {
         log_error("%m");
         return -1;
     }
-    add_fd(pipefd, &pipefd, EPOLLIN);
+    add_fd(_pipefd, &_pipefd, EPOLLIN);
 
     return 0;
 }
@@ -128,7 +128,7 @@ int Mainloop::add_fd(int fd, void *data, int events)
 
 int Mainloop::remove_fd(int fd)
 {
-    if (epoll_ctl(epollfd, EPOLL_CTL_DEL, fd, NULL) < 0) {
+    if (epoll_ctl(epollfd, EPOLL_CTL_DEL, fd, nullptr) < 0) {
         log_error("Could not remove fd from epoll (%m)");
         return -1;
     }
@@ -164,7 +164,7 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid
         }
     }
 
-    for (auto i: dynamic_endpoints) {
+    for (auto i: _dynamic_endpoints) {
         if (i.second->accept_msg(target_sysid, target_compid, sender_sysid, sender_compid, msg_id)) {
             log_debug("Endpoint [%d] accepted message to %d/%d from %u/%u", i.second->fd, target_sysid,
                       target_compid, sender_sysid, sender_compid);
@@ -300,7 +300,7 @@ void Mainloop::loop()
         if (r < 0 && errno == EINTR)
             continue;
         for (i = 0; i < r; i++) {
-            if (events[i].data.ptr == &pipefd) {
+            if (events[i].data.ptr == &_pipefd) {
                 _handle_pipe();
                 continue;
             }
@@ -389,7 +389,7 @@ void Mainloop::print_statistics()
 {
     for (Endpoint **e = g_endpoints; *e != nullptr; e++)
         (*e)->print_statistics();
-    for (auto i: dynamic_endpoints) {
+    for (auto i: _dynamic_endpoints) {
         i.second->print_statistics();
     }
     for (auto *t = g_tcp_endpoints; t; t = t->next)
@@ -403,19 +403,41 @@ static bool _print_statistics_timeout_cb(void *data)
     return true;
 }
 
-bool Mainloop::_add_dynamic_endpoint(std::string name, Endpoint *endpoint)
+bool Mainloop::remove_dynamic_endpoint(Endpoint *endpoint)
 {
     if (!endpoint) {
         return false;
     }
-    log_debug("Adding dynamic endpoint: %s", name.c_str());
-    auto ep = dynamic_endpoints.find(name);
-    if (ep != dynamic_endpoints.end()) {
+
+    for (auto i = _dynamic_endpoints.begin(); i != _dynamic_endpoints.end(); i++) {
+        if (i->second == endpoint) {
+            log_info("Removing dynamic endpoint: %s", i->first.c_str());
+            remove_fd(i->second->fd);
+            delete i->second;
+            _pipe_commands.erase(i->first);
+            _dynamic_endpoints.erase(i);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool Mainloop::_add_dynamic_endpoint(std::string name, std::string command, Endpoint *endpoint)
+{
+    if (!endpoint) {
+        return false;
+    }
+    log_info("Adding dynamic endpoint: %s", name.c_str());
+    auto ep = _dynamic_endpoints.find(name);
+    if (ep != _dynamic_endpoints.end()) {
         remove_fd(ep->second->fd);
         delete ep->second;
     }
-    dynamic_endpoints[name] = endpoint;
+    _pipe_commands[name] = command;
+    _dynamic_endpoints[name] = endpoint;
     add_fd(endpoint->fd, endpoint, EPOLLIN);
+    endpoint->start_expire_timer();
 
     return true;
 }
@@ -473,9 +495,9 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
 
             if (conf->filter) {
                 char *token = strtok(conf->filter, ",");
-                while (token != NULL) {
+                while (token != nullptr) {
                     udp->add_message_to_filter(atoi(token));
-                    token = strtok(NULL, ",");
+                    token = strtok(nullptr, ",");
                 } 
             }
 
@@ -543,9 +565,11 @@ void Mainloop::free_endpoints(struct options *opt)
         t = next;
     }
 
-    for (auto ep = dynamic_endpoints.begin(); ep != dynamic_endpoints.end(); ep++) {
+    for (auto ep = _dynamic_endpoints.begin(); ep != _dynamic_endpoints.end(); ep++) {
         delete ep->second;
     }
+    _pipe_commands.clear();
+    _dynamic_endpoints.clear();
 
     for (auto e = opt->endpoints; e;) {
         auto next = e->next;
@@ -600,10 +624,9 @@ int Mainloop::tcp_open(unsigned long tcp_port)
 
 Timeout *Mainloop::add_timeout(uint32_t timeout_msec, std::function<bool(void*)> cb, const void *data)
 {
-    struct itimerspec ts;
     Timeout *t = new Timeout(cb, data);
 
-    assert_or_return(t, NULL);
+    assert_or_return(t, nullptr);
 
     t->fd = timerfd_create(CLOCK_MONOTONIC, 0);
     if (t->fd < 0) {
@@ -611,12 +634,7 @@ Timeout *Mainloop::add_timeout(uint32_t timeout_msec, std::function<bool(void*)>
         goto error;
     }
 
-    ts.it_interval.tv_sec = timeout_msec / MSEC_PER_SEC;
-    ts.it_interval.tv_nsec = (timeout_msec % MSEC_PER_SEC) * NSEC_PER_MSEC;
-    ts.it_value.tv_sec = ts.it_interval.tv_sec;
-    ts.it_value.tv_nsec = ts.it_interval.tv_nsec;
-    timerfd_settime(t->fd, 0, &ts, NULL);
-
+    set_timeout(t, timeout_msec);
     if (add_fd(t->fd, t, EPOLLIN) < 0)
         goto error;
 
@@ -627,12 +645,28 @@ Timeout *Mainloop::add_timeout(uint32_t timeout_msec, std::function<bool(void*)>
 
 error:
     delete t;
-    return NULL;
+    return nullptr;
+}
+
+void Mainloop::set_timeout(Timeout *t, uint32_t timeout_msec)
+{
+    if (!t) {
+        return;
+    }
+
+    struct itimerspec ts;
+    ts.it_interval.tv_sec = timeout_msec / MSEC_PER_SEC;
+    ts.it_interval.tv_nsec = (timeout_msec % MSEC_PER_SEC) * NSEC_PER_MSEC;
+    ts.it_value.tv_sec = ts.it_interval.tv_sec;
+    ts.it_value.tv_nsec = ts.it_interval.tv_nsec;
+    timerfd_settime(t->fd, 0, &ts, nullptr);
 }
 
 void Mainloop::del_timeout(Timeout *t)
 {
-    t->remove_me = true;
+    if (t) {
+        t->remove_me = true;
+    }
 }
 
 void Mainloop::_del_timeouts()
@@ -700,32 +734,44 @@ bool Mainloop::_retry_timeout_cb(void *data)
 
 void Mainloop::_handle_pipe()
 {
-    printf("_handle_pipe\n");
-    char buf[1024];
-    ssize_t num_read = read(pipefd, buf, sizeof(buf));
+    char cmd[1024];
+    ssize_t num_read = read(_pipefd, cmd, sizeof(cmd) - 1);
     if (num_read > 0) {
-        buf[num_read] = 0;
-        log_debug("Read %ld bytes: %s", num_read, buf);
+        cmd[num_read] = 0;
+        log_debug("Pipe read %ld bytes: %s", num_read, cmd);
         // Op UDP Name IP Port Eavesdropping
         std::vector<std::string> a;
-        char *pch = strtok(buf, " ");
-        while (pch != NULL) {
-            a.push_back(std::string(pch));
-            pch = strtok(NULL, " \n");
+        std::string command = cmd;
+        char *pch = strtok(cmd, " ");
+        while (pch != nullptr) {
+            a.emplace_back(pch);
+            pch = strtok(nullptr, " \n");
         }
-        if (a.size() < 6 || a[0] != "add" || a[1] != "udp") {
+        // Currently only adding dynamic udp endpoints is supported
+        if (a.size() != 6 || a[0] != "add" || a[1] != "udp") {
             return;
         }
+        std::string name = a[2];
+        std::string address = a[3];
         int port = atoi(a[4].c_str());
         if (port <= 0) {
             return;
         }
-        std::unique_ptr<UdpEndpoint> udp{new UdpEndpoint{}};
-        if (udp->open(a[3].c_str(), port, a[5]=="1") < 0) {
-            log_error("Could not open %s:%d", a[3].c_str(), port);
-            return;
+
+        auto pipecmd = _pipe_commands.find(name);
+        if (pipecmd != _pipe_commands.end() && pipecmd->second == command) {
+            auto ep = _dynamic_endpoints.find(name);
+            if (ep != _dynamic_endpoints.end()) {
+                ep->second->reset_expire_timer();
+                return;
+            }
         }
 
-        _add_dynamic_endpoint(a[2], udp.release());
+        std::unique_ptr<UdpEndpoint> udp{new UdpEndpoint()};
+        if (udp->open(address.c_str(), port, a[5]=="1") < 0) {
+            log_error("Could not open %s:%d", address.c_str(), port);
+            return;
+        }
+        _add_dynamic_endpoint(name, command, udp.release());
     }
 }

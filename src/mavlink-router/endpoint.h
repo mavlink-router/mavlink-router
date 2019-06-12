@@ -100,6 +100,12 @@ public:
 
     void add_message_to_filter(uint32_t msg_id) { _message_filter.push_back(msg_id); }
 
+    void start_expire_timer();
+
+    void reset_expire_timer();
+
+    void del_expire_timer();
+
     struct buffer rx_buf;
     struct buffer tx_buf;
 
@@ -135,6 +141,7 @@ protected:
     std::vector<uint16_t> _sys_comp_ids;
 
 private:
+    Timeout* _expire_timer = nullptr;
     std::vector<uint32_t> _message_filter;
 };
 
@@ -166,7 +173,7 @@ private:
 class UdpEndpoint : public Endpoint {
 public:
     UdpEndpoint();
-    virtual ~UdpEndpoint() { }
+    virtual ~UdpEndpoint() {}
 
     int write_msg(const struct buffer *pbuf) override;
     int flush_pending_msgs() override { return -ENOSYS; }
@@ -195,7 +202,7 @@ public:
     int retry_timeout = 0;
 
     inline const char *get_ip() {
-        return _ip;
+        return _ip.c_str();
     }
 
     inline unsigned long get_port() {
@@ -208,7 +215,7 @@ protected:
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
 
 private:
-    char *_ip = nullptr;
+    std::string _ip;
     unsigned long _port = 0;
     bool _valid = true;
 };

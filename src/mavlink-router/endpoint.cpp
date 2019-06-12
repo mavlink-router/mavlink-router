@@ -61,6 +61,7 @@ Endpoint::~Endpoint()
 {
     free(rx_buf.data);
     free(tx_buf.data);
+    del_expire_timer();
 }
 
 bool Endpoint::handle_canwrite()
@@ -427,6 +428,37 @@ void Endpoint::log_aggregate(unsigned int interval_sec)
     }
 }
 
+static bool _expired(void *data)
+{
+    log_warning("Endpoint expired.");
+    Mainloop::get_instance().remove_dynamic_endpoint(static_cast<Endpoint *>(data));
+    return true;
+}
+
+constexpr int expire_timeout = 30 * MSEC_PER_SEC;
+
+void Endpoint::start_expire_timer()
+{
+    _expire_timer = Mainloop::get_instance().add_timeout(
+        expire_timeout,
+        std::bind(&_expired, this),
+        this);
+}
+
+void Endpoint::reset_expire_timer()
+{
+    log_info("Resetting dynamic endpoint timer");
+    Mainloop::get_instance().set_timeout(_expire_timer, expire_timeout);
+}
+
+void Endpoint::del_expire_timer()
+{
+    if (_expire_timer) {
+        Mainloop::get_instance().del_timeout(_expire_timer);
+        _expire_timer = nullptr;
+    }
+}
+
 UartEndpoint::~UartEndpoint()
 {
     if (fd > 0) {
@@ -789,7 +821,6 @@ TcpEndpoint::TcpEndpoint()
 TcpEndpoint::~TcpEndpoint()
 {
     close();
-    free(_ip);
 }
 
 int TcpEndpoint::accept(int listener_fd)
@@ -807,13 +838,8 @@ int TcpEndpoint::accept(int listener_fd)
 
 int TcpEndpoint::open(const char *ip, unsigned long port)
 {
-    if (!_ip || strcmp(ip, _ip)) {
-        free(_ip);
-        _ip = strdup(ip);
-        _port = port;
-    }
-
-    assert_or_return(_ip, -ENOMEM);
+    _ip = ip;
+    _port = port;
 
     fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd == -1) {
