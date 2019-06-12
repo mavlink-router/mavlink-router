@@ -17,6 +17,9 @@
  */
 #pragma once
 
+#include <string>
+#include <map>
+
 #include "binlog.h"
 #include "comm.h"
 #include "endpoint.h"
@@ -43,10 +46,12 @@ public:
     int write_msg(Endpoint *e, const struct buffer *buf);
     void process_tcp_hangups();
     Timeout *add_timeout(uint32_t timeout_msec, std::function<bool(void*)> cb, const void *data);
+    void set_timeout(Timeout *t, uint32_t timeout_msec);
     void del_timeout(Timeout *t);
 
     void free_endpoints(struct options *opt);
     bool add_endpoints(Mainloop &mainloop, struct options *opt);
+    bool remove_dynamic_endpoint(Endpoint *endpoint);
 
     void print_statistics();
 
@@ -76,6 +81,10 @@ private:
     int g_tcp_fd = -1;
     LogEndpoint *_log_endpoint = nullptr;
 
+    std::map<std::string, std::string> _pipe_commands;
+    std::map<std::string, Endpoint *> _dynamic_endpoints;
+    int _pipefd = -1;
+
     Timeout *_timeouts = nullptr;
 
     struct {
@@ -88,6 +97,8 @@ private:
     void _add_tcp_retry(TcpEndpoint *tcp);
     bool _retry_timeout_cb(void *data);
     bool _log_aggregate_timeout(void *data);
+    bool _add_dynamic_endpoint(std::string name, std::string command, Endpoint *endpoint);
+    void _handle_pipe();
 
     Mainloop() { }
     Mainloop(const Mainloop &) = delete;
