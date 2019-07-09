@@ -130,4 +130,6 @@ struct options {
     LogMode log_mode;
     int debug_log_level;
     enum mavlink_dialect mavlink_dialect;
+    unsigned long min_free_space;
+    unsigned long max_log_files;
 };

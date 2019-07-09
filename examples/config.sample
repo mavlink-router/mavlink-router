@@ -37,6 +37,16 @@
 #       If set to while-armed, a new log file is created whenever the vehicle is
 #       armed, and closed when disarmed.
 #
+#   MinFreeSpace
+#       The Log Endpoint will delete old log files until there are MinFreeSpace bytes
+#       available on the storage device of the logs. Set to 0 to ignore this limit.
+#       Default: 0 (disabled)
+#
+#   MaxLogFiles
+#       Maximum number of log files to keep. The Log Endpoint will delete old
+#       log files to keep the total below this number. Set to 0 to ignore this limit.
+#       Default: 0 (disabled)
+#
 #   DebugLogLevel
 #       One of <error>, <warning>, <info> or <debug>. Which debug log
 #       level is being used by mavlink-router, with <debug> being the

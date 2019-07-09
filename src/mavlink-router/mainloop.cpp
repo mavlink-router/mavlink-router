@@ -443,11 +443,14 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
 
     if (opt->logs_dir) {
         if (opt->mavlink_dialect == Ardupilotmega) {
-            _log_endpoint = new BinLog(opt->logs_dir, opt->log_mode);
+            _log_endpoint
+                = new BinLog(opt->logs_dir, opt->log_mode, opt->min_free_space, opt->max_log_files);
         } else if (opt->mavlink_dialect == Common) {
-            _log_endpoint = new ULog(opt->logs_dir, opt->log_mode);
+            _log_endpoint
+                = new ULog(opt->logs_dir, opt->log_mode, opt->min_free_space, opt->max_log_files);
         } else {
-            _log_endpoint = new AutoLog(opt->logs_dir, opt->log_mode);
+            _log_endpoint = new AutoLog(opt->logs_dir, opt->log_mode, opt->min_free_space,
+                                        opt->max_log_files);
         }
         _log_endpoint->mark_unfinished_logs();
         g_endpoints[i] = _log_endpoint;
