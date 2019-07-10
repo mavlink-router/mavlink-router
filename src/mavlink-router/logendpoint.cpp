@@ -38,6 +38,22 @@
 #define ALIVE_TIMEOUT 5
 #define MAX_RETRIES 10
 
+LogEndpoint::LogEndpoint(const char *name, const char *logs_dir, LogMode mode)
+    : Endpoint {name, false}
+    , _logs_dir {logs_dir}
+    , _mode(mode)
+{
+    assert(_logs_dir);
+    _add_sys_comp_id(LOG_ENDPOINT_SYSTEM_ID << 8);
+    _fsync_cb.aio_fildes = -1;
+
+    aioinit aio_init_data {};
+    aio_init_data.aio_threads = 1;
+    aio_init_data.aio_num = 1;
+    aio_init_data.aio_idle_time = 3; // make sure to keep the thread running
+    aio_init(&aio_init_data);
+}
+
 void LogEndpoint::_send_msg(const mavlink_message_t *msg, int target_sysid)
 {
     uint8_t data[MAVLINK_MAX_PACKET_LEN];
@@ -128,6 +144,7 @@ int LogEndpoint::_get_file(const char *extension)
     uint32_t i;
     int j, r;
     DIR *dir;
+    int dir_fd;
 
     dir = _open_or_create_dir(_logs_dir);
     if (!dir) {
@@ -138,6 +155,7 @@ int LogEndpoint::_get_file(const char *extension)
     std::shared_ptr<void> defer(dir, [](DIR *p) { closedir(p); });
 
     i = _get_prefix(dir);
+    dir_fd = dirfd(dir);
 
     for (j = 0; j <= MAX_RETRIES; j++) {
         r = snprintf(_filename, sizeof(_filename), "%05u-%i-%02i-%02i_%02i-%02i-%02i.%s", i + j,
@@ -149,14 +167,18 @@ int LogEndpoint::_get_file(const char *extension)
             return -1;
         }
 
-        r = openat(dirfd(dir), _filename, O_WRONLY | O_CLOEXEC | O_CREAT | O_NONBLOCK | O_EXCL,
-                   0644);
+        r = openat(dir_fd, _filename, O_WRONLY | O_CLOEXEC | O_CREAT | O_NONBLOCK | O_EXCL, 0644);
         if (r < 0) {
             if (errno != EEXIST) {
                 log_error("Unable to open Log file(%s): (%m)", _filename);
                 return -1;
             }
             continue;
+        }
+
+        // Ensure the directory entry of the file is written to disk
+        if (fsync(dir_fd) == -1) {
+            log_error("fsync failed: %m");
         }
 
         return r;
@@ -179,9 +201,15 @@ void LogEndpoint::stop()
         _alive_check_timeout = nullptr;
     }
 
+    if (_fsync_timeout) {
+        mainloop.del_timeout(_fsync_timeout);
+        _fsync_timeout = nullptr;
+    }
+
     fsync(_file);
     close(_file);
     _file = -1;
+    _fsync_cb.aio_fildes = -1;
 
     // change file permissions to read-only to mark them as finished
     char log_file[PATH_MAX];
@@ -210,11 +238,24 @@ bool LogEndpoint::start()
         goto timeout_error;
     }
 
+    // Call fsync once per second
+    _fsync_timeout = Mainloop::get_instance().add_timeout(
+        MSEC_PER_SEC, std::bind(&LogEndpoint::_fsync, this), this);
+    if (!_fsync_timeout) {
+        log_error("Unable to add timeout");
+        goto timeout_error;
+    }
+
     log_info("Logging target system_id=%u on %s", _target_system_id, _filename);
 
     return true;
 
 timeout_error:
+    if (_logging_start_timeout) {
+        Mainloop::get_instance().del_timeout(_fsync_timeout);
+        _fsync_timeout = nullptr;
+    }
+
     close(_file);
     _file = -1;
     return false;
@@ -229,6 +270,24 @@ bool LogEndpoint::_alive_timeout()
     }
 
     _timeout_write_total = _stat.write.total;
+    return true;
+}
+
+bool LogEndpoint::_fsync()
+{
+    if (_file < 0) {
+        return false;
+    }
+
+    if (_fsync_cb.aio_fildes >= 0 && aio_error(&_fsync_cb) == EINPROGRESS) {
+        // previous operation is still in progress
+        return true;
+    }
+    _fsync_cb.aio_fildes = _file;
+    _fsync_cb.aio_sigevent.sigev_notify = SIGEV_NONE;
+
+    aio_fsync(O_SYNC, &_fsync_cb);
+
     return true;
 }
 
