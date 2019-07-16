@@ -413,10 +413,10 @@ uint8_t Endpoint::get_trimmed_zeros(const mavlink_msg_entry_t *msg_entry, const 
         return 0;
 
     /* Should never happen but if happens it will cause stack overflow */
-    if (msg->payload_len > msg_entry->msg_len)
+    if (msg->payload_len > msg_entry->max_msg_len)
         return 0;
 
-    return msg_entry->msg_len - msg->payload_len;
+    return msg_entry->max_msg_len - msg->payload_len;
 }
 
 void Endpoint::log_aggregate(unsigned int interval_sec)
