@@ -449,6 +449,7 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
         } else {
             _log_endpoint = new AutoLog(opt->logs_dir, opt->log_mode);
         }
+        _log_endpoint->mark_unfinished_logs();
         g_endpoints[i] = _log_endpoint;
     }
 
