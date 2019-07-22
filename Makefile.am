@@ -124,7 +124,8 @@ AM_CXXFLAGS = \
 AM_LDFLAGS = \
 	-Wl,--as-needed \
 	-Wl,--no-undefined \
-	-Wl,--gc-sections
+	-Wl,--gc-sections \
+	-lrt
 
 bin_PROGRAMS += mavlink-routerd
 mavlink_routerd_SOURCES = \
