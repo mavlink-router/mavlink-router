@@ -38,6 +38,27 @@
 #define ALIVE_TIMEOUT 5
 #define MAX_RETRIES 10
 
+LogEndpoint::LogEndpoint(const char *name, const char *logs_dir, LogMode mode, bool heartbeat)
+    : Endpoint {name, false}
+    , _logs_dir {logs_dir}
+    , _mode(mode)
+{
+    assert(_logs_dir);
+    _add_sys_comp_id(LOG_ENDPOINT_SYSTEM_ID << 8);
+
+    if (heartbeat) {
+        _start_heartbeat();
+    }
+
+    _fsync_cb.aio_fildes = -1;
+
+    aioinit aio_init_data {};
+    aio_init_data.aio_threads = 1;
+    aio_init_data.aio_num = 1;
+    aio_init_data.aio_idle_time = 3; // make sure to keep the thread running
+    aio_init(&aio_init_data);
+}
+
 bool LogEndpoint::_broadcast_log_heartbeat() {
 
     if(_target_system_id != -1) {
@@ -82,20 +103,24 @@ void LogEndpoint::mark_unfinished_logs()
     uint32_t u;
 
     while ((ent = readdir(dir)) != nullptr) {
-        if (sscanf(ent->d_name, "%u-", &u) == 1) {
-            char log_file[PATH_MAX];
-            struct stat file_stat;
-            if (snprintf(log_file, sizeof(log_file), "%s/%s", _logs_dir, ent->d_name)
-                < (int)sizeof(log_file)) {
-                if (!stat(log_file, &file_stat)) {
-                    if (!S_ISDIR(file_stat.st_mode) && (file_stat.st_mode & S_IWUSR)) {
-                        log_info("File %s not read-only yet, marking as RO", ent->d_name);
-                        chmod(log_file, S_IRUSR | S_IRGRP | S_IROTH);
-                    }
-                }
-            }
+        if (sscanf(ent->d_name, "%u-", &u) != 1)
+            continue;
+
+        char log_file[PATH_MAX];
+        struct stat file_stat;
+        if (snprintf(log_file, sizeof(log_file), "%s/%s", _logs_dir, ent->d_name)
+            >= (int)sizeof(log_file))
+            continue;
+
+        if (stat(log_file, &file_stat))
+            continue;
+
+        if (S_ISREG(file_stat.st_mode) && (file_stat.st_mode & S_IWUSR)) {
+            log_info("File %s not read-only yet, marking as RO", ent->d_name);
+            chmod(log_file, S_IRUSR | S_IRGRP | S_IROTH);
         }
     }
+    closedir(dir);
 }
 
 uint32_t LogEndpoint::_get_prefix(DIR *dir)
@@ -139,6 +164,7 @@ int LogEndpoint::_get_file(const char *extension)
     uint32_t i;
     int j, r;
     DIR *dir;
+    int dir_fd;
 
     dir = _open_or_create_dir(_logs_dir);
     if (!dir) {
@@ -149,6 +175,7 @@ int LogEndpoint::_get_file(const char *extension)
     std::shared_ptr<void> defer(dir, [](DIR *p) { closedir(p); });
 
     i = _get_prefix(dir);
+    dir_fd = dirfd(dir);
 
     for (j = 0; j <= MAX_RETRIES; j++) {
         r = snprintf(_filename, sizeof(_filename), "%05u-%i-%02i-%02i_%02i-%02i-%02i.%s", i + j,
@@ -160,14 +187,18 @@ int LogEndpoint::_get_file(const char *extension)
             return -1;
         }
 
-        r = openat(dirfd(dir), _filename, O_WRONLY | O_CLOEXEC | O_CREAT | O_NONBLOCK | O_EXCL,
-                   0644);
+        r = openat(dir_fd, _filename, O_WRONLY | O_CLOEXEC | O_CREAT | O_NONBLOCK | O_EXCL, 0644);
         if (r < 0) {
             if (errno != EEXIST) {
                 log_error("Unable to open Log file(%s): (%m)", _filename);
                 return -1;
             }
             continue;
+        }
+
+        // Ensure the directory entry of the file is written to disk
+        if (fsync(dir_fd) == -1) {
+            log_error("fsync failed: %m");
         }
 
         return r;
@@ -195,9 +226,15 @@ void LogEndpoint::stop()
         _alive_check_timeout = nullptr;
     }
 
+    if (_fsync_timeout) {
+        mainloop.del_timeout(_fsync_timeout);
+        _fsync_timeout = nullptr;
+    }
+
     fsync(_file);
     close(_file);
     _file = -1;
+    _fsync_cb.aio_fildes = -1;
 
     // change file permissions to read-only to mark them as finished
     char log_file[PATH_MAX];
@@ -244,6 +281,14 @@ bool LogEndpoint::start()
         goto timeout_error;
     }
 
+    // Call fsync once per second
+    _fsync_timeout = Mainloop::get_instance().add_timeout(
+        MSEC_PER_SEC, std::bind(&LogEndpoint::_fsync, this), this);
+    if (!_fsync_timeout) {
+        log_error("Unable to add timeout");
+        goto timeout_error;
+    }
+
     // notify the system that we are active
     _system_status = MAV_STATE_ACTIVE;
 
@@ -252,6 +297,11 @@ bool LogEndpoint::start()
     return true;
 
 timeout_error:
+    if (_logging_start_timeout) {
+        Mainloop::get_instance().del_timeout(_fsync_timeout);
+        _fsync_timeout = nullptr;
+    }
+
     close(_file);
     _file = -1;
     return false;
@@ -266,6 +316,24 @@ bool LogEndpoint::_alive_timeout()
     }
 
     _timeout_write_total = _stat.write.total;
+    return true;
+}
+
+bool LogEndpoint::_fsync()
+{
+    if (_file < 0) {
+        return false;
+    }
+
+    if (_fsync_cb.aio_fildes >= 0 && aio_error(&_fsync_cb) == EINPROGRESS) {
+        // previous operation is still in progress
+        return true;
+    }
+    _fsync_cb.aio_fildes = _file;
+    _fsync_cb.aio_sigevent.sigev_notify = SIGEV_NONE;
+
+    aio_fsync(O_SYNC, &_fsync_cb);
+
     return true;
 }
 
