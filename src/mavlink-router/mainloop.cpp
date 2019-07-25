@@ -305,15 +305,7 @@ void Mainloop::loop()
     }
 
     if (_log_endpoint)
-        _log_endpoint->stop();
-
-    // free all remaning Timeouts
-    while (_timeouts) {
-        Timeout *current = _timeouts;
-        _timeouts = current->next;
-        remove_fd(current->fd);
-        delete current;
-    }
+        _log_endpoint->stop(); 
 }
 
 bool Mainloop::_log_aggregate_timeout(void *data)
@@ -396,6 +388,22 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
         }
         case Udp: {
             std::unique_ptr<UdpEndpoint> udp{new UdpEndpoint{}};
+
+            if (conf->sleep_interval) {
+                udp->sleep_timeout = add_timeout(conf->sleep_interval * MSEC_PER_SEC,
+                    std::bind(&Endpoint::sleep_timeout_callback, udp.get(), std::placeholders::_1),
+                    udp.get());
+
+                if (udp->sleep_timeout == nullptr)
+                {
+                    log_error("Failed to create a sleep timeout");
+                    return false;
+                }
+
+                // Endpoint is intially sleeping
+                udp->sleep_enabled = true;
+            }
+
             if (udp->open(conf->address, conf->port, conf->eavesdropping) < 0) {
                 log_error("Could not open %s:%ld", conf->address, conf->port);
                 return false;
@@ -526,7 +534,7 @@ int Mainloop::tcp_open(unsigned long tcp_port)
 
 Timeout *Mainloop::add_timeout(uint32_t timeout_msec, std::function<bool(void*)> cb, const void *data)
 {
-    struct itimerspec ts;
+    struct itimerspec ts = {0};
     Timeout *t = new Timeout(cb, data);
 
     assert_or_return(t, NULL);
@@ -541,6 +549,7 @@ Timeout *Mainloop::add_timeout(uint32_t timeout_msec, std::function<bool(void*)>
     ts.it_interval.tv_nsec = (timeout_msec % MSEC_PER_SEC) * NSEC_PER_MSEC;
     ts.it_value.tv_sec = ts.it_interval.tv_sec;
     ts.it_value.tv_nsec = ts.it_interval.tv_nsec;
+    memcpy(&t->spec, &ts, sizeof(t->spec));
     timerfd_settime(t->fd, 0, &ts, NULL);
 
     if (add_fd(t->fd, t, EPOLLIN) < 0)
@@ -553,7 +562,7 @@ Timeout *Mainloop::add_timeout(uint32_t timeout_msec, std::function<bool(void*)>
 
 error:
     delete t;
-    return NULL;
+    return nullptr;
 }
 
 void Mainloop::del_timeout(Timeout *t)
@@ -623,3 +632,13 @@ bool Mainloop::_retry_timeout_cb(void *data)
 
     return false;
 }
+
+ void Mainloop::free_timeouts()
+ {
+    while (_timeouts) {
+        Timeout *current = _timeouts;
+        _timeouts = current->next;
+        remove_fd(current->fd);
+        delete current;
+    }
+ }

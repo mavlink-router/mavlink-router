@@ -103,6 +103,10 @@ public:
     struct buffer rx_buf;
     struct buffer tx_buf;
 
+    Timeout *sleep_timeout;  // Sleep timeout (nullptr to disable sleep mode)
+    bool sleep_timeout_callback(void *data);
+    bool sleep_enabled;
+
 protected:
     virtual int read_msg(struct buffer *pbuf, int *target_system, int *target_compid,
                          uint8_t *src_sysid, uint8_t *src_compid, uint32_t *msg_id);
