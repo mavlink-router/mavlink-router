@@ -423,6 +423,22 @@ bool Mainloop::remove_dynamic_endpoint(Endpoint *endpoint)
     return false;
 }
 
+bool Mainloop::_remove_dynamic_endpoint(std::string name)
+{
+    for (auto i = _dynamic_endpoints.begin(); i != _dynamic_endpoints.end(); i++) {
+        if (i->first == name) {
+            log_info("Removing dynamic endpoint: %s", i->first.c_str());
+            remove_fd(i->second->fd);
+            delete i->second;
+            _pipe_commands.erase(i->first);
+            _dynamic_endpoints.erase(i);
+            return true;
+        }
+    }
+
+    return false;
+}
+
 bool Mainloop::_add_dynamic_endpoint(std::string name, std::string command, Endpoint *endpoint)
 {
     if (!endpoint) {
@@ -747,7 +763,12 @@ void Mainloop::_handle_pipe()
             a.emplace_back(pch);
             pch = strtok(nullptr, " \n");
         }
-        // Currently only adding dynamic udp endpoints is supported
+
+        if (a.size() == 2 && a[0] == "remove") {
+            _remove_dynamic_endpoint(a[1]);
+            return;
+        }
+
         if (a.size() != 6 || a[0] != "add" || a[1] != "udp") {
             return;
         }
