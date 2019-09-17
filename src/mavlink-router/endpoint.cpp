@@ -44,9 +44,8 @@
 
 #define UART_BAUD_RETRY_SEC 5
 
-Endpoint::Endpoint(const char *name, bool crc_check_enabled)
+Endpoint::Endpoint(const char *name)
     : _name{name}
-    , _crc_check_enabled{crc_check_enabled}
 {
     rx_buf.data = (uint8_t *) malloc(RX_BUF_MAX_SIZE);
     rx_buf.len = 0;
@@ -216,7 +215,7 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
     _stat.read.total++;
 
     msg_entry = mavlink_get_msg_entry(*msg_id);
-    if (_crc_check_enabled && msg_entry) {
+    if (msg_entry) {
         /*
          * It is accepting and forwarding unknown messages ids because
          * it can be a new MAVLink message implemented only in
@@ -228,14 +227,11 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
             _stat.read.crc_error_bytes += expected_size;
             return 0;
         }
+        _add_sys_comp_id(((uint16_t)*src_sysid << 8) | *src_compid);
     }
 
     _stat.read.handled++;
     _stat.read.handled_bytes += expected_size;
-
-    if (!_crc_check_enabled || msg_entry) {
-        _add_sys_comp_id(((uint16_t)*src_sysid << 8) | *src_compid);
-    }
 
     *target_sysid = -1;
     *target_compid = -1;
@@ -679,7 +675,7 @@ int UartEndpoint::add_speeds(std::vector<unsigned long> bauds)
 }
 
 UdpEndpoint::UdpEndpoint()
-    : Endpoint{"UDP", false}
+    : Endpoint{"UDP"}
 {
     bzero(&sockaddr, sizeof(sockaddr));
 }
@@ -781,7 +777,7 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
 }
 
 TcpEndpoint::TcpEndpoint()
-    : Endpoint{"TCP", false}
+    : Endpoint{"TCP"}
 {
     bzero(&sockaddr, sizeof(sockaddr));
 }

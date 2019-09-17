@@ -39,7 +39,7 @@
 #define MAX_RETRIES 10
 
 LogEndpoint::LogEndpoint(const char *name, const char *logs_dir, LogMode mode)
-    : Endpoint {name, false}
+    : Endpoint {name}
     , _logs_dir {logs_dir}
     , _mode(mode)
 {
