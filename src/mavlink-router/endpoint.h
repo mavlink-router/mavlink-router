@@ -17,7 +17,7 @@
  */
 #pragma once
 
-#include <mavlink.h>
+#include <common/mavlink.h>
 
 #include <memory>
 #include <vector>

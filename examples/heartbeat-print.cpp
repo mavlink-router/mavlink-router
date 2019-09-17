@@ -26,7 +26,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#include <mavlink.h>
+#include <common/mavlink.h>
 
 static volatile bool g_should_exit;
 
