@@ -44,9 +44,12 @@
 
 #define UART_BAUD_RETRY_SEC 5
 
-Endpoint::Endpoint(const char *name, bool crc_check_enabled)
+Endpoint::Endpoint(const char *name, bool crc_check_enabled, unsigned long sleep_interval)
     : _name{name}
     , _crc_check_enabled{crc_check_enabled}
+    , _sleep_interval{sleep_interval}
+    // No need to initialize the last message timestamp (sleep mode is enabled initially)
+    , _sleep_enabled{static_cast<bool>(sleep_interval)}
 {
     rx_buf.data = (uint8_t *) malloc(RX_BUF_MAX_SIZE);
     rx_buf.len = 0;
@@ -282,6 +285,15 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
     pbuf->data = rx_buf.data;
     pbuf->len = expected_size;
 
+    if ((msg_entry != nullptr) && _sleep_interval) {
+        if (_sleep_enabled)
+            _sleep_enabled = false;
+
+        // Update the last message timestamp
+        if (clock_gettime(CLOCK_MONOTONIC, &_last_message) < 0)
+            log_error("Failed to get the current time: \"%s\"", strerror(errno));  
+    }
+
     return msg_entry != nullptr ? ReadOk : ReadUnkownMsg;
 }
 
@@ -335,6 +347,25 @@ bool Endpoint::accept_msg(int target_sysid, int target_compid, uint8_t src_sysid
 
         // if filter is defined and message is not in the set then discard it
         return false;
+    }
+
+    if (_sleep_interval) {
+        if (_sleep_enabled)
+            // Discard the message if the endpoint is in the sleep mode
+            return false;
+        
+        struct timespec current_time;
+
+        if (clock_gettime(CLOCK_MONOTONIC, &current_time) < 0)
+            log_error("Failed to get the current time: \"%s\"", strerror(errno));
+
+        if (((current_time.tv_sec + current_time.tv_nsec / 1000000000.0) - 
+                (_last_message.tv_sec + _last_message.tv_nsec / 1000000000.0)) > _sleep_interval) {
+            _sleep_enabled = true;
+
+            // Discard the message, endpoint is in the sleep mode now
+            return false;
+        }
     }
 
     // Message is broadcast on sysid: accept msg
@@ -398,6 +429,7 @@ void Endpoint::print_statistics()
     printf("\n\t}");
     printf("\n\tTransmitted messages {");
     printf("\n\t\tTotal: %u %luKBytes", _stat.write.total, _stat.write.bytes / 1000);
+    printf("\n\tSleep mode: %s", (_sleep_enabled) ? "enabled" : "disabled");
     printf("\n\t}");
     printf("\n}\n");
 }
@@ -678,8 +710,8 @@ int UartEndpoint::add_speeds(std::vector<unsigned long> bauds)
     return 0;
 }
 
-UdpEndpoint::UdpEndpoint()
-    : Endpoint{"UDP", false}
+UdpEndpoint::UdpEndpoint(unsigned long sleep_interval)
+    : Endpoint{"UDP", false, sleep_interval}
 {
     bzero(&sockaddr, sizeof(sockaddr));
 }
@@ -716,7 +748,8 @@ int UdpEndpoint::open(const char *ip, unsigned long port, bool to_bind)
 
     if (to_bind)
         sockaddr.sin_port = 0;
-    log_info("Open UDP [%d] %s:%lu %c", fd, ip, port, to_bind ? '*' : ' ');
+    log_info("Open UDP [%d] %s:%lu%s%s", fd, ip, port, to_bind ? " *" : "",
+        (_sleep_interval) ? " S" : "");
 
     return fd;
 
@@ -781,7 +814,7 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
 }
 
 TcpEndpoint::TcpEndpoint()
-    : Endpoint{"TCP", false}
+    : Endpoint{"TCP", false, 0}
 {
     bzero(&sockaddr, sizeof(sockaddr));
 }

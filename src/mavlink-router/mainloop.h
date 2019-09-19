@@ -118,6 +118,7 @@ struct endpoint_config {
         };
     };
     char *filter;
+    unsigned long sleep_interval;
 };
 
 struct options {

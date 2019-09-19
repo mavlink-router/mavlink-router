@@ -37,7 +37,7 @@ enum class LogMode {
 class LogEndpoint : public Endpoint {
 public:
     LogEndpoint(const char *name, const char *logs_dir, LogMode mode)
-        : Endpoint{name, false}
+        : Endpoint{name, false, 0}
         , _logs_dir{logs_dir}
         , _mode(mode)
     {
