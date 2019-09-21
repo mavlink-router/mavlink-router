@@ -15,7 +15,8 @@ matrix:
             - python3-setuptools
 
 before_script:
-        - pip3 install --user future pymavlink
+        - pip3 install --user flake8 future pymavlink
+        - flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         - CXX="g++-6"
         - CC="gcc-6"
 
