@@ -17,6 +17,7 @@
  */
 #pragma once
 
+#include <aio.h>
 #include <assert.h>
 #include <dirent.h>
 
@@ -36,14 +37,7 @@ enum class LogMode {
 
 class LogEndpoint : public Endpoint {
 public:
-    LogEndpoint(const char *name, const char *logs_dir, LogMode mode)
-        : Endpoint{name, false}
-        , _logs_dir{logs_dir}
-        , _mode(mode)
-    {
-        assert(_logs_dir);
-        _add_sys_comp_id(LOG_ENDPOINT_SYSTEM_ID << 8);
-    }
+    LogEndpoint(const char *name, const char *logs_dir, LogMode mode);
 
     virtual bool start();
     virtual void stop();
@@ -62,8 +56,10 @@ protected:
     LogMode _mode;
 
     Timeout *_logging_start_timeout = nullptr;
+    Timeout *_fsync_timeout = nullptr;
     Timeout *_alive_check_timeout = nullptr;
     uint32_t _timeout_write_total = 0;
+    aiocb _fsync_cb = {};
 
     virtual const char *_get_logfile_extension() = 0;
 
@@ -73,6 +69,8 @@ protected:
 
     virtual bool _start_timeout() = 0;
     virtual bool _alive_timeout();
+
+    bool _fsync();
 
     void _handle_auto_start_stop(uint32_t msg_id, uint8_t source_system_id,
             uint8_t source_component_id, uint8_t *payload);
