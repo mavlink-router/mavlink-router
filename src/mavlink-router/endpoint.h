@@ -75,7 +75,7 @@ public:
         ReadUnkownMsg,
     };
 
-    Endpoint(const char *name, bool crc_check_enabled);
+    Endpoint(const char *name);
     virtual ~Endpoint();
 
     int handle_read() override;
@@ -130,7 +130,6 @@ protected:
         } write;
     } _stat;
 
-    const bool _crc_check_enabled;
     uint32_t _incomplete_msgs = 0;
     std::vector<uint16_t> _sys_comp_ids;
 
@@ -140,7 +139,10 @@ private:
 
 class UartEndpoint : public Endpoint {
 public:
-    UartEndpoint() : Endpoint{"UART", true} { }
+    UartEndpoint()
+        : Endpoint {"UART"}
+    {
+    }
     virtual ~UartEndpoint();
     int write_msg(const struct buffer *pbuf) override;
     int flush_pending_msgs() override { return -ENOSYS; }
