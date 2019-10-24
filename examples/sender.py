@@ -17,7 +17,6 @@
 # limitations under the License.
 
 from __future__ import print_function
-from __future__ import print_function
 from threading import Thread
 from time import sleep
 
