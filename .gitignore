@@ -47,3 +47,7 @@ tags
 /heartbeat-print
 
 test.log
+
+# Jetbrains IDEs
+.idea/
+compile_commands.json

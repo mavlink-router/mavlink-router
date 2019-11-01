@@ -42,16 +42,18 @@
 #define DEFAULT_RETRY_TCP_TIMEOUT 5
 
 static struct options opt = {
-        .endpoints = nullptr,
-        .conf_file_name = nullptr,
-        .conf_dir = nullptr,
-        .tcp_port = ULONG_MAX,
-        .report_msg_statistics = false,
-        .logs_dir = nullptr,
-        .log_mode = LogMode::always,
-        .debug_log_level = (int)Log::Level::INFO,
-        .mavlink_dialect = Auto,
-        .heartbeat = false
+    .endpoints = nullptr,
+    .conf_file_name = nullptr,
+    .conf_dir = nullptr,
+    .tcp_port = ULONG_MAX,
+    .report_msg_statistics = false,
+    .logs_dir = nullptr,
+    .log_mode = LogMode::always,
+    .debug_log_level = (int)Log::Level::INFO,
+    .mavlink_dialect = Auto,
+    .min_free_space = 0,
+    .max_log_files = 0,
+    .heartbeat = false
 };
 
 static const struct option long_options[] = {
@@ -654,12 +656,19 @@ static int parse_confs(ConfFile &conf)
     const char *pattern;
 
     static const ConfFile::OptionsTable option_table[] = {
-        {"TcpServerPort",   false, ConfFile::parse_ul,      OPTIONS_TABLE_STRUCT_FIELD(options, tcp_port)},
-        {"ReportStats",     false, ConfFile::parse_bool,    OPTIONS_TABLE_STRUCT_FIELD(options, report_msg_statistics)},
-        {"MavlinkDialect",  false, parse_mavlink_dialect,   OPTIONS_TABLE_STRUCT_FIELD(options, mavlink_dialect)},
-        {"Log",             false, ConfFile::parse_str_dup, OPTIONS_TABLE_STRUCT_FIELD(options, logs_dir)},
-        {"LogMode",         false, parse_log_mode,          OPTIONS_TABLE_STRUCT_FIELD(options, log_mode)},
-        {"DebugLogLevel",   false, parse_log_level,         OPTIONS_TABLE_STRUCT_FIELD(options, debug_log_level)},
+        {"TcpServerPort", false, ConfFile::parse_ul, OPTIONS_TABLE_STRUCT_FIELD(options, tcp_port)},
+        {"ReportStats", false, ConfFile::parse_bool,
+         OPTIONS_TABLE_STRUCT_FIELD(options, report_msg_statistics)},
+        {"MavlinkDialect", false, parse_mavlink_dialect,
+         OPTIONS_TABLE_STRUCT_FIELD(options, mavlink_dialect)},
+        {"Log", false, ConfFile::parse_str_dup, OPTIONS_TABLE_STRUCT_FIELD(options, logs_dir)},
+        {"LogMode", false, parse_log_mode, OPTIONS_TABLE_STRUCT_FIELD(options, log_mode)},
+        {"DebugLogLevel", false, parse_log_level,
+         OPTIONS_TABLE_STRUCT_FIELD(options, debug_log_level)},
+        {"MinFreeSpace", false, ConfFile::parse_ul,
+         OPTIONS_TABLE_STRUCT_FIELD(options, min_free_space)},
+        {"MaxLogFiles", false, ConfFile::parse_ul,
+         OPTIONS_TABLE_STRUCT_FIELD(options, max_log_files)},
     };
 
     struct option_uart {

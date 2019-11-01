@@ -23,8 +23,8 @@
 
 class ULog : public LogEndpoint {
 public:
-    ULog(const char *logs_dir, LogMode mode, bool heartbeat)
-        : LogEndpoint{"ULog", logs_dir, mode, heartbeat}
+    ULog(const char *logs_dir, LogMode mode, unsigned long min_free_space, unsigned long max_files, bool heartbeat)
+        : LogEndpoint{"ULog", logs_dir, mode, min_free_space, max_files, heartbeat}
     {
     }
 

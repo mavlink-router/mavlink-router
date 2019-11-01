@@ -24,9 +24,9 @@
 
 class AutoLog : public LogEndpoint {
 public:
-
-    AutoLog(const char *logs_dir, LogMode mode, bool heartbeat)
-        : LogEndpoint{"AutoLog", logs_dir, mode, heartbeat }
+    AutoLog(const char *logs_dir, LogMode mode, unsigned long min_free_space,
+            unsigned long max_files, bool heartbeat)
+        : LogEndpoint{"AutoLog", logs_dir, mode, min_free_space, max_files, heartbeat}
     {
         _broadcast_hb = heartbeat;
     }

@@ -1,5 +1,5 @@
 language: cpp
-dist: trusty
+dist: bionic
 cache: pip
 matrix:
   include:
@@ -12,6 +12,7 @@ matrix:
             - g++-6
             - gcc-6
             - python3-pip
+            - python3-setuptools
 
 before_script:
         - pip3 install --user future pymavlink

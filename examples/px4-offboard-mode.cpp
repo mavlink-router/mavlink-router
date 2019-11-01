@@ -48,7 +48,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include <mavlink.h>
+#include <common/mavlink.h>
 
 #include "common/util.h"
 

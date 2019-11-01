@@ -24,11 +24,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
 
+#include <algorithm>
+#include <map>
 #include <memory>
+#include <tuple>
+#include <vector>
 
 #include <common/log.h>
 #include <common/util.h>
@@ -38,9 +43,12 @@
 #define ALIVE_TIMEOUT 5
 #define MAX_RETRIES 10
 
-LogEndpoint::LogEndpoint(const char *name, const char *logs_dir, LogMode mode, bool heartbeat)
-    : Endpoint {name, false}
-    , _logs_dir {logs_dir}
+LogEndpoint::LogEndpoint(const char *name, const char *logs_dir, LogMode mode,
+                         unsigned long min_free_space, unsigned long max_files, bool heartbeat)
+    : Endpoint{name}
+    , _logs_dir{logs_dir}
+    , _min_free_space(min_free_space)
+    , _max_files(max_files)
     , _mode(mode)
 {
     assert(_logs_dir);
@@ -120,6 +128,110 @@ void LogEndpoint::mark_unfinished_logs()
             chmod(log_file, S_IRUSR | S_IRGRP | S_IROTH);
         }
     }
+    closedir(dir);
+}
+
+void LogEndpoint::_delete_old_logs()
+{
+
+    struct statvfs buf;
+    uint64_t free_space;
+    if (statvfs(_logs_dir, &buf) == 0) {
+        free_space = (uint64_t) buf.f_bsize * buf.f_bavail;
+    } else {
+        free_space = UINT64_MAX;
+        log_error("[Log Deletion] Error when measuring free disk space: %m");
+    }
+    log_debug("[Log Deletion]  Total free space: %lumb. Min free space: %lumb",
+              free_space / (1ul << 20), _min_free_space / (1ul << 20));
+
+    // This check is not necessary, it just saves on some file IO.
+    if (free_space > _min_free_space && _max_files == 0) {
+        return;
+    }
+
+    DIR *dir = opendir(_logs_dir);
+
+    // Assume the directory does not exist if opendir failed
+    if (!dir) {
+        return;
+    }
+
+    int dir_fd = dirfd(dir);
+    if (dir_fd < 0) {
+        closedir(dir);
+        log_error("[Log Deletion] Error getting dir file descriptor: %m");
+        return;
+    }
+
+    // Map of index -> (filename, file size)
+    // All three of these values are saved for later to reduce the amount of IO operations needed.
+    std::map<unsigned long, std::tuple<std::string, unsigned long>> file_map;
+
+    struct dirent *ent;
+    uint32_t idx, year, month, day, hour, minute, second;
+
+    // This loop just gathers the name, index, and size of each read-only file in the log dir
+    while ((ent = readdir(dir)) != nullptr) {
+        // Even though we don't need the timestamp, we want to match as much of the filename as
+        // possible, so we don't accidentally delete something that isn't a log.
+        if (sscanf(ent->d_name, "%u-%u-%u-%u_%u-%u-%u.", &idx, &year, &month, &day, &hour, &minute,
+                   &second)
+            == 7) {
+            struct stat file_stat;
+            if (!fstatat(dir_fd, ent->d_name, &file_stat, 0)) {
+                // Only bother with read-only files. If this function is somehow called while a file
+                // is still being used (not read-only), it should not be deleted.
+                if (!S_ISDIR(file_stat.st_mode) && !(file_stat.st_mode & S_IWUSR)) {
+                    std::string str(ent->d_name);
+                    file_map[idx] = std::make_tuple(str, file_stat.st_size);
+                }
+            }
+        }
+    }
+
+    // If the configured value for _min_free_space is 0, then we don't have to do anything special.
+    uint64_t bytes_to_delete = _min_free_space - free_space;
+    // If the configured value for _max_files is 0, then set this to -1 to indicate that we've
+    // already deleted enough files.
+    uint64_t files_to_delete = _max_files > 0 ? file_map.size() - _max_files : -1;
+
+    log_debug("[Log Deletion] Files to delete: %ld", files_to_delete);
+
+    // Delete the logs in order until there's enough free space, and few enough files
+    // It is possible for this loop to run only once and return immediately, if we don't actually
+    // need to delete any files. Maps in C++ are ordered by the keys, so this iteration is
+    // guaranteed to happen in index order (oldest -> newest)
+    for (auto &pair : file_map) {
+        if (bytes_to_delete <= 0 && files_to_delete <= 0) {
+            break;
+        }
+
+        std::string &filename = std::get<0>(pair.second);
+        const unsigned long filesize = std::get<1>(pair.second);
+        char log_file[PATH_MAX];
+        if (snprintf(log_file, sizeof(log_file), "%s/%s", _logs_dir, filename.c_str())
+            >= (int)sizeof(log_file)) {
+            log_error("Directory + filename %s is longer than PATH_MAX of %d", filename.c_str(),
+                      PATH_MAX);
+            continue;
+        }
+
+        int err_code = remove(log_file);
+        if (err_code == 0) {
+            bytes_to_delete -= filesize;
+            files_to_delete--;
+            log_info("[Log Deletion] Deleted old logfile %s", filename.c_str());
+        } else {
+            log_error("[Log Deletion] Error deleting old logfile %s: %m", filename.c_str());
+        }
+    }
+
+    if (bytes_to_delete > 0) {
+        log_error(
+            "[Log Deletion] Deleted all closed logs, but there is still not enough free space.");
+    }
+
     closedir(dir);
 }
 
@@ -267,6 +379,9 @@ bool LogEndpoint::start()
         log_warning("Log already started");
         return false;
     }
+
+    // Clear up space before opening a new file
+    _delete_old_logs();
 
     _file = _get_file(_get_logfile_extension());
     if (_file < 0) {

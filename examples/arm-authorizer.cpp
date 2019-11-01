@@ -27,7 +27,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include <mavlink.h>
+#include <common/mavlink.h>
 
 #define SYSTEM_ID 10
 
