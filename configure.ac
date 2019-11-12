@@ -48,6 +48,18 @@ AC_COMPILE_IFELSE(
 	 AC_MSG_RESULT([yes])],
 	[AC_MSG_RESULT([no])])
 
+PKG_CHECK_MODULES([GTEST], [gtest_main], [HAVE_GTEST=true], [
+	# Fallback to try linking it directly (required on some installations).
+	# This assumes that having "gtest_main" implies we also have "gtest"
+	# which seems reasonable.
+	AC_CHECK_LIB(
+		[gtest_main], [main], 
+		[HAVE_GTEST=true] [GTEST_LIBS="-lgtest_main -lgtest"], 
+		[HAVE_GTEST=false]) 
+])
+AM_CONDITIONAL([HAVE_GTEST], [test x$HAVE_GTEST = xtrue])
+AC_SUBST([GTEST_LIBS])
+AC_SUBST([GTEST_CFLAGS])
 
 #####################################################################
 # --with-
