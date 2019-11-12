@@ -330,8 +330,10 @@ bool Mainloop::_log_aggregate_timeout(void *data)
         _errors_aggregate.msg_to_unknown = 0;
     }
 
-    for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
-        (*e)->log_aggregate(LOG_AGGREGATE_INTERVAL_SEC);
+    if (g_endpoints) {
+        for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
+            (*e)->log_aggregate(LOG_AGGREGATE_INTERVAL_SEC);
+        }
     }
 
     for (auto *t = g_tcp_endpoints; t; t = t->next) {
