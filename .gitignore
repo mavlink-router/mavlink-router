@@ -33,9 +33,6 @@
 /test-suite.log
 /tests/routing_test.log
 /tests/routing_test.trs
-/unit_test
-/unit_test.log
-/unit_test.trs
 /arm-authorizer
 
 *~
@@ -45,6 +42,7 @@ tags
 
 /mavlink-routerd
 /heartbeat-print
+/mainloop_test*
 
 test.log
 

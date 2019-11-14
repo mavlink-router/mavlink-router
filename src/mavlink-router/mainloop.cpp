@@ -23,6 +23,7 @@
 #include <sys/timerfd.h>
 #include <unistd.h>
 
+#include <atomic>
 #include <memory>
 
 #include <common/log.h>
@@ -30,14 +31,14 @@
 
 #include "autolog.h"
 
-static volatile bool should_exit = false;
+static std::atomic<bool> should_exit {false};
 
 Mainloop Mainloop::_instance{};
 bool Mainloop::_initialized = false;
 
 static void exit_signal_handler(int signum)
 {
-    should_exit = true;
+    Mainloop::request_exit();
 }
 
 static void setup_signal_handlers()
@@ -60,6 +61,11 @@ Mainloop &Mainloop::init()
     _initialized = true;
 
     return _instance;
+}
+
+void Mainloop::request_exit()
+{
+    should_exit.store(true, std::memory_order_relaxed);
 }
 
 int Mainloop::open()
@@ -261,7 +267,7 @@ void Mainloop::loop()
     add_timeout(LOG_AGGREGATE_INTERVAL_SEC * MSEC_PER_SEC,
                 std::bind(&Mainloop::_log_aggregate_timeout, this, std::placeholders::_1), this);
 
-    while (!should_exit) {
+    while (!should_exit.load(std::memory_order_relaxed)) {
         int i;
 
         r = epoll_wait(epollfd, events, max_events, -1);
@@ -293,7 +299,7 @@ void Mainloop::loop()
                 remove_fd(p->fd);
                 // make poll errors fatal so that an external component can
                 // restart mavlink-router
-                should_exit = true;
+                request_exit();
             }
         }
 
@@ -324,8 +330,10 @@ bool Mainloop::_log_aggregate_timeout(void *data)
         _errors_aggregate.msg_to_unknown = 0;
     }
 
-    for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
-        (*e)->log_aggregate(LOG_AGGREGATE_INTERVAL_SEC);
+    if (g_endpoints) {
+        for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
+            (*e)->log_aggregate(LOG_AGGREGATE_INTERVAL_SEC);
+        }
     }
 
     for (auto *t = g_tcp_endpoints; t; t = t->next) {
