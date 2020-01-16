@@ -21,7 +21,6 @@ from threading import Thread
 from time import sleep
 
 import functools
-import inspect
 import pymavlink.mavutil as mavutil
 import subprocess
 import sys
