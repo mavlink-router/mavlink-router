@@ -191,10 +191,10 @@ void LogEndpoint::_delete_old_logs()
     }
 
     // If the configured value for _min_free_space is 0, then we don't have to do anything special.
-    uint64_t bytes_to_delete = _min_free_space - free_space;
+    int64_t bytes_to_delete = _min_free_space - free_space;
     // If the configured value for _max_files is 0, then set this to -1 to indicate that we've
     // already deleted enough files.
-    uint64_t files_to_delete = _max_files > 0 ? file_map.size() - _max_files : -1;
+    int64_t files_to_delete = _max_files > 0 ? file_map.size() - _max_files : -1;
 
     log_debug("[Log Deletion] Files to delete: %ld", files_to_delete);
 
