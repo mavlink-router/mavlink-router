@@ -569,7 +569,9 @@ error:
 
 void Mainloop::del_timeout(Timeout *t)
 {
-    t->remove_me = true;
+    if (_timeouts && t) {
+        t->remove_me = true;
+    }
 }
 
 void Mainloop::_del_timeouts()
