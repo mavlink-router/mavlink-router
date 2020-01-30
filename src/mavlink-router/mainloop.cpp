@@ -25,6 +25,7 @@
 #include <sys/timerfd.h>
 #include <unistd.h>
 
+#include <atomic>
 #include <memory>
 #include <vector>
 
@@ -36,14 +37,14 @@
 #define TIMEOUT_LOG_SHUTDOWN_US     5000000ULL // number of microseconds we wait until we give up trying to stop log streaming
                                         // after a shutdown of mavlink router was requested
 
-static volatile bool should_exit = false;
+static std::atomic<bool> should_exit {false};
 
 Mainloop Mainloop::_instance{};
 bool Mainloop::_initialized = false;
 
 static void exit_signal_handler(int signum)
 {
-    should_exit = true;
+    Mainloop::request_exit();
 }
 
 static void setup_signal_handlers()
@@ -69,6 +70,11 @@ Mainloop &Mainloop::init()
 }
 
 static const char* pipe_path = "/tmp/mavlink_router_pipe";
+
+void Mainloop::request_exit()
+{
+    should_exit.store(true, std::memory_order_relaxed);
+}
 
 int Mainloop::open()
 {
@@ -291,7 +297,7 @@ void Mainloop::loop()
 
     usec_t timestamp_stop_requested = 0;
 
-    bool run_loop= true;
+    bool run_loop = true;
 
     while (run_loop) {
         int i;
@@ -328,12 +334,12 @@ void Mainloop::loop()
                 remove_fd(p->fd);
                 // make poll errors fatal so that an external component can
                 // restart mavlink-router
-                should_exit = true;
+                request_exit();
             }
 
             // we should exit the router, make sure to stop the logendpoint properly (e.g. wait for ACK)
             // we will try for max TIMEOUT_LOG_SHUTDOWN_US to shut down the log stream before we give up and exit anyways
-            if (should_exit) {
+            if (should_exit.load(std::memory_order_relaxed)) {
                 if (!_log_endpoint) {
                     // no log streaming active, exit
                     run_loop = false;
@@ -375,8 +381,10 @@ bool Mainloop::_log_aggregate_timeout(void *data)
         _errors_aggregate.msg_to_unknown = 0;
     }
 
-    for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
-        (*e)->log_aggregate(LOG_AGGREGATE_INTERVAL_SEC);
+    if (g_endpoints) {
+        for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
+            (*e)->log_aggregate(LOG_AGGREGATE_INTERVAL_SEC);
+        }
     }
 
     for (auto *t = g_tcp_endpoints; t; t = t->next) {
