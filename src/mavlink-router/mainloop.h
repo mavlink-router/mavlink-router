@@ -67,7 +67,6 @@ public:
     Timeout *add_timeout(uint32_t timeout_msec, std::function<bool(void*)> cb, const void *data);
     void del_timeout(Timeout *t);
 
-    void free_endpoints(struct options *opt);
     bool add_endpoints(Mainloop &mainloop, struct options *opt);
 
     void print_statistics();
@@ -86,13 +85,24 @@ public:
      */
     void request_exit();
 
+    /*
+     * Expose list of registered endpoints (primarily for direct interaction
+     * in tests).
+     */
+    inline const std::vector<std::unique_ptr<Endpoint>>& endpoints() const
+    {
+        return _endpoints;
+    }
+
 private:
     static const unsigned int LOG_AGGREGATE_INTERVAL_SEC = 5;
 
     endpoint_entry *g_tcp_endpoints = nullptr;
-    Endpoint **g_endpoints = nullptr;
+    std::vector<std::unique_ptr<Endpoint>> _endpoints;
     int g_tcp_fd = -1;
     LogEndpoint *_log_endpoint = nullptr;
+
+    struct options* _options{nullptr};
 
     Timeout *_timeouts = nullptr;
 
@@ -102,6 +112,7 @@ private:
         uint32_t msg_to_unknown = 0;
     } _errors_aggregate;
 
+    void free_endpoints();
     int tcp_open(unsigned long tcp_port);
     void _del_timeouts();
     int _add_tcp_endpoint(TcpEndpoint *tcp);
