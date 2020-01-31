@@ -147,14 +147,26 @@ mainloop_test_SOURCES = \
 	src/common/log.h \
 	src/common/util.c \
 	src/common/util.h \
+	src/common/xtermios.cpp \
+	src/common/xtermios.h \
+	src/mavlink-router/autolog.cpp \
+	src/mavlink-router/autolog.h \
+	src/mavlink-router/binlog.cpp \
+	src/mavlink-router/binlog.h \
+	src/mavlink-router/comm.h \
+	src/mavlink-router/endpoint.h \
 	src/mavlink-router/endpoint.cpp \
 	src/mavlink-router/endpoint.h \
+	src/mavlink-router/logendpoint.cpp \
+	src/mavlink-router/logendpoint.h \
 	src/mavlink-router/mainloop_test.cpp \
 	src/mavlink-router/mainloop.cpp \
 	src/mavlink-router/pollable.cpp \
 	src/mavlink-router/pollable.h \
 	src/mavlink-router/timeout.cpp \
-	src/mavlink-router/timeout.h
+	src/mavlink-router/timeout.h \
+	src/mavlink-router/ulog.h \
+	src/mavlink-router/ulog.cpp
 mainloop_test_LDADD = $(GTEST_LIBS)
 
 # ------------------------------------------------------------------------------
