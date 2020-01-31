@@ -17,6 +17,9 @@
  */
 #pragma once
 
+#include <signal.h>
+
+#include <atomic>
 #include <string>
 #include <map>
 
@@ -33,11 +36,29 @@ struct endpoint_entry {
 
 class Mainloop {
 public:
-    int open();
+    /*
+     * Sets up main event handling loop. There can be only a single instance
+     * of it in the whole process at any given point in time.
+     */
+    Mainloop();
+    Mainloop(const Mainloop &) = delete;
+    Mainloop &operator=(const Mainloop &) = delete;
+
+    ~Mainloop();
+
     int add_fd(int fd, void *data, int events);
     int mod_fd(int fd, void *data, int events);
     int remove_fd(int fd);
     void loop();
+
+    /*
+     * Runs single iteration of mainloop, i.e. single round of event handling.
+     * This will wait for at most the given time (indefinitely if -1) and
+     * within this time dispatch of all handling events (socket events &
+     * timers.
+     */
+    int run_single(int timeout_msec);
+
     void route_msg(struct buffer *buf, int target_sysid, int target_compid, int sender_sysid,
                    int sender_compid, uint32_t msg_id = UINT32_MAX);
     void handle_read(Endpoint *e);
@@ -59,24 +80,15 @@ public:
     bool should_process_tcp_hangups = false;
 
     /*
-     * Return singleton for this class, tied to the main thread. It needds to
-     * be called after a call to Mainloop::init().
+     * Return singleton for this class, tied to the main thread.
      */
-    static Mainloop &get_instance()
-    {
-        assert(_initialized);
-        return _instance;
-    }
+    static Mainloop &get_instance();
 
     /*
-     * Initialize and return singleton.
+     * Request that loop exits "eventually". This (and only this!) function
+     * is async-signal safe.
      */
-    static Mainloop &init();
-
-    /*
-     * Request that loop exits "eventually".
-     */
-    static void request_exit();
+    void request_exit();
 
 private:
     static const unsigned int LOG_AGGREGATE_INTERVAL_SEC = 5;
@@ -92,6 +104,8 @@ private:
 
     Timeout *_timeouts = nullptr;
 
+    std::atomic<bool> _should_exit {false};
+
     struct {
         uint32_t msg_to_unknown = 0;
     } _errors_aggregate;
@@ -106,12 +120,22 @@ private:
     bool _remove_dynamic_endpoint(std::string name);
     void _handle_pipe();
 
-    Mainloop() { }
-    Mainloop(const Mainloop &) = delete;
-    Mainloop &operator=(const Mainloop &) = delete;
+    static Mainloop* instance;
+};
 
-    static Mainloop _instance;
-    static bool _initialized;
+class MainloopSignalHandlers {
+public:
+    explicit MainloopSignalHandlers(Mainloop* mainloop);
+    ~MainloopSignalHandlers();
+
+private:
+    static void signal_handler_function(int signo);
+
+    static Mainloop* mainloop_instance;
+
+    struct sigaction _old_sigterm;
+    struct sigaction _old_sigint;
+    struct sigaction _old_sigpipe;
 };
 
 enum endpoint_type { Tcp, Uart, Udp, Unknown };

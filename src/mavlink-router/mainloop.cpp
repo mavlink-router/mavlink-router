@@ -25,7 +25,6 @@
 #include <sys/timerfd.h>
 #include <unistd.h>
 
-#include <atomic>
 #include <memory>
 #include <vector>
 
@@ -37,69 +36,49 @@
 #define TIMEOUT_LOG_SHUTDOWN_US     5000000ULL // number of microseconds we wait until we give up trying to stop log streaming
                                         // after a shutdown of mavlink router was requested
 
-static std::atomic<bool> should_exit {false};
-
-Mainloop Mainloop::_instance{};
-bool Mainloop::_initialized = false;
-
-static void exit_signal_handler(int signum)
-{
-    Mainloop::request_exit();
-}
-
-static void setup_signal_handlers()
-{
-    struct sigaction sa = { };
-
-    sa.sa_flags = SA_NOCLDSTOP;
-    sa.sa_handler = exit_signal_handler;
-    sigaction(SIGTERM, &sa, nullptr);
-    sigaction(SIGINT, &sa, nullptr);
-
-    sa.sa_handler = SIG_IGN;
-    sigaction(SIGPIPE, &sa, nullptr);
-}
-
-Mainloop &Mainloop::init()
-{
-    assert(_initialized == false);
-
-    _initialized = true;
-
-    return _instance;
-}
-
 static const char* pipe_path = "/tmp/mavlink_router_pipe";
 
-void Mainloop::request_exit()
-{
-    should_exit.store(true, std::memory_order_relaxed);
-}
+Mainloop* Mainloop::instance = nullptr;
 
-int Mainloop::open()
+Mainloop::Mainloop()
 {
-    if (epollfd != -1)
-        return -EBUSY;
+    if (instance) {
+        throw std::logic_error("Only one mainloop instance must exist at a given time");
+    }
 
     epollfd = epoll_create1(EPOLL_CLOEXEC);
 
     if (epollfd == -1) {
-        log_error("%m");
-        return -1;
+        throw std::runtime_error(std::string("epoll_create: ") + strerror(errno));
     }
 
-    if (mkfifo(pipe_path, 0777) == -1) {
-        log_error("%m");
+    // XXX: this is bad for testing/multi-instantiation.
+    if (mkfifo(pipe_path, 0777) == -1 && errno != EEXIST) {
+        throw std::runtime_error(std::string("mkfifo: ") + strerror(errno));
     }
 
-    _pipefd = ::open(pipe_path, O_RDWR);
+    _pipefd = ::open(pipe_path, O_RDWR | O_CLOEXEC);
     if (_pipefd == -1) {
-        log_error("%m");
-        return -1;
+        throw std::runtime_error(std::string("open pipe: ") + strerror(errno));
     }
     add_fd(_pipefd, &_pipefd, EPOLLIN);
 
-    return 0;
+    instance = this;
+}
+
+Mainloop::~Mainloop()
+{
+    instance = nullptr;
+}
+
+Mainloop& Mainloop::get_instance()
+{
+    return *instance;
+}
+
+void Mainloop::request_exit()
+{
+    _should_exit.store(true, std::memory_order_relaxed);
 }
 
 int Mainloop::mod_fd(int fd, void *data, int events)
@@ -283,86 +262,34 @@ accept_error:
 
 void Mainloop::loop()
 {
-    const int max_events = 8;
-    struct epoll_event events[max_events];
-    int r;
-
     if (epollfd < 0)
         return;
 
-    setup_signal_handlers();
+    MainloopSignalHandlers handlers(this);
 
     add_timeout(LOG_AGGREGATE_INTERVAL_SEC * MSEC_PER_SEC,
                 std::bind(&Mainloop::_log_aggregate_timeout, this, std::placeholders::_1), this);
 
-    usec_t timestamp_stop_requested = 0;
-
-    bool run_loop = true;
-
-    while (run_loop) {
-        int i;
-
-        r = epoll_wait(epollfd, events, max_events, -1);
-        if (r < 0 && errno == EINTR)
-            continue;
-        for (i = 0; i < r; i++) {
-            if (events[i].data.ptr == &_pipefd) {
-                _handle_pipe();
-                continue;
-            }
-            else if (events[i].data.ptr == &g_tcp_fd) {
-                handle_tcp_connection();
-                continue;
-            }
-            Pollable *p = static_cast<Pollable *>(events[i].data.ptr);
-
-            if (events[i].events & EPOLLIN) {
-                r = p->handle_read();
-                if (r < 0 && !p->is_valid()) {
-                    // Only TcpEndpoint may become invalid after a read
-                    should_process_tcp_hangups = true;
-                }
-            }
-
-            if (events[i].events & EPOLLOUT) {
-                if (!p->handle_canwrite()) {
-                    mod_fd(p->fd, p, EPOLLIN);
-                }
-            }
-            if (events[i].events & EPOLLERR) {
-                log_error("poll error for fd %i, closing it", p->fd);
-                remove_fd(p->fd);
-                // make poll errors fatal so that an external component can
-                // restart mavlink-router
-                request_exit();
-            }
-
-            // we should exit the router, make sure to stop the logendpoint properly (e.g. wait for ACK)
-            // we will try for max TIMEOUT_LOG_SHUTDOWN_US to shut down the log stream before we give up and exit anyways
-            if (should_exit.load(std::memory_order_relaxed)) {
-                if (!_log_endpoint) {
-                    // no log streaming active, exit
-                    run_loop = false;
-                } else if (_log_endpoint && timestamp_stop_requested == 0) {
-                    // log streaming is active, start timing
-                    timestamp_stop_requested = now_usec();
-                    _log_endpoint->stop();
-                } else if (_log_endpoint && (!_log_endpoint->has_active_stop_timeout() || (now_usec() - timestamp_stop_requested) > TIMEOUT_LOG_SHUTDOWN_US)) {
-                    // log stream was either shut down successfully or we ran into timeout, exit
-                    run_loop = false;
-                }
-            }
-        }
-
-        if (should_process_tcp_hangups) {
-            process_tcp_hangups();
-        }
-
-        _del_timeouts();
+    while (!_should_exit.load(std::memory_order_relaxed)) {
+        run_single(-1);
     }
 
-    if (_log_endpoint)
+    // This is a bit weird, but models previous behavior: run event handling a
+    // bit more to allow log end point to shutdown. This should instead be
+    // handled in main taking care of log_endpoint *only*.
+    if (_log_endpoint) {
         _log_endpoint->stop();
+
+        usec_t now = now_usec();
+        usec_t deadline = now + TIMEOUT_LOG_SHUTDOWN_US;
+
+        while (now < deadline) {
+            run_single((deadline - now) / 1000);
+            now = now_usec();
+        }
+
+        _log_endpoint->stop();
+    }
 
     // free all remaning Timeouts
     while (_timeouts) {
@@ -371,6 +298,57 @@ void Mainloop::loop()
         remove_fd(current->fd);
         delete current;
     }
+}
+
+int Mainloop::run_single(int timeout_msec)
+{
+    constexpr int max_events = 8;
+    struct epoll_event events[max_events];
+
+    int r = epoll_wait(epollfd, events, max_events, timeout_msec);
+    if (r <= 0) {
+        return 0;
+    }
+    for (int i = 0; i < r; i++) {
+        if (events[i].data.ptr == &_pipefd) {
+            _handle_pipe();
+            continue;
+        }
+        else if (events[i].data.ptr == &g_tcp_fd) {
+            handle_tcp_connection();
+            continue;
+        }
+        Pollable *p = static_cast<Pollable *>(events[i].data.ptr);
+
+        if (events[i].events & EPOLLIN) {
+            r = p->handle_read();
+            if (r < 0 && !p->is_valid()) {
+                // Only TcpEndpoint may become invalid after a read
+                should_process_tcp_hangups = true;
+            }
+        }
+
+        if (events[i].events & EPOLLOUT) {
+            if (!p->handle_canwrite()) {
+                mod_fd(p->fd, p, EPOLLIN);
+            }
+        }
+        if (events[i].events & EPOLLERR) {
+            log_error("poll error for fd %i, closing it", p->fd);
+            remove_fd(p->fd);
+            // make poll errors fatal so that an external component can
+            // restart mavlink-router
+            request_exit();
+        }
+    }
+
+    if (should_process_tcp_hangups) {
+        process_tcp_hangups();
+    }
+
+    _del_timeouts();
+
+    return r;
 }
 
 bool Mainloop::_log_aggregate_timeout(void *data)
@@ -821,3 +799,38 @@ void Mainloop::_handle_pipe()
         }
     }
 }
+
+MainloopSignalHandlers::MainloopSignalHandlers(Mainloop* mainloop)
+{
+    if (mainloop_instance) {
+        throw std::logic_error("Only one MainloopSignalHandlers instance must exist at a given time");
+    }
+
+    mainloop_instance = mainloop;
+
+    struct sigaction sa = { };
+
+    sa.sa_flags = SA_NOCLDSTOP;
+    sa.sa_handler = &signal_handler_function;
+    sigaction(SIGTERM, &sa, &_old_sigterm);
+    sigaction(SIGINT, &sa, &_old_sigint);
+
+    sa.sa_handler = SIG_IGN;
+    sigaction(SIGPIPE, &sa, &_old_sigpipe);
+}
+
+MainloopSignalHandlers::~MainloopSignalHandlers()
+{
+    sigaction(SIGTERM, &_old_sigterm, nullptr);
+    sigaction(SIGINT, &_old_sigint, nullptr);
+    sigaction(SIGPIPE, &_old_sigpipe, nullptr);
+
+    mainloop_instance = nullptr;
+}
+
+void MainloopSignalHandlers::signal_handler_function(int signo)
+{
+    mainloop_instance->request_exit();
+}
+
+Mainloop* MainloopSignalHandlers::mainloop_instance{nullptr};
