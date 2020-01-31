@@ -844,7 +844,7 @@ fail:
 
 int main(int argc, char *argv[])
 {
-    Mainloop &mainloop = Mainloop::init();
+    Mainloop mainloop;
 
     Log::open();
 
@@ -862,9 +862,6 @@ int main(int argc, char *argv[])
     Log::set_max_level((Log::Level) opt.debug_log_level);
 
     dbg("Cmd line and options parsed");
-
-    if (mainloop.open() < 0)
-        goto close_log;
 
     if (opt.tcp_port == ULONG_MAX)
         opt.tcp_port = MAVLINK_TCP_PORT;
