@@ -143,7 +143,7 @@ public:
         : Endpoint {"UART"}
     {
     }
-    virtual ~UartEndpoint();
+    ~UartEndpoint() override;
     int write_msg(const struct buffer *pbuf) override;
     int flush_pending_msgs() override { return -ENOSYS; }
 
@@ -184,7 +184,7 @@ protected:
 class TcpEndpoint : public Endpoint {
 public:
     TcpEndpoint();
-    ~TcpEndpoint();
+    ~TcpEndpoint() override;
 
     int accept(int listener_fd);
     int open(const char *ip, unsigned long port);
