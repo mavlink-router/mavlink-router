@@ -3,8 +3,9 @@
 #include <gtest/gtest.h>
 
 TEST(MainLoopTest, termination) {
-    Mainloop& mainloop = Mainloop::init();
-    mainloop.open();
+    Mainloop mainloop;
+
     mainloop.request_exit();
+
     mainloop.loop();
 }
