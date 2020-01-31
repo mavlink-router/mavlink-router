@@ -844,6 +844,30 @@ fail:
     return ret;
 }
 
+/*
+ * Frees dynamically allocated strings in options struct. This code was
+ * extracted from Mainloop (where it does not belong at all) and simply
+ * moved here verbatim as a "slightly" better place.
+ *
+ * XXX: it should go to proper encapsulation in config system; it should
+ * not use C memory management.
+ */
+static void free_endpoints_options_strings(struct options* opts)
+{
+    for (auto e = opts->endpoints; e;) {
+        auto next = e->next;
+        if (e->type == Udp || e->type == Tcp) {
+            free(e->address);
+        } else {
+            free(e->device);
+            delete e->bauds;
+        }
+        free(e->name);
+        free(e);
+        e = next;
+    }
+}
+
 int main(int argc, char *argv[])
 {
     Mainloop mainloop;
@@ -873,7 +897,7 @@ int main(int argc, char *argv[])
 
     mainloop.loop();
 
-    mainloop.free_endpoints(&opt);
+    free_endpoints_options_strings(&opt);
 
     free(opt.logs_dir);
 
@@ -882,7 +906,8 @@ int main(int argc, char *argv[])
     return 0;
 
 endpoint_error:
-    mainloop.free_endpoints(&opt);
+    free_endpoints_options_strings(&opt);
+
     free(opt.logs_dir);
 
 close_log:

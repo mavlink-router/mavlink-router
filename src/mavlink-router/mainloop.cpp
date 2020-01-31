@@ -68,6 +68,7 @@ Mainloop::Mainloop()
 
 Mainloop::~Mainloop()
 {
+    free_endpoints();
     instance = nullptr;
 }
 
@@ -140,11 +141,11 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid
 {
     bool unknown = true;
 
-    for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
-        if ((*e)->accept_msg(target_sysid, target_compid, sender_sysid, sender_compid, msg_id)) {
-            log_debug("Endpoint [%d] accepted message to %d/%d from %u/%u", (*e)->fd, target_sysid,
+    for (const auto& e : _endpoints) {
+        if (e->accept_msg(target_sysid, target_compid, sender_sysid, sender_compid, msg_id)) {
+            log_debug("Endpoint [%d] accepted message to %d/%d from %u/%u", e->fd, target_sysid,
                       target_compid, sender_sysid, sender_compid);
-            write_msg(*e, buf);
+            write_msg(e.get(), buf);
             unknown = false;
         }
     }
@@ -359,10 +360,8 @@ bool Mainloop::_log_aggregate_timeout(void *data)
         _errors_aggregate.msg_to_unknown = 0;
     }
 
-    if (g_endpoints) {
-        for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
-            (*e)->log_aggregate(LOG_AGGREGATE_INTERVAL_SEC);
-        }
+    for (const auto& e : _endpoints) {
+        e->log_aggregate(LOG_AGGREGATE_INTERVAL_SEC);
     }
 
     for (auto *t = g_tcp_endpoints; t; t = t->next) {
@@ -373,8 +372,9 @@ bool Mainloop::_log_aggregate_timeout(void *data)
 
 void Mainloop::print_statistics()
 {
-    for (Endpoint **e = g_endpoints; *e != nullptr; e++)
-        (*e)->print_statistics();
+    for (const auto & e : _endpoints) {
+        e->print_statistics();
+    }
     for (auto i: _dynamic_endpoints) {
         i.second->print_statistics();
     }
@@ -446,22 +446,19 @@ bool Mainloop::_add_dynamic_endpoint(std::string name, std::string command, Endp
 
 bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
 {
-    unsigned n_endpoints = 0, i = 0;
+    unsigned n_endpoints = 0;
     struct endpoint_config *conf;
 
     for (conf = opt->endpoints; conf; conf = conf->next) {
         if (conf->type != Tcp) {
             // TCP endpoints are ephemeral, that's why they don't
-            // live on `g_endpoints` array, but on `g_tcp_endpoints` list
+            // live on `_endpoints` array, but on `g_tcp_endpoints` list
             n_endpoints++;
         }
     }
 
     if (opt->logs_dir)
         n_endpoints++;
-
-    g_endpoints = (Endpoint**) calloc(n_endpoints + 1, sizeof(Endpoint*));
-    assert_or_return(g_endpoints, false);
 
     for (conf = opt->endpoints; conf; conf = conf->next) {
         switch (conf->type) {
@@ -483,9 +480,8 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
                     return false;
             }
 
-            g_endpoints[i] = uart.release();
-            mainloop.add_fd(g_endpoints[i]->fd, g_endpoints[i], EPOLLIN);
-            i++;
+            mainloop.add_fd(uart->fd, uart.get(), EPOLLIN);
+            _endpoints.push_back(std::move(uart));
             break;
         }
         case Udp: {
@@ -503,9 +499,8 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
                 }
             }
 
-            g_endpoints[i] = udp.release();
-            mainloop.add_fd(g_endpoints[i]->fd, g_endpoints[i], EPOLLIN);
-            i++;
+            mainloop.add_fd(udp->fd, udp.get(), EPOLLIN);
+            _endpoints.push_back(std::move(udp));
             break;
         }
         case Tcp: {
@@ -532,22 +527,26 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
         }
     }
 
-    if (opt->tcp_port)
+    if (opt->tcp_port) {
         g_tcp_fd = tcp_open(opt->tcp_port);
+    }
+
 
     if (opt->logs_dir) {
+        std::unique_ptr<LogEndpoint> log_endpoint;
         if (opt->mavlink_dialect == Ardupilotmega) {
-            _log_endpoint
-                = new BinLog(opt->logs_dir, opt->log_mode, opt->min_free_space, opt->max_log_files, opt->heartbeat);
+            log_endpoint.reset(
+                new BinLog(opt->logs_dir, opt->log_mode, opt->min_free_space, opt->max_log_files, opt->heartbeat));
         } else if (opt->mavlink_dialect == Common) {
-            _log_endpoint
-                = new ULog(opt->logs_dir, opt->log_mode, opt->min_free_space, opt->max_log_files, opt->heartbeat);
+            log_endpoint.reset(
+                new ULog(opt->logs_dir, opt->log_mode, opt->min_free_space, opt->max_log_files, opt->heartbeat));
         } else {
-            _log_endpoint = new AutoLog(opt->logs_dir, opt->log_mode, opt->min_free_space,
-                                        opt->max_log_files, opt->heartbeat);
+            log_endpoint.reset(new AutoLog(opt->logs_dir, opt->log_mode, opt->min_free_space,
+                                        opt->max_log_files, opt->heartbeat));
         }
+        _log_endpoint = log_endpoint.get();
         _log_endpoint->mark_unfinished_logs();
-        g_endpoints[i] = _log_endpoint;
+        _endpoints.push_back(std::move(log_endpoint));
     }
 
     if (opt->report_msg_statistics)
@@ -556,12 +555,11 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
     return true;
 }
 
-void Mainloop::free_endpoints(struct options *opt)
+void Mainloop::free_endpoints()
 {
-    for (Endpoint **e = g_endpoints; *e; e++) {
-        delete *e;
-    }
-    free(g_endpoints);
+    // XXX not explicitly needed since only called from constructor; leaving
+    // here until remainder clean.
+    _endpoints.clear();
 
     for (auto *t = g_tcp_endpoints; t;) {
         auto next = t->next;
@@ -575,19 +573,6 @@ void Mainloop::free_endpoints(struct options *opt)
     }
     _pipe_commands.clear();
     _dynamic_endpoints.clear();
-
-    for (auto e = opt->endpoints; e;) {
-        auto next = e->next;
-        if (e->type == Udp || e->type == Tcp) {
-            free(e->address);
-        } else {
-            free(e->device);
-            delete e->bauds;
-        }
-        free(e->name);
-        free(e);
-        e = next;
-    }
 }
 
 int Mainloop::tcp_open(unsigned long tcp_port)

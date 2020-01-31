@@ -70,7 +70,6 @@ public:
     void set_timeout(Timeout *t, uint32_t timeout_msec);
     void del_timeout(Timeout *t);
 
-    void free_endpoints(struct options *opt);
     bool add_endpoints(Mainloop &mainloop, struct options *opt);
     bool remove_dynamic_endpoint(Endpoint *endpoint);
 
@@ -90,17 +89,27 @@ public:
      */
     void request_exit();
 
+    /*
+     * Expose list of registered endpoints (primarily for direct interaction
+     * in tests).
+     */
+    inline const std::vector<std::unique_ptr<Endpoint>>& endpoints() const
+    {
+        return _endpoints;
+    }
+
 private:
     static const unsigned int LOG_AGGREGATE_INTERVAL_SEC = 5;
 
     endpoint_entry *g_tcp_endpoints = nullptr;
-    Endpoint **g_endpoints = nullptr;
+    std::vector<std::unique_ptr<Endpoint>> _endpoints;
     int g_tcp_fd = -1;
     LogEndpoint *_log_endpoint = nullptr;
 
     std::map<std::string, std::string> _pipe_commands;
     std::map<std::string, Endpoint *> _dynamic_endpoints;
     int _pipefd = -1;
+    struct options* _options{nullptr};
 
     Timeout *_timeouts = nullptr;
 
@@ -110,6 +119,7 @@ private:
         uint32_t msg_to_unknown = 0;
     } _errors_aggregate;
 
+    void free_endpoints();
     int tcp_open(unsigned long tcp_port);
     void _del_timeouts();
     int _add_tcp_endpoint(TcpEndpoint *tcp);
