@@ -150,7 +150,7 @@ public:
         : Endpoint {"UART"}
     {
     }
-    virtual ~UartEndpoint();
+    ~UartEndpoint() override;
     int write_msg(const struct buffer *pbuf) override;
     int flush_pending_msgs() override { return -ENOSYS; }
 
@@ -185,13 +185,21 @@ public:
     struct sockaddr_in sockaddr;
 
 protected:
+
+    void _schedule_write();
+    int _force_write();
+    bool _write_scheduled;
+
+    Timeout* _write_schedule_timer = nullptr;
+    const unsigned int _max_packet_size, _max_timeout_ms;
+
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
 };
 
 class TcpEndpoint : public Endpoint {
 public:
     TcpEndpoint();
-    ~TcpEndpoint();
+    ~TcpEndpoint() override;
 
     int accept(int listener_fd);
     int open(const char *ip, unsigned long port);
