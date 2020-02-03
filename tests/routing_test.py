@@ -21,10 +21,13 @@ from threading import Thread
 from time import sleep
 
 import functools
-import pymavlink.mavutil as mavutil
 import subprocess
 import sys
 import time
+try:
+	import pymavlink.mavutil as mavutil
+except:
+	sys.exit(77)
 
 
 def log(s):
