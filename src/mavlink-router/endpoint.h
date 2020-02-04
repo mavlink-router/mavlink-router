@@ -97,8 +97,10 @@ public:
     }
 
     bool accept_msg(int target_sysid, int target_compid, uint8_t src_sysid, uint8_t src_compid, uint32_t msg_id);
+    void postprocess_msg(int target_sysid, int target_compid, uint8_t src_sysid, uint8_t src_compid, uint32_t msg_id);
 
     void add_message_to_filter(uint32_t msg_id) { _message_filter.push_back(msg_id); }
+    void add_message_to_nodelay(uint32_t msg_id) { _message_nodelay.push_back(msg_id); }
 
     void start_expire_timer();
 
@@ -142,6 +144,7 @@ protected:
 private:
     Timeout* _expire_timer = nullptr;
     std::vector<uint32_t> _message_filter;
+    std::vector<uint32_t> _message_nodelay;
 };
 
 class UartEndpoint : public Endpoint {
@@ -175,23 +178,24 @@ private:
 class UdpEndpoint : public Endpoint {
 public:
     UdpEndpoint();
-    virtual ~UdpEndpoint() {}
+    ~UdpEndpoint() override;
 
     int write_msg(const struct buffer *pbuf) override;
-    int flush_pending_msgs() override { return -ENOSYS; }
+    int flush_pending_msgs() override;
 
     int open(const char *ip, unsigned long port, bool bind = false);
+
+    void set_coalescing(unsigned int bytes, unsigned int milliseconds);
 
     struct sockaddr_in sockaddr;
 
 protected:
 
     void _schedule_write();
-    int _force_write();
     bool _write_scheduled;
 
     Timeout* _write_schedule_timer = nullptr;
-    const unsigned int _max_packet_size, _max_timeout_ms;
+    unsigned int _max_packet_size, _max_timeout_ms;
 
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
 };

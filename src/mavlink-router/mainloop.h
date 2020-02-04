@@ -160,7 +160,10 @@ struct endpoint_config {
             char *address;
             long unsigned port;
             int retry_timeout;
-            bool eavesdropping;
+            bool eavesdropping;     // bind to local port specified, instead of send to remote port
+            int coalesce_ms;        // max time to hold data to try to send packets together
+            int coalesce_bytes;     // never send packets larger than this size
+            char *coalesce_nodelay; // immediately send if a mavlink msg_id is matching this
         };
         struct {
             char *device;

@@ -69,6 +69,7 @@ Mainloop::Mainloop()
 Mainloop::~Mainloop()
 {
     free_endpoints();
+    _del_timeouts(); // needs to happen after endpoints are freed
     instance = nullptr;
 }
 
@@ -168,6 +169,7 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid
                 should_process_tcp_hangups = true;
             }
             unknown = false;
+            e->endpoint->postprocess_msg(target_sysid, target_compid, sender_sysid, sender_compid, msg_id);
         }
     }
 
@@ -491,12 +493,26 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
                 return false;
             }
 
+            udp->set_coalescing(conf->coalesce_bytes, conf->coalesce_ms);
+
             if (conf->filter) {
-                char *token = strtok(conf->filter, ",");
+                char *local_filter = strdup(conf->filter);
+                char *token = strtok(local_filter, ",");
                 while (token != nullptr) {
                     udp->add_message_to_filter(atoi(token));
                     token = strtok(nullptr, ",");
                 }
+                free(local_filter);
+            }
+
+            if (conf->coalesce_nodelay) {
+                char *local_nodelay = strdup(conf->coalesce_nodelay);
+                char *token = strtok(local_nodelay, ",");
+                while (token != nullptr) {
+                    udp->add_message_to_nodelay(atoi(token));
+                    token = strtok(nullptr, ",");
+                }
+                free(local_nodelay);
             }
 
             mainloop.add_fd(udp->fd, udp.get(), EPOLLIN);
