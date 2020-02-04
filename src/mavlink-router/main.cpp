@@ -211,8 +211,9 @@ fail:
     return ret;
 }
 
-static int add_endpoint_address(const char *name, size_t name_len, const char *ip,
-                                long unsigned port, bool eavesdropping, const char *filter)
+static int add_udp_endpoint_address(const char *name, size_t name_len, const char *ip,
+                                    long unsigned port, bool eavesdropping, const char *filter,
+                                    int coalesce_ms, int coalesce_bytes, const char *coalesce_nodelay)
 {
     int ret;
 
@@ -236,7 +237,7 @@ static int add_endpoint_address(const char *name, size_t name_len, const char *i
         ret = -ENOMEM;
         goto fail;
     }
-    
+
     if (filter) {
         conf->filter = strdup(filter);
         if (!conf->filter) {
@@ -254,6 +255,16 @@ static int add_endpoint_address(const char *name, size_t name_len, const char *i
     }
 
     conf->eavesdropping = eavesdropping;
+    conf->coalesce_bytes = coalesce_bytes;
+    conf->coalesce_ms = coalesce_ms;
+
+    if (coalesce_nodelay) {
+        conf->coalesce_nodelay = strdup(coalesce_nodelay);
+        if (!conf->coalesce_nodelay) {
+            ret = -ENOMEM;
+            goto fail;
+        }
+    }
 
     conf->next = opt.endpoints;
     opt.endpoints = conf;
@@ -410,7 +421,7 @@ static int parse_argv(int argc, char *argv[])
                 return -EINVAL;
             }
 
-            add_endpoint_address(NULL, 0, ip, port, false, NULL);
+            add_udp_endpoint_address(NULL, 0, ip, port, false, NULL, 0, 0, NULL);
             free(ip);
             break;
         }
@@ -500,7 +511,7 @@ static int parse_argv(int argc, char *argv[])
                 return -EINVAL;
             }
 
-            add_endpoint_address(NULL, 0, base, number, true, NULL);
+            add_udp_endpoint_address(NULL, 0, base, number, true, NULL, 0, 0, NULL);
         } else {
             const char *bauds = number != ULONG_MAX ? base + strlen(base) + 1 : NULL;
             int ret = add_uart_endpoint(NULL, 0, base, bauds, false);
@@ -687,12 +698,18 @@ static int parse_confs(ConfFile &conf)
         bool eavesdropping;
         unsigned long port;
         char *filter;
+        unsigned long coalesce_bytes;
+        unsigned long coalesce_ms;
+        char *coalesce_nodelay;
     };
     static const ConfFile::OptionsTable option_table_udp[] = {
-        {"address", true,   ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_udp, addr)},
-        {"mode",    true,   parse_mode,                 OPTIONS_TABLE_STRUCT_FIELD(option_udp, eavesdropping)},
-        {"port",    false,  ConfFile::parse_ul,         OPTIONS_TABLE_STRUCT_FIELD(option_udp, port)},
-        {"filter",  false,  ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_udp, filter)},
+        {"address",         true,   ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_udp, addr)},
+        {"mode",            true,   parse_mode,                 OPTIONS_TABLE_STRUCT_FIELD(option_udp, eavesdropping)},
+        {"port",            false,  ConfFile::parse_ul,         OPTIONS_TABLE_STRUCT_FIELD(option_udp, port)},
+        {"filter",          false,  ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_udp, filter)},
+        {"CoalesceBytes",   false,  ConfFile::parse_ul,         OPTIONS_TABLE_STRUCT_FIELD(option_udp, coalesce_bytes)},
+        {"CoalesceMs",      false,  ConfFile::parse_ul,         OPTIONS_TABLE_STRUCT_FIELD(option_udp, coalesce_ms)},
+        {"CoalesceNoDelay", false,  ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_udp, coalesce_nodelay)},
     };
 
     struct option_tcp {
@@ -730,19 +747,22 @@ static int parse_confs(ConfFile &conf)
     pattern = "udpendpoint *";
     offset = strlen(pattern) - 1;
     while (conf.get_sections(pattern, &iter) == 0) {
-        struct option_udp opt_udp = {nullptr, false, ULONG_MAX};
+        struct option_udp opt_udp = {nullptr, false, ULONG_MAX, nullptr, 0, 0, nullptr};
         ret = conf.extract_options(&iter, option_table_udp, ARRAY_SIZE(option_table_udp), &opt_udp);
         if (ret == 0) {
             if (opt_udp.eavesdropping && opt_udp.port == ULONG_MAX) {
                 log_error("Expected 'port' key for section %.*s", (int)iter.name_len, iter.name);
                 ret = -EINVAL;
             } else {
-                ret = add_endpoint_address(iter.name + offset, iter.name_len - offset, opt_udp.addr,
-                                           opt_udp.port, opt_udp.eavesdropping, opt_udp.filter);
+                ret = add_udp_endpoint_address(iter.name + offset, iter.name_len - offset, opt_udp.addr,
+                                               opt_udp.port, opt_udp.eavesdropping, opt_udp.filter, opt_udp.coalesce_bytes,
+                                               opt_udp.coalesce_ms, opt_udp.coalesce_nodelay);
             }
         }
 
         free(opt_udp.addr);
+        free(opt_udp.coalesce_nodelay);
+        free(opt_udp.filter);
         if (ret < 0)
             return ret;
     }
@@ -858,10 +878,12 @@ static void free_endpoints_options_strings(struct options* opts)
         auto next = e->next;
         if (e->type == Udp || e->type == Tcp) {
             free(e->address);
+            free(e->coalesce_nodelay);
         } else {
             free(e->device);
             delete e->bauds;
         }
+        free(e->filter);
         free(e->name);
         free(e);
         e = next;
