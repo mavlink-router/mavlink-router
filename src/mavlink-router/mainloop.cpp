@@ -742,6 +742,18 @@ bool Mainloop::_retry_timeout_cb(void *data)
 
 void Mainloop::_handle_pipe()
 {
+    enum CMD_ARG_INDEX {
+      CMD = 0,
+      PROTOCOL = 1,
+      NAME = 2,
+      IP = 3,
+      PORT = 4,
+      EAVESDROPPING = 5,
+      COALESCE_BYTES = 6,
+      COALESCE_MS = 7,
+      COALESCE_NODELAY = 8,
+    };
+
     char cmd[1024];
     ssize_t num_read = read(_pipefd, cmd, sizeof(cmd) - 1);
     char* buffer = cmd;
@@ -760,8 +772,8 @@ void Mainloop::_handle_pipe()
 
           // Parse each command
           // Command Format:
-          // Cmd UDP Name IP Port Eavesdropping
-          // e.g. add udp application 127.0.0.1 14532 0
+          // Cmd UDP Name IP Port Eavesdropping coalesce_bytes coalesce_ms coalesce_nodelay_ids
+          // e.g. add udp application 127.0.0.1 14532 0 1500 30 75,76,77
           std::vector<std::string> a;
           char *pch = strtok(command, " ");
           while (pch != nullptr) {
@@ -769,20 +781,40 @@ void Mainloop::_handle_pipe()
               pch = strtok(nullptr, " \n");
           }
 
-          if (a.size() == 2 && a[0] == "remove") {
-              _remove_dynamic_endpoint(a[1]);
+          if (a.size() == 2 && a[CMD] == "remove") {
+              // Note: 'remove' commands don't specify protocol, they just give name
+              _remove_dynamic_endpoint(a[PROTOCOL]);
               continue;
           }
 
-          if (a.size() != 6 || a[0] != "add" || a[1] != "udp") {
+          if (a.size() < 6 || a[CMD] != "add" || a[PROTOCOL] != "udp") {
               continue;
           }
-          std::string name = a[2];
-          std::string address = a[3];
-          int port = atoi(a[4].c_str());
+          std::string name = a[NAME];
+          std::string address = a[IP];
+          int port = atoi(a[PORT].c_str());
           if (port <= 0) {
               continue;
           }
+
+          int coalesce_timeout = 0, coalesce_num_bytes = 0;
+          if (a.size() >= 8) {
+              coalesce_num_bytes = atoi(a[COALESCE_BYTES].c_str());
+              coalesce_timeout = atoi(a[COALESCE_MS].c_str());
+          }
+
+          std::vector<int> nodelay_ids;
+          if (a.size() >= COALESCE_NODELAY && a[COALESCE_NODELAY].size() > 0) {
+              char* nodelay = strdup(a[COALESCE_NODELAY].c_str());
+              char* tok = strtok(nodelay, ",");
+              while(tok != nullptr) {
+                  nodelay_ids.push_back(atoi(tok));
+                  tok = strtok(nullptr, ",");
+              }
+              free(nodelay);
+          }
+
+          bool eavesdropping = a[EAVESDROPPING]=="1";
 
           auto pipecmd = _pipe_commands.find(name);
           if (pipecmd != _pipe_commands.end() && pipecmd->second == command) {
@@ -794,10 +826,15 @@ void Mainloop::_handle_pipe()
           }
 
           std::unique_ptr<UdpEndpoint> udp{new UdpEndpoint()};
-          if (udp->open(address.c_str(), port, a[5]=="1") < 0) {
+          if (udp->open(address.c_str(), port, eavesdropping) < 0) {
               log_error("Could not open %s:%d", address.c_str(), port);
               continue;
           }
+          udp->set_coalescing(coalesce_num_bytes, coalesce_timeout);
+          for (int id : nodelay_ids) {
+              udp->add_message_to_nodelay(id);
+          }
+
           _add_dynamic_endpoint(name, command, udp.release());
         }
     }
