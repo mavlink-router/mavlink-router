@@ -147,6 +147,7 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid
             log_debug("Endpoint [%d] accepted message to %d/%d from %u/%u", e->fd, target_sysid,
                       target_compid, sender_sysid, sender_compid);
             write_msg(e.get(), buf);
+            e->postprocess_msg(target_sysid, target_compid, sender_sysid, sender_compid, msg_id);
             unknown = false;
         }
     }
@@ -157,6 +158,7 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid
                       target_compid, sender_sysid, sender_compid);
             write_msg(i.second, buf);
             unknown = false;
+            i.second->postprocess_msg(target_sysid, target_compid, sender_sysid, sender_compid, msg_id);
         }
     }
 
