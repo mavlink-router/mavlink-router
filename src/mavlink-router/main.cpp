@@ -213,7 +213,7 @@ fail:
 
 static int add_udp_endpoint_address(const char *name, size_t name_len, const char *ip,
                                     long unsigned port, bool eavesdropping, const char *filter,
-                                    int coalesce_ms, int coalesce_bytes, const char *coalesce_nodelay)
+                                    int coalesce_bytes, int coalesce_ms, const char *coalesce_nodelay)
 {
     int ret;
 
