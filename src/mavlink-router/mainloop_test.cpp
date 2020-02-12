@@ -254,3 +254,130 @@ TEST_F(MainLoopTest, direct_udp_endpoint_send_coalesce_nodelay)
 
     ::close(sock);
 }
+
+
+TEST_F(MainLoopTest, dynamic_udp_endpoint_send)
+{
+    dynamic_command cmd;
+    cmd.port = 7777;
+    cmd.address = "127.0.0.1";
+    cmd.name = "test";
+    cmd.command = dynamic_command::add;
+
+    Mainloop mainloop;
+
+    // Set up and grab one udp endpoint
+    mainloop.add_dynamic_endpoint(cmd);
+    ASSERT_EQ(1, mainloop.dynamic_endpoints().size());
+    UdpEndpoint* udp_endpoint = dynamic_cast<UdpEndpoint *>(mainloop.dynamic_endpoints().cbegin()->second);
+    ASSERT_NE(nullptr, udp_endpoint);
+
+    int sock;
+    std::tie(sock, udp_endpoint->sockaddr) = make_scratch_udp_socket();
+
+    char data[17] = "0123456789abcdef";
+    struct buffer buf = {16, reinterpret_cast<uint8_t*>(data)};
+    udp_endpoint->write_msg(&buf);
+
+    char recvbuf[1024];
+    ssize_t count = ::recv(sock, recvbuf, 1024, 0);
+
+    EXPECT_EQ(16, count);
+    EXPECT_EQ(0, std::memcmp("0123456789abcdef", recvbuf, 16));
+
+    cmd.command = dynamic_command::remove;
+    mainloop.remove_dynamic_endpoint(cmd);
+    EXPECT_EQ(0, mainloop.dynamic_endpoints().size());
+
+    ::close(sock);
+}
+
+TEST_F(MainLoopTest, dynamic_udp_endpoint_send_coalesce)
+{
+    dynamic_command cmd;
+    cmd.port = 7777;
+    cmd.address = "127.0.0.1";
+    cmd.name = "test";
+    cmd.command = dynamic_command::add;
+    cmd.coalesce_bytes = 100;
+    cmd.coalesce_ms = 1;
+
+    Mainloop mainloop;
+
+    // Set up and grab one udp endpoint
+    mainloop.add_dynamic_endpoint(cmd);
+    ASSERT_EQ(1, mainloop.dynamic_endpoints().size());
+    UdpEndpoint* udp_endpoint = dynamic_cast<UdpEndpoint *>(mainloop.dynamic_endpoints().cbegin()->second);
+    ASSERT_NE(nullptr, udp_endpoint);
+
+    int sock;
+    std::tie(sock, udp_endpoint->sockaddr) = make_scratch_udp_socket();
+
+    char data[17] = "0123456789abcdef";
+    struct buffer buf = {16, reinterpret_cast<uint8_t*>(data)};
+    udp_endpoint->write_msg(&buf);
+
+    char recvbuf[1024];
+    ssize_t count = ::recv(sock, recvbuf, 1024, MSG_DONTWAIT);
+
+    EXPECT_EQ(-1, count) << "UDP packet coalescing shouldn't have allowed a send yet";
+    EXPECT_EQ(EWOULDBLOCK, errno);
+
+    // allow UDP packet coalescing to expire
+    // XXX: make the timer expire explicitly, instead of waiting for timeout
+    mainloop.run_single(100);
+
+    count = ::recv(sock, recvbuf, 1024, 0);
+
+    EXPECT_EQ(16, count);
+    EXPECT_EQ(0, std::memcmp("0123456789abcdef", recvbuf, 16));
+
+    cmd.command = dynamic_command::remove;
+    mainloop.remove_dynamic_endpoint(cmd);
+    EXPECT_EQ(0, mainloop.dynamic_endpoints().size());
+
+    ::close(sock);
+}
+
+
+TEST(MainLoopParseTest, parse_remove_dynamic_endpoint) {
+    std::string input = "remove GCS";
+    dynamic_command cmd;
+    EXPECT_EQ(Mainloop::parse(input.c_str(), cmd), 0);
+    EXPECT_EQ(cmd.command, dynamic_command::remove);
+    EXPECT_EQ(cmd.name, "GCS");
+}
+
+TEST(MainLoopParseTest, parse_add_dynamic_endpoint_coalesce) {
+    std::string input = "add udp GCS 127.0.0.1 9001 0 1200 60 75,76,77";
+    dynamic_command cmd;
+    EXPECT_EQ(Mainloop::parse(input.c_str(), cmd), 0);
+    EXPECT_EQ(cmd.command, dynamic_command::add);
+    EXPECT_EQ(cmd.protocol, dynamic_command::udp);
+    EXPECT_EQ(cmd.name, "GCS");
+    EXPECT_EQ(cmd.address, "127.0.0.1");
+    EXPECT_EQ(cmd.port, 9001);
+    EXPECT_EQ(cmd.eavesdropping, false);
+    EXPECT_EQ(cmd.coalesce_bytes, 1200);
+    EXPECT_EQ(cmd.coalesce_ms, 60);
+    ASSERT_EQ(cmd.coalesce_nodelay_ids.size(), 3);
+    EXPECT_EQ(cmd.coalesce_nodelay_ids[0], 75);
+    EXPECT_EQ(cmd.coalesce_nodelay_ids[1], 76);
+    EXPECT_EQ(cmd.coalesce_nodelay_ids[2], 77);
+}
+
+TEST(MainLoopParseTest, parse_add_dynamic_endpoint) {
+    std::string input = "add udp GCS 127.0.0.1 9001 1";
+    dynamic_command cmd;
+    EXPECT_EQ(Mainloop::parse(input.c_str(), cmd), 0);
+    EXPECT_EQ(cmd.command, dynamic_command::add);
+    EXPECT_EQ(cmd.protocol, dynamic_command::udp);
+    EXPECT_EQ(cmd.name, "GCS");
+    EXPECT_EQ(cmd.address, "127.0.0.1");
+    EXPECT_EQ(cmd.port, 9001);
+    EXPECT_EQ(cmd.eavesdropping, true);
+    EXPECT_EQ(cmd.coalesce_bytes, 0);
+    EXPECT_EQ(cmd.coalesce_ms, 0);
+    ASSERT_EQ(cmd.coalesce_nodelay_ids.size(), 0);
+}
+

@@ -81,10 +81,10 @@ public:
     void del_timeout(Timeout *t);
 
     bool add_endpoints(Mainloop &mainloop, struct options *opt);
-    bool remove_dynamic_endpoint(Endpoint *endpoint);
 
     bool add_dynamic_endpoint(const dynamic_command& command);
     bool remove_dynamic_endpoint(const dynamic_command& command);
+    bool remove_dynamic_endpoint(Endpoint *endpoint);
 
     void print_statistics();
 
@@ -109,6 +109,13 @@ public:
     inline const std::vector<std::unique_ptr<Endpoint>>& endpoints() const
     {
         return _endpoints;
+    }
+
+    /*
+     * Expose lsit of registered dynamic endpoints (mostly for tests)
+     */
+    inline const std::map<std::string, Endpoint *>& dynamic_endpoints() const {
+        return _dynamic_endpoints;
     }
 
     static int parse(const char* cmd_string, dynamic_command& cmd);
