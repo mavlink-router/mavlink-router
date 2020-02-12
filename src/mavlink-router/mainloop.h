@@ -34,6 +34,16 @@ struct endpoint_entry {
     TcpEndpoint *endpoint;
 };
 
+struct dynamic_command {
+    enum Command { add, remove, unknown_command } command = unknown_command;
+    enum Protocol { udp, unknown_protocol } protocol = unknown_protocol;
+    std::string name, address;
+    int port = -1;
+    bool eavesdropping = false;
+    int coalesce_bytes = 0, coalesce_ms = 0;
+    std::vector<int> coalesce_nodelay_ids;
+};
+
 class Mainloop {
 public:
     /*
@@ -73,6 +83,9 @@ public:
     bool add_endpoints(Mainloop &mainloop, struct options *opt);
     bool remove_dynamic_endpoint(Endpoint *endpoint);
 
+    bool add_dynamic_endpoint(const dynamic_command& command);
+    bool remove_dynamic_endpoint(const dynamic_command& command);
+
     void print_statistics();
 
     int epollfd = -1;
@@ -98,6 +111,8 @@ public:
         return _endpoints;
     }
 
+    static int parse(const char* cmd_string, dynamic_command& cmd);
+
 private:
     static const unsigned int LOG_AGGREGATE_INTERVAL_SEC = 5;
 
@@ -106,7 +121,7 @@ private:
     int g_tcp_fd = -1;
     LogEndpoint *_log_endpoint = nullptr;
 
-    std::map<std::string, std::string> _pipe_commands;
+    std::map<std::string, dynamic_command::Command> _pipe_commands;
     std::map<std::string, Endpoint *> _dynamic_endpoints;
     int _pipefd = -1;
     struct options* _options{nullptr};
@@ -126,8 +141,6 @@ private:
     void _add_tcp_retry(TcpEndpoint *tcp);
     bool _retry_timeout_cb(void *data);
     bool _log_aggregate_timeout(void *data);
-    bool _add_dynamic_endpoint(std::string name, std::string command, Endpoint *endpoint);
-    bool _remove_dynamic_endpoint(std::string name);
     void _handle_pipe();
 
     static Mainloop* instance;

@@ -27,6 +27,7 @@
 
 #include <memory>
 #include <vector>
+#include <sstream>
 
 #include <common/log.h>
 #include <common/util.h>
@@ -413,10 +414,10 @@ bool Mainloop::remove_dynamic_endpoint(Endpoint *endpoint)
     return false;
 }
 
-bool Mainloop::_remove_dynamic_endpoint(std::string name)
+bool Mainloop::remove_dynamic_endpoint(const dynamic_command& command)
 {
     for (auto i = _dynamic_endpoints.begin(); i != _dynamic_endpoints.end(); i++) {
-        if (i->first == name) {
+        if (i->first == command.name) {
             log_info("Removing dynamic endpoint: %s", i->first.c_str());
             remove_fd(i->second->fd);
             delete i->second;
@@ -429,21 +430,43 @@ bool Mainloop::_remove_dynamic_endpoint(std::string name)
     return false;
 }
 
-bool Mainloop::_add_dynamic_endpoint(std::string name, std::string command, Endpoint *endpoint)
+bool Mainloop::add_dynamic_endpoint(const dynamic_command& command)
 {
+    // prevent expire if it was there already
+    auto pipecmd = _pipe_commands.find(command.name);
+    if (pipecmd != _pipe_commands.end() && pipecmd->second == command.command) {
+        auto ep = _dynamic_endpoints.find(command.name);
+        if (ep != _dynamic_endpoints.end()) {
+            ep->second->reset_expire_timer();
+            return true;
+        }
+    }
+
+    std::unique_ptr<UdpEndpoint> endpoint{new UdpEndpoint()};
     if (!endpoint) {
         return false;
     }
-    log_info("Adding dynamic endpoint: %s", name.c_str());
-    auto ep = _dynamic_endpoints.find(name);
+    if (endpoint->open(command.address.c_str(), command.port, command.eavesdropping) < 0) {
+        log_error("Could not open %s:%d", command.address.c_str(), command.port);
+        return false;
+    }
+
+    endpoint->set_coalescing(command.coalesce_bytes, command.coalesce_ms);
+    for (int id : command.coalesce_nodelay_ids) {
+        endpoint->add_message_to_nodelay(id);
+    }
+
+    log_info("Adding dynamic endpoint: %s", command.name.c_str());
+    auto ep = _dynamic_endpoints.find(command.name);
     if (ep != _dynamic_endpoints.end()) {
         remove_fd(ep->second->fd);
         delete ep->second;
     }
-    _pipe_commands[name] = command;
-    _dynamic_endpoints[name] = endpoint;
-    add_fd(endpoint->fd, endpoint, EPOLLIN);
+    _pipe_commands[command.name] = command.command;
+    add_fd(endpoint->fd, endpoint.get(), EPOLLIN);
+    _dynamic_endpoints[command.name] = endpoint.get();
     endpoint->start_expire_timer();
+    endpoint.release();
 
     return true;
 }
@@ -740,13 +763,14 @@ bool Mainloop::_retry_timeout_cb(void *data)
     return false;
 }
 
-void Mainloop::_handle_pipe()
-{
+
+int Mainloop::parse(const char* cmd_string, dynamic_command& cmd) {
+
     enum CMD_ARG_INDEX {
       CMD = 0,
       PROTOCOL = 1,
       NAME = 2,
-      IP = 3,
+      ADDRESS = 3,
       PORT = 4,
       EAVESDROPPING = 5,
       COALESCE_BYTES = 6,
@@ -754,6 +778,77 @@ void Mainloop::_handle_pipe()
       COALESCE_NODELAY = 8,
     };
 
+    std::istringstream stream(cmd_string);
+
+    std::vector<std::string> tokens;
+
+    for (std::string each; std::getline(stream, each, ' '); tokens.push_back(each));
+
+    if (tokens.size() > EAVESDROPPING && tokens[CMD] == "add") {
+        cmd.command = dynamic_command::add;
+    }
+    else if (tokens.size() == 2 && tokens[CMD] == "remove") {
+        cmd.command = dynamic_command::remove;
+        cmd.name = tokens[1];
+        return 0;
+    }
+    else {
+        cmd.command = dynamic_command::unknown_command;
+        return -CMD;
+    }
+
+    if (tokens[1] == "udp") {
+        cmd.protocol = dynamic_command::udp;
+    }
+    else {
+        cmd.protocol = dynamic_command::unknown_protocol;
+        return -PROTOCOL;
+    }
+
+    cmd.name = tokens[NAME];
+    cmd.address = tokens[ADDRESS];
+
+    errno = 0;
+    cmd.port = strtol(tokens[PORT].c_str(), nullptr, 10);
+    if (errno != 0) {
+        return -PORT;
+    }
+
+    int eavesdropping = strtol(tokens[EAVESDROPPING].c_str(), nullptr, 10);
+    if (errno != 0 || (eavesdropping != 0 && eavesdropping != 1)) {
+        return -EAVESDROPPING;
+    }
+    cmd.eavesdropping = (eavesdropping == 1);
+
+    if (tokens.size() > COALESCE_BYTES) {
+        cmd.coalesce_bytes = strtol(tokens[COALESCE_BYTES].c_str(), nullptr, 10);
+        if (errno != 0) {
+            return -COALESCE_BYTES;
+        }
+    }
+
+    if (tokens.size() > COALESCE_MS) {
+        cmd.coalesce_ms = strtol(tokens[COALESCE_MS].c_str(), nullptr, 10);
+        if (errno != 0) {
+            return -COALESCE_MS;
+        }
+    }
+
+    if (tokens.size() > COALESCE_NODELAY) {
+        std::istringstream nodelay_split(tokens[COALESCE_NODELAY]);
+        for (std::string each; std::getline(nodelay_split, each, ',');) {
+            int id = strtol(each.c_str(), nullptr, 10);
+            if (errno != 0) {
+                return -COALESCE_NODELAY;
+            }
+            cmd.coalesce_nodelay_ids.push_back(id);
+        }
+    }
+    return 0;
+}
+
+void Mainloop::_handle_pipe()
+{
     char cmd[1024];
     ssize_t num_read = read(_pipefd, cmd, sizeof(cmd) - 1);
     char* buffer = cmd;
@@ -765,77 +860,37 @@ void Mainloop::_handle_pipe()
         // line was written in the pipe, separate each command
         char* current_new_line = strchr(buffer, '\n');
         while (current_new_line != NULL) {
-          *current_new_line = '\0';
-          char *command = buffer;
-          buffer = current_new_line+1;
-          current_new_line = strchr(buffer, '\n');
+            *current_new_line = '\0';
+            char *command = buffer;
+            buffer = current_new_line+1;
+            current_new_line = strchr(buffer, '\n');
 
-          // Parse each command
-          // Command Format:
-          // Cmd UDP Name IP Port Eavesdropping coalesce_bytes coalesce_ms coalesce_nodelay_ids
-          // e.g. add udp application 127.0.0.1 14532 0 1500 30 75,76,77
-          std::vector<std::string> a;
-          char *pch = strtok(command, " ");
-          while (pch != nullptr) {
-              a.emplace_back(pch);
-              pch = strtok(nullptr, " \n");
-          }
+            // Parse each command
 
-          if (a.size() == 2 && a[CMD] == "remove") {
-              // Note: 'remove' commands don't specify protocol, they just give name
-              _remove_dynamic_endpoint(a[PROTOCOL]);
-              continue;
-          }
+            dynamic_command dcmd;
+            int err_code = parse(command, dcmd);
+            if (err_code != 0) {
+                log_warning("Could not read command '%s', error %d", command, err_code);
+                continue;
+            }
 
-          if (a.size() < 6 || a[CMD] != "add" || a[PROTOCOL] != "udp") {
-              continue;
-          }
-          std::string name = a[NAME];
-          std::string address = a[IP];
-          int port = atoi(a[PORT].c_str());
-          if (port <= 0) {
-              continue;
-          }
-
-          int coalesce_timeout = 0, coalesce_num_bytes = 0;
-          if (a.size() >= 8) {
-              coalesce_num_bytes = atoi(a[COALESCE_BYTES].c_str());
-              coalesce_timeout = atoi(a[COALESCE_MS].c_str());
-          }
-
-          std::vector<int> nodelay_ids;
-          if (a.size() >= COALESCE_NODELAY && a[COALESCE_NODELAY].size() > 0) {
-              char* nodelay = strdup(a[COALESCE_NODELAY].c_str());
-              char* tok = strtok(nodelay, ",");
-              while(tok != nullptr) {
-                  nodelay_ids.push_back(atoi(tok));
-                  tok = strtok(nullptr, ",");
-              }
-              free(nodelay);
-          }
-
-          bool eavesdropping = a[EAVESDROPPING]=="1";
-
-          auto pipecmd = _pipe_commands.find(name);
-          if (pipecmd != _pipe_commands.end() && pipecmd->second == command) {
-              auto ep = _dynamic_endpoints.find(name);
-              if (ep != _dynamic_endpoints.end()) {
-                  ep->second->reset_expire_timer();
-                  continue;
-              }
-          }
-
-          std::unique_ptr<UdpEndpoint> udp{new UdpEndpoint()};
-          if (udp->open(address.c_str(), port, eavesdropping) < 0) {
-              log_error("Could not open %s:%d", address.c_str(), port);
-              continue;
-          }
-          udp->set_coalescing(coalesce_num_bytes, coalesce_timeout);
-          for (int id : nodelay_ids) {
-              udp->add_message_to_nodelay(id);
-          }
-
-          _add_dynamic_endpoint(name, command, udp.release());
+            switch(dcmd.command) {
+                case dynamic_command::remove:
+                {
+                    remove_dynamic_endpoint(dcmd);
+                    break;
+                }
+                case dynamic_command::add:
+                {
+                    add_dynamic_endpoint(dcmd);
+                    break;
+                }
+                default:
+                {
+                    log_warning("Unhandled dynamic endpoint command");
+                    break;
+                }
+            }
         }
     }
 }
