@@ -194,9 +194,9 @@ void LogEndpoint::_delete_old_logs()
     int64_t bytes_to_delete = _min_free_space - free_space;
     // If the configured value for _max_files is 0, then set this to -1 to indicate that we've
     // already deleted enough files.
-    int64_t files_to_delete = _max_files > 0 ? file_map.size() - _max_files : -1;
+    ssize_t files_to_delete = _max_files > 0 ? (ssize_t)file_map.size() - _max_files : -1;
 
-    log_debug("[Log Deletion] Files to delete: %ld", files_to_delete);
+    log_debug("[Log Deletion] Files to delete: %zd", files_to_delete);
 
     // Delete the logs in order until there's enough free space, and few enough files
     // It is possible for this loop to run only once and return immediately, if we don't actually
