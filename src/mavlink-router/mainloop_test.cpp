@@ -381,3 +381,23 @@ TEST(MainLoopParseTest, parse_add_dynamic_endpoint) {
     ASSERT_EQ(cmd.coalesce_nodelay_ids.size(), 0);
 }
 
+TEST(MainLoopParseTest, parse_add_dynamic_endpoint_command_error) {
+    std::string input = "wrong_command udp GCS 127.0.0.1 9001 1";
+    dynamic_command cmd;
+    EXPECT_EQ(Mainloop::parse(input.c_str(), cmd), 0);  // -CMD
+    EXPECT_EQ(cmd.command, dynamic_command::unknown_command);
+}
+
+TEST(MainLoopParseTest, parse_add_dynamic_endpoint_protocol_error) {
+    std::string input = "add wrong_protocol GCS 127.0.0.1 9001 1";
+    dynamic_command cmd;
+    EXPECT_EQ(Mainloop::parse(input.c_str(), cmd), -1); // -PROTOCOL
+    EXPECT_EQ(cmd.protocol, dynamic_command::unknown_protocol);
+}
+
+TEST(MainLoopParseTest, parse_add_dynamic_endpoint_eavesdropping_error) {
+    std::string input = "add udp GCS 127.0.0.1 9001 10"; // eavesdropping should receive either 0 or 1
+    dynamic_command cmd;
+    EXPECT_EQ(Mainloop::parse(input.c_str(), cmd), -5); // -EAVESDROPPING
+    EXPECT_EQ(cmd.eavesdropping, false);
+}
