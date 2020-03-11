@@ -20,3 +20,7 @@ jobs:
         run: |
           ./autogen.sh && ./configure CFLAGS='-g -O2' --sysconfdir=/etc --localstatedir=/var --libdir=/usr/lib64 --prefix=/usr
           make -j`nproc --all`
+      - name: Run Mainloop Unit Tests
+        run: |
+          make mainloop_test
+          ./mainloop_test
