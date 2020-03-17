@@ -45,82 +45,21 @@ AM_CPPFLAGS = \
 
 AM_CFLAGS = \
 	-pipe \
-	-Wall \
-	-W \
-	-Wextra \
-	-Wno-inline \
-	-Wundef \
-	-Wformat=2 \
-	-Wlogical-op \
-	-Wsign-compare \
-	-Wformat-security \
-	-Wmissing-include-dirs \
-	-Wformat-nonliteral \
-	-Wold-style-definition \
-	-Wpointer-arith \
-	-Winit-self \
-	-Wdeclaration-after-statement \
-	-Wfloat-equal \
-	-Wmissing-prototypes \
-	-Wstrict-prototypes \
-	-Wredundant-decls \
-	-Wmissing-declarations \
-	-Wmissing-noreturn \
-	-Wshadow \
-	-Wendif-labels \
-	-Wstrict-aliasing=3 \
-	-Wwrite-strings \
-	-Wno-long-long \
-	-Wno-overlength-strings \
-	-Wno-unused-parameter \
-	-Wno-missing-field-initializers \
-	-Wno-unused-result \
-	-Wnested-externs \
-	-Wchar-subscripts \
-	-Wtype-limits \
-	-Wuninitialized \
 	-fno-common \
 	-fdiagnostics-show-option \
 	-fvisibility=hidden \
 	-ffunction-sections \
-	-fdata-sections
+	-fdata-sections \
+	$(OUR_CFLAGS)
 
 AM_CXXFLAGS = \
 	-pipe \
-	-Wall \
-	-W \
-	-Wextra \
-	-Wno-inline \
-	-Wundef \
-	-Wformat=2 \
-	-Wlogical-op \
-	-Wsign-compare \
-	-Wformat-security \
-	-Wmissing-include-dirs \
-	-Wformat-nonliteral \
-	-Wpointer-arith \
-	-Winit-self \
-	-Wfloat-equal \
-	-Wredundant-decls \
-	-Wmissing-declarations \
-	-Wmissing-noreturn \
-	-Wshadow \
-	-Wendif-labels \
-	-Wstrict-aliasing=3 \
-	-Wwrite-strings \
-	-Wno-long-long \
-	-Wno-overlength-strings \
-	-Wno-unused-parameter \
-	-Wno-missing-field-initializers \
-	-Wno-unused-result \
-	-Wchar-subscripts \
-	-Wtype-limits \
-	-Wuninitialized \
 	-fno-common \
 	-fdiagnostics-show-option \
 	-fvisibility=hidden \
 	-ffunction-sections \
-	-fdata-sections
+	-fdata-sections \
+	$(OUR_CXXFLAGS)
 
 AM_LDFLAGS = \
 	-Wl,--as-needed \

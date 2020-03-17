@@ -95,6 +95,81 @@ AM_CONDITIONAL(SYSTEMD, test "${enable_systemd}" != "no")
 # Default CFLAGS and LDFLAGS
 #####################################################################
 
+# Check C compiler flag
+AC_LANG_PUSH([C])
+CC_CHECK_FLAGS_APPEND(with_cflags, [CFLAGS], [ \
+	-Wall \
+	-W \
+	-Wextra \
+	-Wno-inline \
+	-Wundef \
+	-Wformat=2 \
+	-Wlogical-op \
+	-Wsign-compare \
+	-Wformat-security \
+	-Wmissing-include-dirs \
+	-Wformat-nonliteral \
+	-Wold-style-definition \
+	-Wpointer-arith \
+	-Winit-self \
+	-Wdeclaration-after-statement \
+	-Wfloat-equal \
+	-Wmissing-prototypes \
+	-Wstrict-prototypes \
+	-Wredundant-decls \
+	-Wmissing-declarations \
+	-Wmissing-noreturn \
+	-Wshadow \
+	-Wendif-labels \
+	-Wstrict-aliasing=3 \
+	-Wwrite-strings \
+	-Wno-long-long \
+	-Wno-overlength-strings \
+	-Wno-unused-parameter \
+	-Wno-missing-field-initializers \
+	-Wno-unused-result \
+	-Wnested-externs \
+	-Wchar-subscripts \
+	-Wtype-limits \
+	-Wuninitialized])
+AC_SUBST([OUR_CFLAGS], "$with_cflags")
+AC_LANG_POP([C])
+
+# Check C++ compiler flags
+AC_LANG_PUSH([C++])
+CC_CHECK_FLAGS_APPEND(with_cxxflags, [CXXFLAGS], [ \
+	-Wall \
+	-W \
+	-Wextra \
+	-Wno-inline \
+	-Wundef \
+	-Wformat=2 \
+	-Wlogical-op \
+	-Wsign-compare \
+	-Wformat-security \
+	-Wmissing-include-dirs \
+	-Wformat-nonliteral \
+	-Wpointer-arith \
+	-Winit-self \
+	-Wfloat-equal \
+	-Wredundant-decls \
+	-Wmissing-declarations \
+	-Wmissing-noreturn \
+	-Wshadow \
+	-Wendif-labels \
+	-Wstrict-aliasing=3 \
+	-Wwrite-strings \
+	-Wno-long-long \
+	-Wno-overlength-strings \
+	-Wno-unused-parameter \
+	-Wno-missing-field-initializers \
+	-Wno-unused-result \
+	-Wchar-subscripts \
+	-Wtype-limits \
+	-Wuninitialized])
+AC_LANG_POP([C++])
+AC_SUBST([OUR_CXXFLAGS], "$with_cxxflags")
+
 #####################################################################
 # Generate files from *.in
 #####################################################################
