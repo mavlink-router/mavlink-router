@@ -140,6 +140,7 @@ AC_LANG_PUSH([C++])
 CC_CHECK_FLAGS_APPEND(with_cxxflags, [CXXFLAGS], [ \
 	-Wall \
 	-W \
+	-Waddress-of-packed-member \
 	-Wextra \
 	-Wno-inline \
 	-Wundef \
@@ -168,6 +169,9 @@ CC_CHECK_FLAGS_APPEND(with_cxxflags, [CXXFLAGS], [ \
 	-Wtype-limits \
 	-Wuninitialized])
 AC_LANG_POP([C++])
+
+AS_VAR_IF([cc_cv_CXXFLAGS__Waddress_of_packed_member], [yes],
+	  [with_cxxflags="$with_cxxflags -DHAVE_WADDRESS_OF_PACKED_MEMBER"])
 AC_SUBST([OUR_CXXFLAGS], "$with_cxxflags")
 
 #####################################################################
