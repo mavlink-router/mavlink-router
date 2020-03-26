@@ -1,3 +1,34 @@
+mavlink-router 2
+================
+    - Misc bug fixes on handling error handling paths and general cleanups
+    - Log file is now changed to read-only when we are not saving flight stack
+      log anymore
+    - New "LogMode" configuration to allow logging only when armed
+    - MavlinkDialect now defaults to "auto": we set it based on the flight stack:
+      either ArduPilot or PX4
+    - Fix logging from vehicles with systemd ID not equal 1. We will now get the
+      system ID from the first message heartbeat received with MAV_COMP_ID_AUTOPILOT1
+      component ID
+    - Gracefully handle restarts, to reuse the same IP/port.
+    - Gracefully handle errors when the UART device disappears (e.g. when disconnecting
+      a USB-serial dongle)
+    - Make mavlink-router compatible with musl libc
+    - Tweak USB-serial configuration to ask Linux to reduce the latency
+    - Add "Filter" configuration to endpoints: this allows endpoints to declare interest
+      in only a subset of messages by specifying the message IDs. This allows reducing the
+      the link traffic and thus mixing for e.g. low bandwidth links in a high bandwith
+      network
+    - We now plunge a background sync() call every 1 second when logging to avoid losing
+      log data - default OS configuration in Linux is 30 seconds.
+    - Always check CRC of the messages arriving independently of the link (UDP vs UART).
+      Previously we would skip checking on UDP because the network layer guarantees we
+      aren't receiving garbage and it's expected to have 1 message per packet. However
+      we don't enforce the 1 message per packet and the source of the message
+      could be unintentionally sending garbage when, for example it relays
+      messages from other lossy links.
+    - New MinFreeSpace and MaxLogFiles configuration to control logging maximum size
+      and rotation
+
 mavlink-router 1
 ================
 

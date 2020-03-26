@@ -1,6 +1,6 @@
 AC_PREREQ(2.64)
 AC_INIT([mavlink-router],
-	[1],
+	[2],
 	[],
 	[mavlink-router],
 	[https://github.com/01org/mavlink-router])
