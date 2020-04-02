@@ -148,8 +148,8 @@ int ULog::write_msg(const struct buffer *buffer)
         return buffer->len;
     }
 
-    if (payload_len > msg_entry->msg_len) {
-        payload_len = msg_entry->msg_len;
+    if (payload_len > msg_entry->max_msg_len) {
+        payload_len = msg_entry->max_msg_len;
     }
 
     if (mavlink2) {
