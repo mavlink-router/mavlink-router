@@ -333,7 +333,7 @@ bool Endpoint::accept_msg(int target_sysid, int target_compid, uint8_t src_sysid
         return false;
     }
 
-    // Message is broadcast on sysid: accept msg
+    // Message is broadcast on sysid or sysid is non-existent: accept msg
     if (target_sysid == 0 || target_sysid == -1)
         return true;
 
@@ -341,8 +341,8 @@ bool Endpoint::accept_msg(int target_sysid, int target_compid, uint8_t src_sysid
     if (target_compid > 0 && has_sys_comp_id(target_sysid, target_compid))
         return true;
 
-    // This endpoint has the target of message (sysid, but compid is broadcast): accept
-    if (has_sys_id(target_sysid))
+    // This endpoint has the target of message (sysid, but compid is broadcast or non-existent): accept
+    if ((target_compid == 0 || target_compid == -1) && has_sys_id(target_sysid))
         return true;
 
     // Reject everything else
