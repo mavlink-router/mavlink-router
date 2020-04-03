@@ -27,4 +27,4 @@ mav.wait_heartbeat()
 while True:
     m = mav.recv_match(type='HEARTBEAT', blocking=True)
     if m is not None:
-        print(m)
+        print('%3d %3d ' % (m.get_srcSystem(),m.get_srcComponent()), m)
