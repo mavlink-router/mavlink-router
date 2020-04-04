@@ -312,10 +312,9 @@ bool Endpoint::accept_msg(int target_sysid, int target_compid, uint8_t src_sysid
                           uint8_t src_compid, uint32_t msg_id)
 {
     if (Log::get_max_level() >= Log::Level::DEBUG) {
-        log_debug("Endpoint [%d] got message to %d/%d from %u/%u", fd, target_sysid, target_compid,
         log_debug("Endpoint [%d] got message %u to %d/%d from %u/%u", fd, msg_id, target_sysid, target_compid,
                   src_sysid, src_compid);
-        log_debug("\tKnown endpoints:");
+        log_debug("\tKnown components:");
         for (auto it = _sys_comp_ids.begin(); it != _sys_comp_ids.end(); it++) {
             log_debug("\t\t%u/%u", (*it >> 8), *it & 0xff);
         }
