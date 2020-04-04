@@ -144,7 +144,7 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid
 
     for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
         if ((*e)->accept_msg(target_sysid, target_compid, sender_sysid, sender_compid, msg_id)) {
-            log_debug("Endpoint [%d] accepted message to %d/%d from %u/%u", (*e)->fd, target_sysid,
+            log_debug("Endpoint [%d] accepted message %u to %d/%d from %u/%u", (*e)->fd, msg_id, target_sysid,
                       target_compid, sender_sysid, sender_compid);
             write_msg(*e, buf);
             unknown = false;
@@ -153,7 +153,7 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid
 
     for (struct endpoint_entry *e = g_tcp_endpoints; e; e = e->next) {
         if (e->endpoint->accept_msg(target_sysid, target_compid, sender_sysid, sender_compid, msg_id)) {
-            log_debug("Endpoint [%d] accepted message to %d/%d from %u/%u", e->endpoint->fd,
+            log_debug("Endpoint [%d] accepted message %u to %d/%d from %u/%u", e->endpoint->fd, msg_id,
                       target_sysid, target_compid, sender_sysid, sender_compid);
             int r = write_msg(e->endpoint, buf);
             if (r == -EPIPE) {
@@ -165,7 +165,7 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid
 
     if (unknown) {
         _errors_aggregate.msg_to_unknown++;
-        log_debug("Message to unknown sysid/compid: %u/%u", target_sysid, target_compid);
+        log_debug("Message %u to unknown sysid/compid: %u/%u", msg_id, target_sysid, target_compid);
     }
 }
 
