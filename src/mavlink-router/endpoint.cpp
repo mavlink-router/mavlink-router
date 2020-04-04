@@ -120,7 +120,7 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
         if (r <= 0)
             return r;
 
-        log_debug("%s: Got %zd bytes [%d]", _name, r, fd);
+        log_debug("%s [%d] got %zd bytes", _name, fd, r);
         rx_buf.len += r;
     }
 
