@@ -644,7 +644,7 @@ int UartEndpoint::write_msg(const struct buffer *pbuf)
         log_debug("Discarding packet, incomplete write %zd but len=%u", r, pbuf->len);
     }
 
-    log_debug("UART: [%d] wrote %zd bytes", fd, r);
+    log_debug("UART [%d] wrote %zd bytes", fd, r);
 
     return r;
 }
@@ -762,7 +762,7 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
         log_debug("Discarding packet, incomplete write %zd but len=%u", r, pbuf->len);
     }
 
-    log_debug("UDP: [%d] wrote %zd bytes", fd, r);
+    log_debug("UDP [%d] wrote %zd bytes", fd, r);
 
     return r;
 }
@@ -884,7 +884,7 @@ int TcpEndpoint::write_msg(const struct buffer *pbuf)
         log_debug("Discarding packet, incomplete write %zd but len=%u", r, pbuf->len);
     }
 
-    log_debug("TCP: [%d] wrote %zd bytes", fd, r);
+    log_debug("TCP [%d] wrote %zd bytes", fd, r);
 
     return r;
 }
