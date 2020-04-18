@@ -19,6 +19,7 @@
 
 #include <common/mavlink.h>
 
+#include <chrono>
 #include <memory>
 #include <vector>
 
@@ -75,7 +76,7 @@ public:
         ReadUnkownMsg,
     };
 
-    Endpoint(const char *name);
+    Endpoint(const std::string& name);
     virtual ~Endpoint();
 
     int handle_read() override;
@@ -118,15 +119,17 @@ protected:
     bool _check_crc(const mavlink_msg_entry_t *msg_entry);
     void _add_sys_comp_id(uint16_t sys_comp_id);
 
-    const char *_name;
+    std::string _name;
     size_t _last_packet_len = 0;
 
     // Statistics
     struct {
+        std::chrono::steady_clock::time_point last_ts = std::chrono::steady_clock::now();
         struct {
             uint64_t crc_error_bytes = 0;
             uint64_t handled_bytes = 0;
             uint32_t total = 0; // handled + crc error + seq lost
+            uint32_t last_bytes = 0;
             uint32_t crc_error = 0;
             uint32_t handled = 0;
             uint32_t drop_seq_total = 0;
@@ -135,6 +138,7 @@ protected:
         struct {
             uint64_t bytes = 0;
             uint32_t total = 0;
+            uint32_t last_bytes = 0;
         } write;
     } _stat;
 
@@ -177,7 +181,8 @@ private:
 
 class UdpEndpoint : public Endpoint {
 public:
-    UdpEndpoint();
+    UdpEndpoint(const std::string& name = "UDP");
+
     ~UdpEndpoint() override;
 
     int write_msg(const struct buffer *pbuf) override;

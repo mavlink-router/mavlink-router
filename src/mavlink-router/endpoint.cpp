@@ -44,7 +44,7 @@
 
 #define UART_BAUD_RETRY_SEC 5
 
-Endpoint::Endpoint(const char *name)
+Endpoint::Endpoint(const std::string& name)
     : _name{name}
 {
     rx_buf.data = (uint8_t *) malloc(RX_BUF_MAX_SIZE);
@@ -121,7 +121,7 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
         if (r <= 0)
             return r;
 
-        log_debug("%s: Got %zd bytes [%d]", _name, r, fd);
+        log_debug("%s: Got %zd bytes [%d]", _name.c_str(), r, fd);
         rx_buf.len += r;
     }
 
@@ -399,20 +399,25 @@ bool Endpoint::_check_crc(const mavlink_msg_entry_t *msg_entry)
 void Endpoint::print_statistics()
 {
     const uint32_t read_total = _stat.read.total == 0 ? 1 : _stat.read.total;
+    auto now = std::chrono::steady_clock::now();
+    int64_t time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - _stat.last_ts).count();
+    _stat.last_ts = now;
 
-    printf("Endpoint %s [%d] {", _name, fd);
-    printf("\n\tReceived messages {");
-    printf("\n\t\tCRC error: %u %u%% %luKBytes", _stat.read.crc_error,
+    printf("EP %s [%d] {", _name.c_str(), fd);
+    printf("RX {");
+    printf("CRC err: %u %u%% %luKB", _stat.read.crc_error,
            (_stat.read.crc_error * 100) / read_total, _stat.read.crc_error_bytes / 1000);
-    printf("\n\t\tSequence lost: %u %u%%", _stat.read.drop_seq_total,
+    printf(" Seq lost: %u %u%%", _stat.read.drop_seq_total,
            (_stat.read.drop_seq_total * 100) / read_total);
-    printf("\n\t\tHandled: %u %luKBytes", _stat.read.handled, _stat.read.handled_bytes / 1000);
-    printf("\n\t\tTotal: %u", _stat.read.total);
-    printf("\n\t}");
-    printf("\n\tTransmitted messages {");
-    printf("\n\t\tTotal: %u %luKBytes", _stat.write.total, _stat.write.bytes / 1000);
-    printf("\n\t}");
-    printf("\n}\n");
+    printf(" Handled: %u %luKbps", _stat.read.handled, (_stat.read.handled_bytes - _stat.read.last_bytes) * 8 / time_ms);
+    printf(" Total: %u", _stat.read.total);
+    printf("}");
+    printf(" TX {");
+    printf("Total: %u %luKbps", _stat.write.total, (_stat.write.bytes - _stat.write.last_bytes) * 8 / time_ms);
+    printf("}}\n");
+
+    _stat.read.last_bytes = _stat.read.handled_bytes;
+    _stat.write.last_bytes = _stat.write.bytes;
 }
 
 uint8_t Endpoint::get_trimmed_zeros(const mavlink_msg_entry_t *msg_entry, const struct buffer *buffer)
@@ -434,7 +439,7 @@ uint8_t Endpoint::get_trimmed_zeros(const mavlink_msg_entry_t *msg_entry, const 
 void Endpoint::log_aggregate(unsigned int interval_sec)
 {
     if (_incomplete_msgs > 0) {
-        log_warning("Endpoint %s [%d]: %u incomplete messages in the last %d seconds", _name, fd,
+        log_warning("Endpoint %s [%d]: %u incomplete messages in the last %d seconds", _name.c_str(), fd,
                     _incomplete_msgs, interval_sec);
         _incomplete_msgs = 0;
     }
@@ -459,7 +464,6 @@ void Endpoint::start_expire_timer()
 
 void Endpoint::reset_expire_timer()
 {
-    log_info("Resetting dynamic endpoint timer");
     Mainloop::get_instance().set_timeout(_expire_timer, expire_timeout);
 }
 
@@ -712,8 +716,8 @@ int UartEndpoint::add_speeds(std::vector<unsigned long> bauds)
     return 0;
 }
 
-UdpEndpoint::UdpEndpoint()
-    : Endpoint{"UDP"},
+UdpEndpoint::UdpEndpoint(const std::string& name)
+    : Endpoint{name},
     _write_scheduled(false),
     _max_packet_size(0),
     _max_timeout_ms(0)

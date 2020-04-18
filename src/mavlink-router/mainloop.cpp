@@ -442,7 +442,7 @@ bool Mainloop::add_dynamic_endpoint(const dynamic_command& command)
         }
     }
 
-    std::unique_ptr<UdpEndpoint> endpoint{new UdpEndpoint()};
+    std::unique_ptr<UdpEndpoint> endpoint{new UdpEndpoint(command.name)};
     if (!endpoint) {
         return false;
     }
@@ -456,12 +456,8 @@ bool Mainloop::add_dynamic_endpoint(const dynamic_command& command)
         endpoint->add_message_to_nodelay(id);
     }
 
+    remove_dynamic_endpoint(command);
     log_info("Adding dynamic endpoint: %s - coalesce %d bytes %d ms", command.name.c_str(), command.coalesce_bytes, command.coalesce_ms);
-    auto ep = _dynamic_endpoints.find(command.name);
-    if (ep != _dynamic_endpoints.end()) {
-        remove_fd(ep->second->fd);
-        delete ep->second;
-    }
     _pipe_commands[command.name] = command.command;
     add_fd(endpoint->fd, endpoint.get(), EPOLLIN);
     _dynamic_endpoints[command.name] = endpoint.get();
