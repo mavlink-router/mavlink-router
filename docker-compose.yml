@@ -1,0 +1,13 @@
+version: "3"
+
+services:
+  mavlink_router:
+    image: mavlink_router:latest
+    # privileged: true # for uart device connection
+    # volumes: 
+    # - "/dev:/dev" # may be replaced with device share
+    environment:
+    - UART_DEVICE=/dev/ttyS4 # uart device name
+    - UART_BAUDRATE=921600 # uart device port
+    - UDP_OUT_IP=<dest ip>
+    - UDP_OUT_PORT=<dest port>
