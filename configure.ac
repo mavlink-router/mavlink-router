@@ -34,6 +34,8 @@ LT_INIT([disable-static pic-only])
 # Function and structure checks
 #####################################################################
 
+AC_CHECK_DECLS([aio_init], [], [], [#include <aio.h>])
+
 AC_MSG_CHECKING([whether _Static_assert() is supported])
 AC_COMPILE_IFELSE(
 	[AC_LANG_SOURCE([[_Static_assert(1, "Test");]])],

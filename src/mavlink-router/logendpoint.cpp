@@ -55,11 +55,13 @@ LogEndpoint::LogEndpoint(const char *name, const char *logs_dir, LogMode mode,
     _add_sys_comp_id(LOG_ENDPOINT_SYSTEM_ID << 8);
     _fsync_cb.aio_fildes = -1;
 
+#if HAVE_DECL_AIO_INIT
     aioinit aio_init_data {};
     aio_init_data.aio_threads = 1;
     aio_init_data.aio_num = 1;
     aio_init_data.aio_idle_time = 3; // make sure to keep the thread running
     aio_init(&aio_init_data);
+#endif
 }
 
 void LogEndpoint::_send_msg(const mavlink_message_t *msg, int target_sysid)
