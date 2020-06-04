@@ -1,0 +1,43 @@
+name: Build and Test
+
+on:
+  push:
+    branches:
+    - 'master'
+    tags:
+    - 'v*'
+  pull_request:
+    branches:
+    - '*'
+
+jobs:
+  ubuntu:
+    name: ubuntu (latest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: recursive
+      - name: install tools
+        run: sudo apt-get install -y python3-pip python3-setuptools && pip3 install future pymavlink
+      - name: configure
+        run: ./autogen.sh c --with-systemdsystemunitdir=/usr/lib/systemd/system
+      - name: build
+        run: make -j
+      - name: test
+        run: make check PYTHON=python3
+
+  alpine-linux:
+    name: alpine 3.11.6 (musl)
+    runs-on: ubuntu-18.04
+    container: alpine:3.11.6
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: recursive
+      - name: install tools
+        run: apk update && apk add autoconf automake build-base git libtool linux-headers openssl-dev perl-extutils-pkgconfig python3 && pip3 install future
+      - name: configure
+        run: ./autogen.sh && ./configure CFLAGS='-g -O2' --sysconfdir=/etc --localstatedir=/var --libdir=/usr/lib --disable-systemd --prefix=/usr
+      - name: build
+        run: make
