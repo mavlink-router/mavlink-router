@@ -282,8 +282,8 @@ void Mainloop::loop()
             Pollable *p = static_cast<Pollable *>(events[i].data.ptr);
 
             if (events[i].events & EPOLLIN) {
-                r = p->handle_read();
-                if (r < 0 && !p->is_valid()) {
+              int rd = p->handle_read();
+                if (rd < 0 && !p->is_valid()) {
                     // Only TcpEndpoint may become invalid after a read
                     should_process_tcp_hangups = true;
                 }
