@@ -1,0 +1,13 @@
+Source: mavlink-router
+Section: unknown
+Priority: optional
+Maintainer: Helge Bahmann <helge@auterion.com>
+Build-Depends: debhelper (>= 11)
+Standards-Version: 4.1.3
+Homepage: https://github.com/Auterion/mavlink-router
+
+Package: mavlink-router
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Mavlink router
+ Mavlink router
