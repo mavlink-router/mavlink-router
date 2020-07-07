@@ -5,6 +5,7 @@ Description=MAVLink Router
 Type=simple
 ExecStart=@BINDIR@/mavlink-routerd --syslog
 Restart=on-failure
+Nice=-20
 
 [Install]
 WantedBy=multi-user.target
