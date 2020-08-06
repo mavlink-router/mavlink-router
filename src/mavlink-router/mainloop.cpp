@@ -23,6 +23,7 @@
 #include <sys/timerfd.h>
 #include <unistd.h>
 
+#include <atomic>
 #include <memory>
 
 #include <common/log.h>
@@ -30,14 +31,14 @@
 
 #include "autolog.h"
 
-static volatile bool should_exit = false;
+static std::atomic<bool> should_exit {false};
 
 Mainloop Mainloop::_instance{};
 bool Mainloop::_initialized = false;
 
 static void exit_signal_handler(int signum)
 {
-    should_exit = true;
+    Mainloop::request_exit();
 }
 
 static void setup_signal_handlers()
@@ -60,6 +61,11 @@ Mainloop &Mainloop::init()
     _initialized = true;
 
     return _instance;
+}
+
+void Mainloop::request_exit()
+{
+    should_exit.store(true, std::memory_order_relaxed);
 }
 
 int Mainloop::open()
@@ -138,7 +144,7 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid
 
     for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
         if ((*e)->accept_msg(target_sysid, target_compid, sender_sysid, sender_compid, msg_id)) {
-            log_debug("Endpoint [%d] accepted message to %d/%d from %u/%u", (*e)->fd, target_sysid,
+            log_debug("Endpoint [%d] accepted message %u to %d/%d from %u/%u", (*e)->fd, msg_id, target_sysid,
                       target_compid, sender_sysid, sender_compid);
             write_msg(*e, buf);
             unknown = false;
@@ -147,7 +153,7 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid
 
     for (struct endpoint_entry *e = g_tcp_endpoints; e; e = e->next) {
         if (e->endpoint->accept_msg(target_sysid, target_compid, sender_sysid, sender_compid, msg_id)) {
-            log_debug("Endpoint [%d] accepted message to %d/%d from %u/%u", e->endpoint->fd,
+            log_debug("Endpoint [%d] accepted message %u to %d/%d from %u/%u", e->endpoint->fd, msg_id,
                       target_sysid, target_compid, sender_sysid, sender_compid);
             int r = write_msg(e->endpoint, buf);
             if (r == -EPIPE) {
@@ -159,7 +165,7 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid
 
     if (unknown) {
         _errors_aggregate.msg_to_unknown++;
-        log_debug("Message to unknown sysid/compid: %u/%u", target_sysid, target_compid);
+        log_debug("Message %u to unknown sysid/compid: %u/%u", msg_id, target_sysid, target_compid);
     }
 }
 
@@ -261,7 +267,7 @@ void Mainloop::loop()
     add_timeout(LOG_AGGREGATE_INTERVAL_SEC * MSEC_PER_SEC,
                 std::bind(&Mainloop::_log_aggregate_timeout, this, std::placeholders::_1), this);
 
-    while (!should_exit) {
+    while (!should_exit.load(std::memory_order_relaxed)) {
         int i;
 
         r = epoll_wait(epollfd, events, max_events, -1);
@@ -276,8 +282,8 @@ void Mainloop::loop()
             Pollable *p = static_cast<Pollable *>(events[i].data.ptr);
 
             if (events[i].events & EPOLLIN) {
-                r = p->handle_read();
-                if (r < 0 && !p->is_valid()) {
+              int rd = p->handle_read();
+                if (rd < 0 && !p->is_valid()) {
                     // Only TcpEndpoint may become invalid after a read
                     should_process_tcp_hangups = true;
                 }
@@ -293,7 +299,7 @@ void Mainloop::loop()
                 remove_fd(p->fd);
                 // make poll errors fatal so that an external component can
                 // restart mavlink-router
-                should_exit = true;
+                request_exit();
             }
         }
 
@@ -324,8 +330,10 @@ bool Mainloop::_log_aggregate_timeout(void *data)
         _errors_aggregate.msg_to_unknown = 0;
     }
 
-    for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
-        (*e)->log_aggregate(LOG_AGGREGATE_INTERVAL_SEC);
+    if (g_endpoints) {
+        for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
+            (*e)->log_aggregate(LOG_AGGREGATE_INTERVAL_SEC);
+        }
     }
 
     for (auto *t = g_tcp_endpoints; t; t = t->next) {

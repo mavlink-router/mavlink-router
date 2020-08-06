@@ -148,8 +148,8 @@ int ULog::write_msg(const struct buffer *buffer)
         return buffer->len;
     }
 
-    if (payload_len > msg_entry->msg_len) {
-        payload_len = msg_entry->msg_len;
+    if (payload_len > msg_entry->max_msg_len) {
+        payload_len = msg_entry->max_msg_len;
     }
 
     if (mavlink2) {
@@ -191,7 +191,6 @@ int ULog::write_msg(const struct buffer *buffer)
         mavlink_msg_logging_ack_encode(LOG_ENDPOINT_SYSTEM_ID, MAV_COMP_ID_ALL, &msg, &ack);
         _send_msg(&msg, _target_system_id);
         /* message will be handled by MAVLINK_MSG_ID_LOGGING_DATA case */
-        /* fall through */
     }
     case MAVLINK_MSG_ID_LOGGING_DATA: {
         if (trimmed_zeros) {

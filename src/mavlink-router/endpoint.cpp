@@ -120,7 +120,7 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
         if (r <= 0)
             return r;
 
-        log_debug("%s: Got %zd bytes [%d]", _name, r, fd);
+        log_debug("%s [%d] got %zd bytes", _name, fd, r);
         rx_buf.len += r;
     }
 
@@ -312,9 +312,9 @@ bool Endpoint::accept_msg(int target_sysid, int target_compid, uint8_t src_sysid
                           uint8_t src_compid, uint32_t msg_id)
 {
     if (Log::get_max_level() >= Log::Level::DEBUG) {
-        log_debug("Endpoint [%d] got message to %d/%d from %u/%u", fd, target_sysid, target_compid,
+        log_debug("Endpoint [%d] got message %u to %d/%d from %u/%u", fd, msg_id, target_sysid, target_compid,
                   src_sysid, src_compid);
-        log_debug("\tKnown endpoints:");
+        log_debug("\tKnown components:");
         for (auto it = _sys_comp_ids.begin(); it != _sys_comp_ids.end(); it++) {
             log_debug("\t\t%u/%u", (*it >> 8), *it & 0xff);
         }
@@ -333,7 +333,7 @@ bool Endpoint::accept_msg(int target_sysid, int target_compid, uint8_t src_sysid
         return false;
     }
 
-    // Message is broadcast on sysid: accept msg
+    // Message is broadcast on sysid or sysid is non-existent: accept msg
     if (target_sysid == 0 || target_sysid == -1)
         return true;
 
@@ -341,8 +341,8 @@ bool Endpoint::accept_msg(int target_sysid, int target_compid, uint8_t src_sysid
     if (target_compid > 0 && has_sys_comp_id(target_sysid, target_compid))
         return true;
 
-    // This endpoint has the target of message (sysid, but compid is broadcast): accept
-    if (has_sys_id(target_sysid))
+    // This endpoint has the target of message (sysid, but compid is broadcast or non-existent): accept
+    if ((target_compid == 0 || target_compid == -1) && has_sys_id(target_sysid))
         return true;
 
     // Reject everything else
@@ -408,10 +408,10 @@ uint8_t Endpoint::get_trimmed_zeros(const mavlink_msg_entry_t *msg_entry, const 
         return 0;
 
     /* Should never happen but if happens it will cause stack overflow */
-    if (msg->payload_len > msg_entry->msg_len)
+    if (msg->payload_len > msg_entry->max_msg_len)
         return 0;
 
-    return msg_entry->msg_len - msg->payload_len;
+    return msg_entry->max_msg_len - msg->payload_len;
 }
 
 void Endpoint::log_aggregate(unsigned int interval_sec)
@@ -497,8 +497,6 @@ int UartEndpoint::set_flow_control(bool enabled)
 int UartEndpoint::open(const char *path)
 {
     struct termios2 tc;
-    const int bit_dtr = TIOCM_DTR;
-    const int bit_rts = TIOCM_RTS;
 
     fd = ::open(path, O_RDWR|O_NONBLOCK|O_CLOEXEC|O_NOCTTY);
     if (fd < 0) {
@@ -569,14 +567,6 @@ int UartEndpoint::open(const char *path)
     }
 
 set_latency_failed:
-
-    /* set DTR/RTS */
-    if (ioctl(fd, TIOCMBIS, &bit_dtr) == -1 ||
-        ioctl(fd, TIOCMBIS, &bit_rts) == -1) {
-        log_error("Could not set DTR/RTS (%m)");
-        goto fail;
-    }
-
     if (ioctl(fd, TCFLSH, TCIOFLUSH) == -1) {
         log_error("Could not flush terminal (%m)");
         goto fail;
@@ -653,7 +643,7 @@ int UartEndpoint::write_msg(const struct buffer *pbuf)
         log_debug("Discarding packet, incomplete write %zd but len=%u", r, pbuf->len);
     }
 
-    log_debug("UART: [%d] wrote %zd bytes", fd, r);
+    log_debug("UART [%d] wrote %zd bytes", fd, r);
 
     return r;
 }
@@ -771,7 +761,7 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
         log_debug("Discarding packet, incomplete write %zd but len=%u", r, pbuf->len);
     }
 
-    log_debug("UDP: [%d] wrote %zd bytes", fd, r);
+    log_debug("UDP [%d] wrote %zd bytes", fd, r);
 
     return r;
 }
@@ -893,7 +883,7 @@ int TcpEndpoint::write_msg(const struct buffer *pbuf)
         log_debug("Discarding packet, incomplete write %zd but len=%u", r, pbuf->len);
     }
 
-    log_debug("TCP: [%d] wrote %zd bytes", fd, r);
+    log_debug("TCP [%d] wrote %zd bytes", fd, r);
 
     return r;
 }

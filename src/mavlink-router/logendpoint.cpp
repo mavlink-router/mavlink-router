@@ -22,7 +22,6 @@
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 #include <sys/types.h>
@@ -32,6 +31,7 @@
 #include <algorithm>
 #include <map>
 #include <memory>
+#include <string>
 #include <tuple>
 #include <vector>
 
@@ -55,11 +55,13 @@ LogEndpoint::LogEndpoint(const char *name, const char *logs_dir, LogMode mode,
     _add_sys_comp_id(LOG_ENDPOINT_SYSTEM_ID << 8);
     _fsync_cb.aio_fildes = -1;
 
+#if HAVE_DECL_AIO_INIT
     aioinit aio_init_data {};
     aio_init_data.aio_threads = 1;
     aio_init_data.aio_num = 1;
     aio_init_data.aio_idle_time = 3; // make sure to keep the thread running
     aio_init(&aio_init_data);
+#endif
 }
 
 void LogEndpoint::_send_msg(const mavlink_message_t *msg, int target_sysid)
@@ -171,12 +173,12 @@ void LogEndpoint::_delete_old_logs()
     }
 
     // If the configured value for _min_free_space is 0, then we don't have to do anything special.
-    uint64_t bytes_to_delete = _min_free_space - free_space;
+    int64_t bytes_to_delete = _min_free_space - free_space;
     // If the configured value for _max_files is 0, then set this to -1 to indicate that we've
     // already deleted enough files.
-    uint64_t files_to_delete = _max_files > 0 ? file_map.size() - _max_files : -1;
+    ssize_t files_to_delete = _max_files > 0 ? (ssize_t)file_map.size() - _max_files : -1;
 
-    log_debug("[Log Deletion] Files to delete: %ld", files_to_delete);
+    log_debug("[Log Deletion] Files to delete: %zd", files_to_delete);
 
     // Delete the logs in order until there's enough free space, and few enough files
     // It is possible for this loop to run only once and return immediately, if we don't actually

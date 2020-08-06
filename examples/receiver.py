@@ -17,7 +17,6 @@
 # limitations under the License.
 
 from __future__ import print_function
-from __future__ import print_function
 
 import pymavlink.mavutil as mavutil
 import sys

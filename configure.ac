@@ -1,6 +1,6 @@
 AC_PREREQ(2.64)
 AC_INIT([mavlink-router],
-	[1],
+	[2],
 	[],
 	[mavlink-router],
 	[https://github.com/01org/mavlink-router])
@@ -34,6 +34,8 @@ LT_INIT([disable-static pic-only])
 # Function and structure checks
 #####################################################################
 
+AC_CHECK_DECLS([aio_init], [], [], [#include <aio.h>])
+
 AC_MSG_CHECKING([whether _Static_assert() is supported])
 AC_COMPILE_IFELSE(
 	[AC_LANG_SOURCE([[_Static_assert(1, "Test");]])],
@@ -48,6 +50,18 @@ AC_COMPILE_IFELSE(
 	 AC_MSG_RESULT([yes])],
 	[AC_MSG_RESULT([no])])
 
+PKG_CHECK_MODULES([GTEST], [gtest_main], [HAVE_GTEST=true], [
+	# Fallback to try linking it directly (required on some installations).
+	# This assumes that having "gtest_main" implies we also have "gtest"
+	# which seems reasonable.
+	AC_CHECK_LIB(
+		[gtest_main], [main], 
+		[HAVE_GTEST=true] [GTEST_LIBS="-lgtest_main -lgtest"], 
+		[HAVE_GTEST=false]) 
+])
+AM_CONDITIONAL([HAVE_GTEST], [test x$HAVE_GTEST = xtrue])
+AC_SUBST([GTEST_LIBS])
+AC_SUBST([GTEST_CFLAGS])
 
 #####################################################################
 # --with-
@@ -82,6 +96,85 @@ AM_CONDITIONAL(SYSTEMD, test "${enable_systemd}" != "no")
 #####################################################################
 # Default CFLAGS and LDFLAGS
 #####################################################################
+
+# Check C compiler flag
+AC_LANG_PUSH([C])
+CC_CHECK_FLAGS_APPEND(with_cflags, [CFLAGS], [ \
+	-Wall \
+	-W \
+	-Wextra \
+	-Wno-inline \
+	-Wundef \
+	-Wformat=2 \
+	-Wlogical-op \
+	-Wsign-compare \
+	-Wformat-security \
+	-Wmissing-include-dirs \
+	-Wformat-nonliteral \
+	-Wold-style-definition \
+	-Wpointer-arith \
+	-Winit-self \
+	-Wdeclaration-after-statement \
+	-Wfloat-equal \
+	-Wmissing-prototypes \
+	-Wstrict-prototypes \
+	-Wredundant-decls \
+	-Wmissing-declarations \
+	-Wmissing-noreturn \
+	-Wshadow \
+	-Wendif-labels \
+	-Wstrict-aliasing=3 \
+	-Wwrite-strings \
+	-Wno-long-long \
+	-Wno-overlength-strings \
+	-Wno-unused-parameter \
+	-Wno-missing-field-initializers \
+	-Wno-unused-result \
+	-Wnested-externs \
+	-Wchar-subscripts \
+	-Wtype-limits \
+	-Wuninitialized])
+AC_SUBST([OUR_CFLAGS], "$with_cflags")
+AC_LANG_POP([C])
+
+# Check C++ compiler flags
+AC_LANG_PUSH([C++])
+CC_CHECK_FLAGS_APPEND(with_cxxflags, [CXXFLAGS], [ \
+	-Wall \
+	-W \
+	-Waddress-of-packed-member \
+	-Wextra \
+	-Wno-inline \
+	-Wundef \
+	-Wformat=2 \
+	-Wlogical-op \
+	-Wsign-compare \
+	-Wformat-security \
+	-Wmissing-include-dirs \
+	-Wformat-nonliteral \
+	-Wpointer-arith \
+	-Winit-self \
+	-Wfloat-equal \
+	-Wredundant-decls \
+	-Wmissing-declarations \
+	-Wmissing-noreturn \
+	-Wshadow \
+	-Wendif-labels \
+	-Wstrict-aliasing=3 \
+	-Wwrite-strings \
+	-Wno-long-long \
+	-Wno-overlength-strings \
+	-Wno-unused-parameter \
+	-Wno-missing-field-initializers \
+	-Wno-unused-result \
+	-Wchar-subscripts \
+	-Wtype-limits \
+	-Wuninitialized])
+AC_LANG_POP([C++])
+
+AS_VAR_IF([cc_cv_CXXFLAGS__Waddress_of_packed_member], [yes],
+	  [with_cxxflags="$with_cxxflags -DHAVE_WADDRESS_OF_PACKED_MEMBER"])
+AC_SUBST([OUR_CXXFLAGS], "$with_cxxflags")
 
 #####################################################################
 # Generate files from *.in
