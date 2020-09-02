@@ -101,7 +101,7 @@
 #
 #   Port:
 #       Numeric value with port to which mavlink-router will connect to.
-#       No dafault value. Must be defined.
+#       No default value. Must be defined.
 #
 #   RetryTimeout:
 #       Numeric value defining how many seconds mavlink-router should wait

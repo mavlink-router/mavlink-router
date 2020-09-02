@@ -23,6 +23,8 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <sys/stat.h>
+#include <string>
+#include <regex>
 
 #include <common/conf_file.h>
 #include <common/dbg.h>
@@ -130,6 +132,19 @@ static int split_on_colon(const char *str, char **base, unsigned long *number)
             free(*base);
             return -EINVAL;
         }
+    }
+
+    return 0;
+}
+
+static int validate_ip(const char* ip)
+{
+    std::string ip_addr(ip);
+
+    std::regex ipv4_regex("(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})");
+
+    if (!std::regex_match(ip_addr, ipv4_regex)) {
+        return -EINVAL;
     }
 
     return 0;
@@ -411,6 +426,11 @@ static int parse_argv(int argc, char *argv[])
                 help(stderr);
                 return -EINVAL;
             }
+            if (validate_ip(ip) < 0) {
+                log_error("Invalid IP address in argument: %s", optarg);
+                help(stderr);
+                return -EINVAL;
+            }
 
             add_endpoint_address(NULL, 0, ip, port, false, NULL);
             free(ip);
@@ -461,6 +481,11 @@ static int parse_argv(int argc, char *argv[])
                 help(stderr);
                 return -EINVAL;
             }
+            if (validate_ip(ip) < 0) {
+                log_error("Invalid IP address in argument: %s", optarg);
+                help(stderr);
+                return -EINVAL;
+            }
 
             add_tcp_endpoint_address(NULL, 0, ip, port, DEFAULT_RETRY_TCP_TIMEOUT);
             free(ip);
@@ -495,6 +520,11 @@ static int parse_argv(int argc, char *argv[])
                 log_error("Invalid argument for UDP port = %s", argv[optind]);
                 help(stderr);
                 free(base);
+                return -EINVAL;
+            }
+            if (validate_ip(base) < 0) {
+                log_error("Invalid IP address in argument: %s", argv[optind]);
+                help(stderr);
                 return -EINVAL;
             }
 
@@ -735,8 +765,13 @@ static int parse_confs(ConfFile &conf)
                 log_error("Expected 'port' key for section %.*s", (int)iter.name_len, iter.name);
                 ret = -EINVAL;
             } else {
-                ret = add_endpoint_address(iter.name + offset, iter.name_len - offset, opt_udp.addr,
-                                           opt_udp.port, opt_udp.eavesdropping, opt_udp.filter);
+                if (validate_ip(opt_udp.addr) < 0) {
+                    log_error("Invalid IP address in section %.*s: %s", (int)iter.name_len, iter.name, opt_udp.addr);
+                    ret = -EINVAL;
+                } else {
+                    ret = add_endpoint_address(iter.name + offset, iter.name_len - offset, opt_udp.addr,
+                                               opt_udp.port, opt_udp.eavesdropping, opt_udp.filter);
+                }
             }
         }
 
@@ -753,8 +788,13 @@ static int parse_confs(ConfFile &conf)
         ret = conf.extract_options(&iter, option_table_tcp, ARRAY_SIZE(option_table_tcp), &opt_tcp);
 
         if (ret == 0) {
-            ret = add_tcp_endpoint_address(iter.name + offset, iter.name_len - offset, opt_tcp.addr,
-                                           opt_tcp.port, opt_tcp.timeout);
+            if (validate_ip(opt_tcp.addr) < 0) {
+                log_error("Invalid IP address in section %.*s: %s", (int)iter.name_len, iter.name, opt_tcp.addr);
+                ret = -EINVAL;
+            } else {
+                ret = add_tcp_endpoint_address(iter.name + offset, iter.name_len - offset, opt_tcp.addr,
+                                               opt_tcp.port, opt_tcp.timeout);
+            }
         }
         free(opt_tcp.addr);
         if (ret < 0)
