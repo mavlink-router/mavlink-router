@@ -113,6 +113,7 @@ protected:
 #ifdef ENABLE_IPV6
     static bool is_ipv6(const char *ip);
     static bool ipv6_is_linklocal(const char *ip);
+    static bool ipv6_is_multicast(const char *ip);
     static unsigned int ipv6_get_scope_id(const char *ip);
 #endif
 

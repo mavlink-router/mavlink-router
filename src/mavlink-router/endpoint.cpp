@@ -445,6 +445,15 @@ bool Endpoint::ipv6_is_linklocal(const char *ip)
     return false;
 }
 
+bool Endpoint::ipv6_is_multicast(const char *ip)
+{
+    /* link-local addresses start with ff0x */
+    if (strncmp(ip, "ff0", 3) == 0) {
+        return true;
+    }
+    return false;
+}
+
 unsigned int Endpoint::ipv6_get_scope_id(const char *ip)
 {
     struct ifaddrs *addrs;
@@ -755,11 +764,23 @@ int UdpEndpoint::open(const char *ip, unsigned long port, bool to_bind)
 
         sockaddr6.sin6_family = AF_INET6;
         sockaddr6.sin6_port = htons(port);
-        inet_pton(AF_INET6, ip_str, &sockaddr6.sin6_addr);
+        
+        /* multicast address needs to listen to all, but "filter" incoming packets */
+        if (to_bind && Endpoint::ipv6_is_multicast(ip_str)) {
+            sockaddr6.sin6_addr = in6addr_any;
+
+            struct ipv6_mreq group;
+            inet_pton(AF_INET6, ip_str, &group.ipv6mr_multiaddr);
+            if (setsockopt(fd, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, &group, sizeof(group)) < 0){
+                log_error("Error setting IPv6 multicast socket options (%m)");
+                goto fail;
+            }
+        } else {
+            inet_pton(AF_INET6, ip_str, &sockaddr6.sin6_addr);
+        }
 
         /* link-local address needs a scope ID */
-        bool is_linklocal = Endpoint::ipv6_is_linklocal(ip_str);
-        if (is_linklocal) {
+        if (Endpoint::ipv6_is_linklocal(ip_str)) {
             sockaddr6.sin6_scope_id = ipv6_get_scope_id(ip_str);
         }
 
@@ -975,13 +996,18 @@ int TcpEndpoint::open(const char *ip, unsigned long port)
         char *ip_str = strdup(&_ip[1]);
         ip_str[strlen(ip_str) - 1] = '\0';
 
+        /* multicast address is not allowed for TCP sockets */
+        if (Endpoint::ipv6_is_multicast(ip_str)) {
+            log_error("TCP socket does not support multicast address");
+            goto fail;
+        }
+
         sockaddr6.sin6_family = AF_INET6;
         sockaddr6.sin6_port = htons(port);
         inet_pton(AF_INET6, ip_str, &sockaddr6.sin6_addr);
 
         /* link-local address needs a scope ID */
-        bool is_linklocal = Endpoint::ipv6_is_linklocal(ip_str);
-        if (is_linklocal) {
+        if (Endpoint::ipv6_is_linklocal(ip_str)) {
             sockaddr6.sin6_scope_id = ipv6_get_scope_id(ip_str);
         }
 
