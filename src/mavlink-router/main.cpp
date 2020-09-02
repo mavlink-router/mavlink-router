@@ -118,15 +118,15 @@ static unsigned long find_next_endpoint_port(const char *ip)
     return port;
 }
 
-static int split_on_colon(const char *str, char **base, unsigned long *number)
+static int split_on_last_colon(const char *str, char **base, unsigned long *number)
 {
     char *colonstr;
 
     *base = strdup(str);
-    colonstr = strchrnul(*base, ':');
+    colonstr = strrchr(*base, ':');
     *number = ULONG_MAX;
 
-    if (*colonstr != '\0') {
+    if (colonstr != nullptr) {
         *colonstr = '\0';
         if (safe_atoul(colonstr + 1, number) < 0) {
             free(*base);
@@ -142,8 +142,13 @@ static int validate_ip(const char* ip)
     std::string ip_addr(ip);
 
     std::regex ipv4_regex("(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})");
+#ifdef ENABLE_IPV6
+    std::regex ipv6_regex("\\[(([a-f\\d]{0,4}:)+[a-f\\d]{0,4})\\]"); // simplyfied pattern
 
+    if (!std::regex_match(ip_addr, ipv4_regex) && !std::regex_match(ip_addr, ipv6_regex)) {
+#else
     if (!std::regex_match(ip_addr, ipv4_regex)) {
+#endif
         return -EINVAL;
     }
 
@@ -253,7 +258,7 @@ static int add_endpoint_address(const char *name, size_t name_len, const char *i
         ret = -EINVAL;
         goto fail;
     }
-    
+
     if (filter) {
         conf->filter = strdup(filter);
         if (!conf->filter) {
@@ -421,7 +426,7 @@ static int parse_argv(int argc, char *argv[])
             char *ip;
             unsigned long port;
 
-            if (split_on_colon(optarg, &ip, &port) < 0) {
+            if (split_on_last_colon(optarg, &ip, &port) < 0) {
                 log_error("Invalid port in argument: %s", optarg);
                 help(stderr);
                 return -EINVAL;
@@ -470,7 +475,7 @@ static int parse_argv(int argc, char *argv[])
             char *ip;
             unsigned long port;
 
-            if (split_on_colon(optarg, &ip, &port) < 0) {
+            if (split_on_last_colon(optarg, &ip, &port) < 0) {
                 log_error("Invalid port in argument: %s", optarg);
                 help(stderr);
                 return -EINVAL;
@@ -509,7 +514,7 @@ static int parse_argv(int argc, char *argv[])
         char *base;
         unsigned long number;
 
-        if (split_on_colon(argv[optind], &base, &number) < 0) {
+        if (split_on_last_colon(argv[optind], &base, &number) < 0) {
             log_error("Invalid argument %s", argv[optind]);
             help(stderr);
             return -EINVAL;

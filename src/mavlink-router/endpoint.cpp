@@ -22,6 +22,9 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <net/if.h>
+#include <ifaddrs.h>
+#include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -423,6 +426,56 @@ void Endpoint::log_aggregate(unsigned int interval_sec)
     }
 }
 
+#ifdef ENABLE_IPV6
+bool Endpoint::is_ipv6(const char *ip)
+{
+    /* Square brackets always exist on IPv6 addresses b/c of input validation */
+    if (strchr(ip, '[') != nullptr) {
+        return true;
+    }
+    return false;
+}
+
+bool Endpoint::ipv6_is_linklocal(const char *ip)
+{
+    /* link-local addresses start with fe80 */
+    if (strncmp(ip, "fe80", 4) == 0) {
+        return true;
+    }
+    return false;
+}
+
+unsigned int Endpoint::ipv6_get_scope_id(const char *ip)
+{
+    struct ifaddrs *addrs;
+    char ipAddress[NI_MAXHOST];
+    unsigned scope=0;
+    getifaddrs(&addrs);
+
+    /* search for our address in all interface addresses */
+    for(ifaddrs *addr = addrs; addr; addr = addr->ifa_next){
+        if (addr->ifa_addr && addr->ifa_addr->sa_family == AF_INET6){
+            getnameinfo(addr->ifa_addr, sizeof(struct sockaddr_in6), ipAddress, sizeof(ipAddress), NULL, 0, NI_NUMERICHOST);
+
+            /* cut the interface name from the end of a link-local address */
+            auto search = strrchr(ipAddress, '%');
+            if (search != nullptr) {
+                *search = '\0';
+            }
+
+            /* convert to a scope ID, if it's our interface */
+            if(strcmp(ipAddress, ip) == 0){
+                scope = if_nametoindex(addr->ifa_name);
+                break;
+            }
+        }
+    }
+
+    freeifaddrs(addrs);
+    return scope;
+}
+#endif
+
 UartEndpoint::~UartEndpoint()
 {
     if (fd > 0) {
@@ -668,26 +721,74 @@ UdpEndpoint::UdpEndpoint()
     : Endpoint{"UDP"}
 {
     bzero(&sockaddr, sizeof(sockaddr));
+#ifdef ENABLE_IPV6
+    bzero(&sockaddr6, sizeof(sockaddr6));
+#endif
 }
 
 int UdpEndpoint::open(const char *ip, unsigned long port, bool to_bind)
 {
     const int broadcast_val = 1;
+
+#ifdef ENABLE_IPV6
+    this->is_ipv6 = Endpoint::is_ipv6(ip);
+    if (this->is_ipv6) {
+        fd = socket(AF_INET6, SOCK_DGRAM, 0);
+    } else {
+#endif
     fd = socket(AF_INET, SOCK_DGRAM, 0);
+
+#ifdef ENABLE_IPV6
+    }
+#endif
+
     if (fd == -1) {
         log_error("Could not create socket (%m)");
         return -1;
     }
 
+#ifdef ENABLE_IPV6
+    if (this->is_ipv6) {
+        /* strip square brackets from ip string */
+        char *ip_str = strdup(&ip[1]);
+        ip_str[strlen(ip_str) - 1] = '\0';
+
+        sockaddr6.sin6_family = AF_INET6;
+        sockaddr6.sin6_port = htons(port);
+        inet_pton(AF_INET6, ip_str, &sockaddr6.sin6_addr);
+
+        /* link-local address needs a scope ID */
+        bool is_linklocal = Endpoint::ipv6_is_linklocal(ip_str);
+        if (is_linklocal) {
+            sockaddr6.sin6_scope_id = ipv6_get_scope_id(ip_str);
+        }
+
+        free(ip_str);
+    } else {
+#endif
     sockaddr.sin_family = AF_INET;
     sockaddr.sin_addr.s_addr = inet_addr(ip);
     sockaddr.sin_port = htons(port);
+#ifdef ENABLE_IPV6
+    }
+#endif
 
     if (to_bind) {
+#ifdef ENABLE_IPV6
+        if (this->is_ipv6) {
+            if (bind(fd, (struct sockaddr *)&sockaddr6, sizeof(sockaddr6)) < 0) {
+                log_error("Error binding IPv6 socket (%m)");
+                goto fail;
+            }
+        } else {
+#endif
         if (bind(fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) < 0) {
             log_error("Error binding socket (%m)");
             goto fail;
         }
+#ifdef ENABLE_IPV6
+        }
+#endif
     } else {
         if (setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &broadcast_val, sizeof(broadcast_val))) {
             log_error("Error enabling broadcast in socket (%m)");
@@ -700,8 +801,17 @@ int UdpEndpoint::open(const char *ip, unsigned long port, bool to_bind)
         goto fail;
     }
 
-    if (to_bind)
+    if (to_bind) {
+#ifdef ENABLE_IPV6
+        if (this->is_ipv6) {
+            sockaddr6.sin6_port = 0;
+        } else {
+#endif
         sockaddr.sin_port = 0;
+#ifdef ENABLE_IPV6
+        }
+#endif
+    }
     log_info("Open UDP [%d] %s:%lu %c", fd, ip, port, to_bind ? '*' : ' ');
 
     return fd;
@@ -717,8 +827,18 @@ fail:
 ssize_t UdpEndpoint::_read_msg(uint8_t *buf, size_t len)
 {
     socklen_t addrlen = sizeof(sockaddr);
-    ssize_t r = ::recvfrom(fd, buf, len, 0,
-                           (struct sockaddr *)&sockaddr, &addrlen);
+    ssize_t r = 0;
+#ifdef ENABLE_IPV6
+    if (this->is_ipv6) {
+        addrlen = sizeof(sockaddr6);
+        r = ::recvfrom(fd, buf, len, 0, (struct sockaddr *)&sockaddr6, &addrlen);
+    } else {
+#endif
+    r = ::recvfrom(fd, buf, len, 0, (struct sockaddr *)&sockaddr, &addrlen);
+#ifdef ENABLE_IPV6
+    }
+#endif
+
     if (r == -1 && errno == EAGAIN)
         return 0;
     if (r == -1)
@@ -739,13 +859,32 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
         ;
     }
 
+#ifdef ENABLE_IPV6
+    bool sock_connected = false;
+    if (is_ipv6) {
+        sock_connected = sockaddr6.sin6_port != 0;
+    } else {
+        sock_connected = sockaddr.sin_port != 0;
+    }
+    if (!sock_connected) {
+#else
     if (!sockaddr.sin_port) {
+#endif
         log_debug("No one ever connected to %d. No one to write for", fd);
         return 0;
     }
 
-    ssize_t r = ::sendto(fd, pbuf->data, pbuf->len, 0,
-                         (struct sockaddr *)&sockaddr, sizeof(sockaddr));
+    ssize_t r = 0;
+#ifdef ENABLE_IPV6
+    if (this->is_ipv6) {
+        r = ::sendto(fd, pbuf->data, pbuf->len, 0, (struct sockaddr *)&sockaddr6, sizeof(sockaddr6));
+    } else {
+#endif
+    r = ::sendto(fd, pbuf->data, pbuf->len, 0, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
+#ifdef ENABLE_IPV6
+    }
+#endif
+
     if (r == -1) {
         if (errno != EAGAIN && errno != ECONNREFUSED && errno != ENETUNREACH)
             log_error("Error sending udp packet (%m)");
@@ -770,6 +909,9 @@ TcpEndpoint::TcpEndpoint()
     : Endpoint{"TCP"}
 {
     bzero(&sockaddr, sizeof(sockaddr));
+#ifdef ENABLE_IPV6
+    bzero(&sockaddr6, sizeof(sockaddr6));
+#endif
 }
 
 TcpEndpoint::~TcpEndpoint()
@@ -781,7 +923,16 @@ TcpEndpoint::~TcpEndpoint()
 int TcpEndpoint::accept(int listener_fd)
 {
     socklen_t addrlen = sizeof(sockaddr);
+#ifdef ENABLE_IPV6
+    if (this->is_ipv6) {
+        addrlen = sizeof(sockaddr6);
+        fd = accept4(listener_fd, (struct sockaddr *)&sockaddr6, &addrlen, SOCK_NONBLOCK);
+    } else {
+#endif
     fd = accept4(listener_fd, (struct sockaddr *)&sockaddr, &addrlen, SOCK_NONBLOCK);
+#ifdef ENABLE_IPV6
+    }
+#endif
 
     if (fd == -1)
         return -1;
@@ -801,20 +952,64 @@ int TcpEndpoint::open(const char *ip, unsigned long port)
 
     assert_or_return(_ip, -ENOMEM);
 
+#ifdef ENABLE_IPV6
+    this->is_ipv6 = Endpoint::is_ipv6(ip);
+    if (this->is_ipv6) {
+        fd = socket(AF_INET6, SOCK_STREAM, 0);
+    } else {
+#endif
     fd = socket(AF_INET, SOCK_STREAM, 0);
+
+#ifdef ENABLE_IPV6
+    }
+#endif
+
     if (fd == -1) {
         log_error("Could not create socket (%m)");
         return -1;
     }
 
+#ifdef ENABLE_IPV6
+    if (this->is_ipv6) {
+        /* strip square brackets from ip string */
+        char *ip_str = strdup(&_ip[1]);
+        ip_str[strlen(ip_str) - 1] = '\0';
+
+        sockaddr6.sin6_family = AF_INET6;
+        sockaddr6.sin6_port = htons(port);
+        inet_pton(AF_INET6, ip_str, &sockaddr6.sin6_addr);
+
+        /* link-local address needs a scope ID */
+        bool is_linklocal = Endpoint::ipv6_is_linklocal(ip_str);
+        if (is_linklocal) {
+            sockaddr6.sin6_scope_id = ipv6_get_scope_id(ip_str);
+        }
+
+        free(ip_str);
+    } else {
+#endif
     sockaddr.sin_family = AF_INET;
     sockaddr.sin_addr.s_addr = inet_addr(ip);
     sockaddr.sin_port = htons(port);
+#ifdef ENABLE_IPV6
+    }
+#endif
 
+#ifdef ENABLE_IPV6
+    if (this->is_ipv6) {
+        if (connect(fd, (struct sockaddr *)&sockaddr6, sizeof(sockaddr6)) < 0) {
+            log_error("Error connecting to IPv6 socket (%m)");
+            goto fail;
+        }
+    } else {
+#endif
     if (connect(fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) < 0) {
         log_error("Error connecting to socket (%m)");
         goto fail;
     }
+#ifdef ENABLE_IPV6
+    }
+#endif
 
     if (fcntl(fd, F_SETFL, O_NONBLOCK | FASYNC) < 0) {
         log_error("Error setting socket fd as non-blocking (%m)");
@@ -835,8 +1030,17 @@ ssize_t TcpEndpoint::_read_msg(uint8_t *buf, size_t len)
 {
     socklen_t addrlen = sizeof(sockaddr);
     errno = 0;
-    ssize_t r = ::recvfrom(fd, buf, len, 0,
-                           (struct sockaddr *)&sockaddr, &addrlen);
+    ssize_t r = 0;
+#ifdef ENABLE_IPV6
+    if (this->is_ipv6) {
+        addrlen = sizeof(sockaddr6);
+        r = ::recvfrom(fd, buf, len, 0, (struct sockaddr *)&sockaddr6, &addrlen);
+    } else {
+#endif
+    r = ::recvfrom(fd, buf, len, 0, (struct sockaddr *)&sockaddr, &addrlen);
+#ifdef ENABLE_IPV6
+    }
+#endif
 
     if (r == -1 && errno == EAGAIN)
         return 0;
@@ -864,8 +1068,17 @@ int TcpEndpoint::write_msg(const struct buffer *pbuf)
         ;
     }
 
-    ssize_t r = ::sendto(fd, pbuf->data, pbuf->len, 0,
-                         (struct sockaddr *)&sockaddr, sizeof(sockaddr));
+    ssize_t r = 0;
+#ifdef ENABLE_IPV6
+    if (this->is_ipv6) {
+        r = ::sendto(fd, pbuf->data, pbuf->len, 0, (struct sockaddr *)&sockaddr6, sizeof(sockaddr6));
+    } else {
+#endif
+    r = ::sendto(fd, pbuf->data, pbuf->len, 0, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
+#ifdef ENABLE_IPV6
+    }
+#endif
+
     if (r == -1) {
         if (errno != EAGAIN && errno != ECONNREFUSED)
             log_error("Error sending tcp packet (%m)");
