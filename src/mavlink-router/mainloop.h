@@ -114,7 +114,7 @@ struct endpoint_config {
             char *address;
             long unsigned port;
             int retry_timeout;
-            bool eavesdropping;
+            UdpEndpoint::UdpMode mode;
         };
         struct {
             char *device;

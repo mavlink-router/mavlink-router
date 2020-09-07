@@ -174,13 +174,19 @@ private:
 
 class UdpEndpoint : public Endpoint {
 public:
+    enum UdpMode {
+        Normal,        // Sending mode
+        Eavesdropping, // Listening mode
+        Multicast      // Listending and sending multicast/ broadcast
+    };
+
     UdpEndpoint();
     virtual ~UdpEndpoint() { }
 
     int write_msg(const struct buffer *pbuf) override;
     int flush_pending_msgs() override { return -ENOSYS; }
 
-    int open(const char *ip, unsigned long port, bool bind = false);
+    int open(const char *ip, unsigned long port, UdpMode mode = UdpEndpoint::Normal);
 
     struct sockaddr_in sockaddr;
 #ifdef ENABLE_IPV6
@@ -190,6 +196,8 @@ public:
 
 protected:
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
+
+    UdpEndpoint::UdpMode _mode;
 };
 
 class TcpEndpoint : public Endpoint {

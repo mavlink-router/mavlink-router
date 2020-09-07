@@ -735,8 +735,9 @@ UdpEndpoint::UdpEndpoint()
 #endif
 }
 
-int UdpEndpoint::open(const char *ip, unsigned long port, bool to_bind)
+int UdpEndpoint::open(const char *ip, unsigned long port, UdpEndpoint::UdpMode mode)
 {
+    this->_mode = mode;
     const int broadcast_val = 1;
 
 #ifdef ENABLE_IPV6
@@ -766,7 +767,7 @@ int UdpEndpoint::open(const char *ip, unsigned long port, bool to_bind)
         sockaddr6.sin6_port = htons(port);
         
         /* multicast address needs to listen to all, but "filter" incoming packets */
-        if (to_bind && Endpoint::ipv6_is_multicast(ip_str)) {
+        if ((_mode == UdpEndpoint::Eavesdropping) && Endpoint::ipv6_is_multicast(ip_str)) {
             sockaddr6.sin6_addr = in6addr_any;
 
             struct ipv6_mreq group;
@@ -794,7 +795,7 @@ int UdpEndpoint::open(const char *ip, unsigned long port, bool to_bind)
     }
 #endif
 
-    if (to_bind) {
+    if (_mode == UdpEndpoint::Eavesdropping) {
 #ifdef ENABLE_IPV6
         if (this->is_ipv6) {
             if (bind(fd, (struct sockaddr *)&sockaddr6, sizeof(sockaddr6)) < 0) {
@@ -822,7 +823,7 @@ int UdpEndpoint::open(const char *ip, unsigned long port, bool to_bind)
         goto fail;
     }
 
-    if (to_bind) {
+    if (_mode == UdpEndpoint::Eavesdropping) {
 #ifdef ENABLE_IPV6
         if (this->is_ipv6) {
             sockaddr6.sin6_port = 0;
@@ -833,7 +834,7 @@ int UdpEndpoint::open(const char *ip, unsigned long port, bool to_bind)
         }
 #endif
     }
-    log_info("Open UDP [%d] %s:%lu %c", fd, ip, port, to_bind ? '*' : ' ');
+    log_info("Open UDP [%d] %s:%lu %c", fd, ip, port, _mode != UdpEndpoint::Normal ? '*' : ' ');
 
     return fd;
 
