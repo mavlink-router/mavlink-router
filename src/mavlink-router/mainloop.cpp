@@ -138,12 +138,12 @@ int Mainloop::write_msg(Endpoint *e, const struct buffer *buf)
 }
 
 void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid, int sender_sysid,
-                         int sender_compid, uint32_t msg_id)
+                         int sender_compid, uint32_t msg_id, Endpoint *sender)
 {
     bool unknown = true;
 
     for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
-        if ((*e)->accept_msg(target_sysid, target_compid, sender_sysid, sender_compid, msg_id)) {
+        if (*e != sender && (*e)->accept_msg(target_sysid, target_compid, sender_sysid, sender_compid, msg_id)) {
             log_debug("Endpoint [%d] accepted message %u to %d/%d from %u/%u", (*e)->fd, msg_id, target_sysid,
                       target_compid, sender_sysid, sender_compid);
             write_msg(*e, buf);
@@ -152,7 +152,7 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid
     }
 
     for (struct endpoint_entry *e = g_tcp_endpoints; e; e = e->next) {
-        if (e->endpoint->accept_msg(target_sysid, target_compid, sender_sysid, sender_compid, msg_id)) {
+        if (e->endpoint != sender && e->endpoint->accept_msg(target_sysid, target_compid, sender_sysid, sender_compid, msg_id)) {
             log_debug("Endpoint [%d] accepted message %u to %d/%d from %u/%u", e->endpoint->fd, msg_id,
                       target_sysid, target_compid, sender_sysid, sender_compid);
             int r = write_msg(e->endpoint, buf);
@@ -404,7 +404,7 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
         }
         case Udp: {
             std::unique_ptr<UdpEndpoint> udp{new UdpEndpoint{}};
-            if (udp->open(conf->address, conf->port, conf->mode) < 0) {
+            if (udp->open(conf->address, conf->port, conf->mode, conf->targetAddress) < 0) {
                 log_error("Could not open %s:%ld", conf->address, conf->port);
                 return false;
             }

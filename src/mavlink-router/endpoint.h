@@ -110,6 +110,7 @@ protected:
     bool _check_crc(const mavlink_msg_entry_t *msg_entry);
     void _add_sys_comp_id(uint16_t sys_comp_id);
 
+    static bool ipv4_is_multicast(const char *ip);
 #ifdef ENABLE_IPV6
     static bool is_ipv6(const char *ip);
     static bool ipv6_is_linklocal(const char *ip);
@@ -186,11 +187,13 @@ public:
     int write_msg(const struct buffer *pbuf) override;
     int flush_pending_msgs() override { return -ENOSYS; }
 
-    int open(const char *ip, unsigned long port, UdpMode mode = UdpEndpoint::Normal);
+    int open(const char *ip, unsigned long port, UdpMode mode = UdpEndpoint::Normal, const char *target_ip = nullptr);
 
     struct sockaddr_in sockaddr;
+    struct sockaddr_in sockaddr_out;
 #ifdef ENABLE_IPV6
     struct sockaddr_in6 sockaddr6;
+    struct sockaddr_in6 sockaddr6_out;
     bool is_ipv6;
 #endif
 

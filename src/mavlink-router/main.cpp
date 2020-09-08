@@ -227,7 +227,7 @@ fail:
 }
 
 static int add_endpoint_address(const char *name, size_t name_len, const char *ip,
-                                long unsigned port, UdpEndpoint::UdpMode mode, const char *filter)
+                                long unsigned port, UdpEndpoint::UdpMode mode, const char *filter, const char *targetIp)
 {
     int ret;
 
@@ -259,6 +259,20 @@ static int add_endpoint_address(const char *name, size_t name_len, const char *i
         goto fail;
     }
 
+    if (targetIp != nullptr) {
+        free(conf->targetAddress);
+        conf->targetAddress = strdup(targetIp);
+        if (!conf->targetAddress) {
+            ret = -ENOMEM;
+            goto fail;
+        }
+    }
+
+    if (mode == UdpEndpoint::UdpMode::Multicast && !conf->targetAddress) {
+        ret = -EINVAL;
+        goto fail;
+    }
+
     if (filter) {
         conf->filter = strdup(filter);
         if (!conf->filter) {
@@ -285,6 +299,7 @@ static int add_endpoint_address(const char *name, size_t name_len, const char *i
 fail:
     free(conf->address);
     free(conf->name);
+    free(conf->targetAddress);
     free(conf);
 
     return ret;
@@ -437,7 +452,7 @@ static int parse_argv(int argc, char *argv[])
                 return -EINVAL;
             }
 
-            add_endpoint_address(NULL, 0, ip, port, UdpEndpoint::UdpMode::Normal, NULL);
+            add_endpoint_address(NULL, 0, ip, port, UdpEndpoint::UdpMode::Normal, NULL, NULL);
             free(ip);
             break;
         }
@@ -533,7 +548,7 @@ static int parse_argv(int argc, char *argv[])
                 return -EINVAL;
             }
 
-            add_endpoint_address(NULL, 0, base, number, UdpEndpoint::UdpMode::Eavesdropping, NULL);
+            add_endpoint_address(NULL, 0, base, number, UdpEndpoint::UdpMode::Eavesdropping, NULL, NULL);
         } else {
             const char *bauds = number != ULONG_MAX ? base + strlen(base) + 1 : NULL;
             int ret = add_uart_endpoint(NULL, 0, base, bauds, false);
@@ -673,6 +688,8 @@ static int parse_mode(const char *val, size_t val_len, void *storage, size_t sto
         *mode = UdpEndpoint::UdpMode::Normal;
     } else if (memcaseeq(val, val_len, "eavesdropping", sizeof("eavesdropping") - 1)) {
         *mode = UdpEndpoint::UdpMode::Eavesdropping;
+    } else if (memcaseeq(val, val_len, "multicast", sizeof("multicast") - 1)) {
+        *mode = UdpEndpoint::UdpMode::Multicast;
     } else {
         log_error("Unknown 'mode' key: %.*s", (int)val_len, val);
         return -EINVAL;
@@ -720,12 +737,14 @@ static int parse_confs(ConfFile &conf)
         UdpEndpoint::UdpMode mode;
         unsigned long port;
         char *filter;
+        char *targetAddress;
     };
     static const ConfFile::OptionsTable option_table_udp[] = {
-        {"address", true,   ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_udp, addr)},
-        {"mode",    true,   parse_mode,                 OPTIONS_TABLE_STRUCT_FIELD(option_udp, eavesdropping)},
-        {"port",    false,  ConfFile::parse_ul,         OPTIONS_TABLE_STRUCT_FIELD(option_udp, port)},
-        {"filter",  false,  ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_udp, filter)},
+        {"address",        true,   ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_udp, addr)},
+        {"mode",           true,   parse_mode,                 OPTIONS_TABLE_STRUCT_FIELD(option_udp, mode)},
+        {"port",           false,  ConfFile::parse_ul,         OPTIONS_TABLE_STRUCT_FIELD(option_udp, port)},
+        {"filter",         false,  ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_udp, filter)},
+        {"targetAddress",  false,  ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_udp, targetAddress)},
     };
 
     struct option_tcp {
@@ -763,19 +782,25 @@ static int parse_confs(ConfFile &conf)
     pattern = "udpendpoint *";
     offset = strlen(pattern) - 1;
     while (conf.get_sections(pattern, &iter) == 0) {
-        struct option_udp opt_udp = {nullptr, UdpEndpoint::UdpMode::Normal, ULONG_MAX};
+        struct option_udp opt_udp = {nullptr, UdpEndpoint::UdpMode::Normal, ULONG_MAX, nullptr};
         ret = conf.extract_options(&iter, option_table_udp, ARRAY_SIZE(option_table_udp), &opt_udp);
         if (ret == 0) {
             if ((opt_udp.mode == UdpEndpoint::UdpMode::Eavesdropping) && opt_udp.port == ULONG_MAX) {
                 log_error("Expected 'port' key for section %.*s", (int)iter.name_len, iter.name);
                 ret = -EINVAL;
+            } else if ((opt_udp.mode == UdpEndpoint::UdpMode::Multicast) && (nullptr == opt_udp.targetAddress)) {
+                log_error("Expected 'targetAddress' key for section %.*s", (int)iter.name_len, iter.name);
+                ret = -EINVAL;
             } else {
                 if (validate_ip(opt_udp.addr) < 0) {
                     log_error("Invalid IP address in section %.*s: %s", (int)iter.name_len, iter.name, opt_udp.addr);
                     ret = -EINVAL;
+                } else if ((opt_udp.mode == UdpEndpoint::UdpMode::Multicast) && (validate_ip(opt_udp.targetAddress) < 0)) {
+                    log_error("Invalid target IP address in section %.*s: %s", (int)iter.name_len, iter.name, opt_udp.targetAddress);
+                    ret = -EINVAL;
                 } else {
                     ret = add_endpoint_address(iter.name + offset, iter.name_len - offset, opt_udp.addr,
-                                               opt_udp.port, opt_udp.mode, opt_udp.filter);
+                                               opt_udp.port, opt_udp.mode, opt_udp.filter, opt_udp.targetAddress);
                 }
             }
         }

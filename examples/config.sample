@@ -78,13 +78,14 @@
 #       route messages to (and from). If on `Eavesdropping` mode,
 #       IP of interface to which mavlink-router will listen for
 #       incoming packets. In this case, `0.0.0.0` means that
-#       mavlink-router will listen on all interfaces.
+#       mavlink-router will listen on all interfaces. If on
+#       `Multicast` mode, same as `Eavesdropping`.
 #       IPv6 addresses must be enclosed in square brackets.
 #       No default value. Must be defined.
 #
 #   Mode
-#       One of <normal> or <eavesdropping>. See `Address` for more
-#       information.
+#       One of <normal>, <eavesdropping> or <multicast>. See `Address`
+#       (and `TargetAddress`) for more information.
 #       No default value. Must be defined
 #
 #   Port
@@ -92,6 +93,16 @@
 #       packets (or listen for them).
 #       Default value: Increasing value, starting from 14550, when
 #       mode is `Normal`. Must be defined if on `Eavesdropping` mode.
+#
+#   TargetAddress
+#       Only needed in `Multicast` mode.
+#       IP address where messages should be sent to. This can either be a
+#       unicast address or a broadcast address or multicast group. In case
+#       of a multicast address, the receiving interface will only listen
+#       to that multicast group.
+#       Using a link-local IPv6 address or multicast group here requires
+#       the Address field to be the an interface's local address! So
+#       listening on all interfaces is not supported in that case.
 #
 # Section [TcpEndpoint]: This section must have a name
 #
