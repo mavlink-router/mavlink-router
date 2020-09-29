@@ -448,8 +448,8 @@ bool Endpoint::is_ipv6(const char *ip)
 
 bool Endpoint::ipv6_is_linklocal(const char *ip)
 {
-    /* link-local addresses start with fe80 */
-    if (strncmp(ip, "fe80", 4) == 0) {
+    /* link-local addresses start with fe80, ULA addresses are in fc::/7 range */
+    if (strncmp(ip, "fe80", 4) == 0 || strncmp(ip, "fc", 2) == 0 || strncmp(ip, "fd", 2) == 0) {
         return true;
     }
     return false;
