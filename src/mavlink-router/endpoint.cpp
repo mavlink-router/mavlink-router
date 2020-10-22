@@ -776,6 +776,11 @@ int UdpEndpoint::open(const char *ip, unsigned long port, UdpEndpoint::UdpMode m
         char *ip_str = strdup(&ip[1]);
         ip_str[strlen(ip_str) - 1] = '\0';
 
+        /* remove omittable zeros from IPv6 address */
+        sockaddr_in6 ip_addr;
+        inet_pton(AF_INET6, ip_str, &ip_addr.sin6_addr);
+        inet_ntop(AF_INET6, &(ip_addr.sin6_addr), ip_str, strlen(ip));
+
         /* do some more input validation for multicast mode */
         if (_mode == UdpEndpoint::UdpMode::Multicast) {
             if (nullptr == target_ip) {
