@@ -32,6 +32,7 @@
 #include "comm.h"
 #include "endpoint.h"
 #include "mainloop.h"
+#include "config.h"
 
 #define MAVLINK_TCP_PORT 5760
 #define DEFAULT_BAUDRATE 115200U
