@@ -50,6 +50,9 @@ be disabled with --disable-systemd. The default systemd system directory
 is taken via pkg-config. To use another directory update the above
 path, use --with-systemdsystemunitdir.
 
+By default mavlink-router is capable of using IPv6 addresses. In a system without an IPv6
+capable kernel, this can be disabled with --disable-ipv6.
+
 Installation location can be changed using the --prefix option while configuring.
 
 Build:
@@ -80,6 +83,9 @@ It's also possible to route mavlinks packets from any interface using:
 
 mavlink-router also listens, by default, on port 5760 for TCP connections. Any
 connection there will also receive routed packets.
+
+IPv6 addresses must be enclosed in square brackets like this: `[::1]`. The port number
+can be specified in the same way, as with IPv4 then: `[::1]:14550`.
 
 <a name="Conffiles"></a>
 ### Conf file ###

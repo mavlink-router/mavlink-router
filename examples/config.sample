@@ -79,7 +79,8 @@
 #       IP of interface to which mavlink-router will listen for
 #       incoming packets. In this case, `0.0.0.0` means that
 #       mavlink-router will listen on all interfaces.
-#       No dafault value. Must be defined.
+#       IPv6 addresses must be enclosed in square brackets.
+#       No default value. Must be defined.
 #
 #   Mode
 #       One of <normal> or <eavesdropping>. See `Address` for more
@@ -97,11 +98,12 @@
 # Keys:
 #   Address:
 #       IP to which mavlink-router will connect to.
+#       IPv6 addresses must be enclosed in square brackets.
 #       No default value. Must be defined.
 #
 #   Port:
 #       Numeric value with port to which mavlink-router will connect to.
-#       No dafault value. Must be defined.
+#       No default value. Must be defined.
 #
 #   RetryTimeout:
 #       Numeric value defining how many seconds mavlink-router should wait
