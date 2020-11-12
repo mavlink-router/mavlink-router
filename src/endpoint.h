@@ -42,6 +42,7 @@ struct UartEndpointConfig {
     std::vector<speed_t> baudrates;
     bool flowcontrol{false};
     std::vector<uint32_t> allow_msg_id_out;
+    std::vector<uint8_t> allow_src_comp_out;
 };
 
 struct UdpEndpointConfig {
@@ -52,6 +53,7 @@ struct UdpEndpointConfig {
     unsigned long port;
     Mode mode;
     std::vector<uint32_t> allow_msg_id_out;
+    std::vector<uint8_t> allow_src_comp_out;
 };
 
 struct TcpEndpointConfig {
@@ -60,6 +62,7 @@ struct TcpEndpointConfig {
     unsigned long port;
     int retry_timeout{5};
     std::vector<uint32_t> allow_msg_id_out;
+    std::vector<uint8_t> allow_src_comp_out;
 };
 
 /*
@@ -144,6 +147,7 @@ public:
     AcceptState accept_msg(const struct buffer *pbuf) const;
 
     void filter_add_allowed_msg_id(uint32_t msg_id) { _allowed_msg_ids.push_back(msg_id); }
+    void filter_add_allowed_src_comp(uint8_t src_comp) { _allowed_src_comps.push_back(src_comp); }
 
     std::string get_type() const { return this->_type; }
 
@@ -182,6 +186,7 @@ protected:
 
 private:
     std::vector<uint32_t> _allowed_msg_ids;
+    std::vector<uint8_t> _allowed_src_comps;
 };
 
 class UartEndpoint : public Endpoint {
@@ -194,7 +199,7 @@ public:
 
     bool setup(UartEndpointConfig config); ///< open UART device and apply config
 
-    static const ConfFile::OptionsTable option_table[4];
+    static const ConfFile::OptionsTable option_table[5];
     static const char *section_pattern;
     static int parse_baudrates(const char *val, size_t val_len, void *storage, size_t storage_len);
     static bool validate_config(const UartEndpointConfig &config);
@@ -226,7 +231,7 @@ public:
 
     bool setup(UdpEndpointConfig config); ///< open socket and apply config
 
-    static const ConfFile::OptionsTable option_table[5];
+    static const ConfFile::OptionsTable option_table[6];
     static const char *section_pattern;
     static int parse_udp_mode(const char *val, size_t val_len, void *storage, size_t storage_len);
     static bool validate_config(const UdpEndpointConfig &config);
@@ -268,7 +273,7 @@ public:
     bool reopen();                      ///< re-try connecting to the server
     void close();
 
-    static const ConfFile::OptionsTable option_table[4];
+    static const ConfFile::OptionsTable option_table[5];
     static const char *section_pattern;
     static bool validate_config(const TcpEndpointConfig &config);
 

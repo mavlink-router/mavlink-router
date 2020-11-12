@@ -99,6 +99,12 @@
 # Default: Empty list (disabled)
 #AllowMsgIdOut = 
 
+# Only allow messages from the specified MAVLink source component IDs to be
+# sent via this endpoint. An empty list allows all source components.
+# Format: Comma separated list of integers
+# Default: Empty list (disabled)
+#AllowSrcCompOut = 
+
 ## Example
 [UartEndpoint alpha]
 Device = /dev/ttyS0
