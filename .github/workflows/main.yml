@@ -12,18 +12,20 @@ on:
 
 jobs:
   ubuntu:
-    name: ubuntu (latest)
-    runs-on: ubuntu-latest
+    name: ubuntu 20.04
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v1
         with:
           submodules: recursive
       - name: install tools
-        run: sudo apt-get install -y python3-pip python3-setuptools && pip3 install future pymavlink
+        run: sudo apt-get install -y python3-pip python3-setuptools libgtest-dev && pip3 install future pymavlink
       - name: configure
         run: ./autogen.sh c --with-systemdsystemunitdir=/usr/lib/systemd/system
       - name: build
-        run: make -j
+        run: make -j`nproc --all`
+      - name: build tests
+        run: make -j`nproc --all` mainloop_test
       - name: test
         run: make check PYTHON=python3
 
