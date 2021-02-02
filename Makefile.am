@@ -139,6 +139,7 @@ mavlink_routerd_SOURCES = \
 	src/common/conf_file.cpp \
 	src/common/conf_file.h \
 	src/common/dbg.h \
+	src/mavlink-router/dedup.cpp \
 	src/common/mavlink.h \
 	src/mavlink-router/endpoint.cpp \
 	src/mavlink-router/endpoint.h \
