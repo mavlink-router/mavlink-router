@@ -105,8 +105,11 @@ public:
     bool allowed_by_filter(uint32_t msg_id);
     void add_message_to_filter(uint32_t msg_id) { _message_filter.push_back(msg_id); }
     void add_message_to_nodelay(uint32_t msg_id) { _message_nodelay.push_back(msg_id); }
+
     bool allowed_by_dropout();
     void set_dropout_percentage (uint32_t dropout_percentage) { _dropout_percentage = dropout_percentage; }
+
+    bool allowed_by_dedup(const buffer* buf);
 
     void start_expire_timer();
 

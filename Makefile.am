@@ -216,6 +216,8 @@ mainloop_test_SOURCES = \
 	src/mavlink-router/binlog.cpp \
 	src/mavlink-router/binlog.h \
 	src/mavlink-router/comm.h \
+	src/mavlink-router/dedup.h \
+	src/mavlink-router/dedup.cpp \
 	src/mavlink-router/endpoint.h \
 	src/mavlink-router/endpoint.cpp \
 	src/mavlink-router/endpoint.h \
