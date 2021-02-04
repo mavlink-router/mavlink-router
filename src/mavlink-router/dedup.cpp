@@ -24,19 +24,18 @@
 
 class DedupImpl {
     using hash_t = uint64_t;
-    using time_t = uint64_t;
+    using time_t = uint32_t;
 
 public:
 
     bool add_check_packet(const uint8_t* buffer, uint32_t size, uint32_t dedup_period_ms)
     {
-        bool new_packet_hash = true;
         using namespace std::chrono;
-        time_t timestamp = duration_cast<milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+        time_t timestamp = duration_cast<milliseconds>(std::chrono::system_clock::now() - _start_time).count();
         // pop data from front queue, delete corresponding data from multiset
         while (_time_hash_queue.size() > 0 && _time_hash_queue.front().first > timestamp + dedup_period_ms) {
             hash_t hash_to_delete = _time_hash_queue.front().second;
-            _multiset.erase(_multiset.find(hash_to_delete)); // NOTE: don't call erase on key, it will delete all
+            _packet_hash_set.erase(_packet_hash_set.find(hash_to_delete));
             _time_hash_queue.pop();
         }
 
@@ -45,20 +44,24 @@ public:
         _hash_buffer.assign((const char*)buffer, (uint64_t)size);
         hash_t hash = std::hash<std::string>{}(_hash_buffer);
 
-        if (_multiset.find(hash) != _multiset.end()) {
+        bool new_packet_hash = true;
+        if (_packet_hash_set.find(hash) == _packet_hash_set.end()) {
+            // add hash and timestamp to back of queue, and add hash to multiset
+            _packet_hash_set.insert(hash);
+            _time_hash_queue.emplace(timestamp, hash);
+        } else {
             new_packet_hash = false;
         }
 
-        // add hash and timestamp to back of queue, and add another copy of hash to multiset
-        _multiset.insert(hash);
-        _time_hash_queue.emplace(timestamp, hash);
 
         return new_packet_hash;
     }
 
 private:
+    const std::chrono::time_point<std::chrono::system_clock> _start_time;
+
     std::queue<std::pair<time_t, hash_t>> _time_hash_queue;
-    std::unordered_multiset<hash_t> _multiset;
+    std::unordered_set<hash_t> _packet_hash_set;
     std::string _hash_buffer;
 };
 
