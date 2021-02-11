@@ -393,10 +393,7 @@ bool Endpoint::allowed_by_dropout()
 
 bool Endpoint::allowed_by_dedup(const buffer* buf)
 {
-    if (Mainloop::get_instance().add_check_dedup(buf)) {
-        return false;
-    }
-    return true;
+    return Mainloop::get_instance().add_check_dedup(buf);
 }
 
 void Endpoint::postprocess_msg(int target_sysid, int target_compid, uint8_t src_sysid,

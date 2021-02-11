@@ -455,11 +455,7 @@ static bool _print_statistics_timeout_cb(void *data)
 
 bool Mainloop::add_check_dedup(const buffer* buf)
 {
-    Dedup::PacketStatus status = _dedup.add_check_packet(buf->data, buf->len);
-    if (status == Dedup::PacketStatus::NEW_PACKET_OR_TIMED_OUT) {
-        return true;
-    }
-    return false;
+    return _dedup.add_check_packet(buf->data, buf->len) == Dedup::PacketStatus::NEW_PACKET_OR_TIMED_OUT;
 }
 
 
