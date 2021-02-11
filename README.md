@@ -232,7 +232,13 @@ Message filters:
   - AllowMsgIdOut: If set, only allow messages with the listed message IDs to
     be sent via this endpoint
   - AllowSrcCompOut: If set, only allow messages from the listed MAVLink source
-    compoent IDs to be sent via this endpoint
+    component IDs to be sent via this endpoint
+  - AllowMsgIdIn: If set, only allow messages with the listed message IDs to
+    be received on this endpoint. Since message ID 0 is not used, only allowing
+    this message ID can be used to block all incoming traffic on this endpoint,
+    e.g. to block interaction with the drone while still receiving telemetry.
+  - AllowSrcCompIn: If set, only allow messages from the listed MAVLink source
+    component IDs to be received on this endpoint
 
 Message de-duplication:
 
