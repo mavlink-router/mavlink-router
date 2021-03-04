@@ -1,14 +1,6 @@
 name: Build and Test
 
-on:
-  push:
-    branches:
-    - 'master'
-    tags:
-    - 'v*'
-  pull_request:
-    branches:
-    - '*'
+on: [push, pull_request]
 
 jobs:
   ubuntu:
