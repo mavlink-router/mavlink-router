@@ -33,7 +33,7 @@ public:
         using namespace std::chrono;
         time_t timestamp = duration_cast<milliseconds>(std::chrono::system_clock::now() - _start_time).count();
         // pop data from front queue, delete corresponding data from multiset
-        while (_time_hash_queue.size() > 0 && _time_hash_queue.front().first > timestamp + dedup_period_ms) {
+        while (_time_hash_queue.size() > 0 && timestamp > _time_hash_queue.front().first + dedup_period_ms) {
             hash_t hash_to_delete = _time_hash_queue.front().second;
             _packet_hash_set.erase(_packet_hash_set.find(hash_to_delete));
             _time_hash_queue.pop();
