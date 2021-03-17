@@ -234,6 +234,14 @@ Message filters:
   - AllowSrcCompOut: If set, only allow messages from the listed MAVLink source
     compoent IDs to be sent via this endpoint
 
+Message de-duplication:
+
+  - If enabled, each incoming message is checked, whether another copy was
+    already received the last `DeduplicationPeriod` milliseconds ago. If it's
+    already known, the message will be dropped as it was never received and the
+    timeout counter for that message will be reset. Messages are identified via
+    their `std::hash` value.
+
 ### Flight Stack Logging
 
 Mavlink router can also collect flight stack logs. It supports collecting both

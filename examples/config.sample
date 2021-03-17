@@ -33,6 +33,12 @@
 # Default: <info>
 #DebugLogLevel = info
 
+# Enable de-duplication of incoming messages. If a message is received another
+# time in the configured time period (in milliseconds), it will be dropped. The
+# second message will reset the timer.
+# Default: 0 (de-duplication disabled)
+#DeDuplicationPeriod = 0
+
 ## TCP Server Endpoints
 
 # Listen for TCP connections on this port. Set to 0 to disable.

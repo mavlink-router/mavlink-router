@@ -193,7 +193,14 @@ int Endpoint::handle_read()
             break;
         }
 
-        Mainloop::get_instance().route_msg(&buf);
+        if (allowed_by_dedup(&buf)) {
+            _add_sys_comp_id(buf.curr.src_sysid, buf.curr.src_compid);
+            Mainloop::get_instance().route_msg(&buf);
+        } else {
+            if (Log::get_max_level() >= Log::Level::DEBUG) {
+                log_debug("Message %u discarded by de-duplication", buf.curr.msg_id);
+            }
+        }
     }
 
     return r;
@@ -350,7 +357,6 @@ int Endpoint::read_msg(struct buffer *pbuf)
             _stat.read.crc_error_bytes += expected_size;
             return 0;
         }
-        _add_sys_comp_id(src_sysid, src_compid);
     }
 
     _stat.read.handled++;
@@ -494,6 +500,11 @@ Endpoint::AcceptState Endpoint::accept_msg(const struct buffer *pbuf) const
 
     // Reject everything else
     return Endpoint::AcceptState::Rejected;
+}
+
+bool Endpoint::allowed_by_dedup(const buffer *buf) const
+{
+    return Mainloop::get_instance().dedup_check_msg(buf);
 }
 
 bool Endpoint::_check_crc(const mavlink_msg_entry_t *msg_entry) const

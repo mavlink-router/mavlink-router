@@ -352,6 +352,12 @@ static bool _print_statistics_timeout_cb(void *data)
     return true;
 }
 
+bool Mainloop::dedup_check_msg(const buffer *buf)
+{
+    return _msg_dedup.check_packet(buf->data, buf->len)
+        == Dedup::PacketStatus::NEW_PACKET_OR_TIMED_OUT;
+}
+
 bool Mainloop::add_endpoints(const Configuration &config)
 {
     // Create UART and UDP endpoints
@@ -420,6 +426,11 @@ bool Mainloop::add_endpoints(const Configuration &config)
     // Apply other options
     if (config.report_msg_statistics) {
         add_timeout(MSEC_PER_SEC, _print_statistics_timeout_cb, this);
+    }
+
+    if (config.dedup_period_ms > 0) {
+        log_info("Message de-duplication enabled: %ld ms period", config.dedup_period_ms);
+        _msg_dedup.set_dedup_period(config.dedup_period_ms);
     }
 
     return true;

@@ -149,6 +149,8 @@ public:
     void filter_add_allowed_msg_id(uint32_t msg_id) { _allowed_msg_ids.push_back(msg_id); }
     void filter_add_allowed_src_comp(uint8_t src_comp) { _allowed_src_comps.push_back(src_comp); }
 
+    bool allowed_by_dedup(const buffer *pbuf) const;
+
     std::string get_type() const { return this->_type; }
 
     struct buffer rx_buf;
