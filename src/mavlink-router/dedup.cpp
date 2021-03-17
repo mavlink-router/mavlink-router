@@ -25,7 +25,9 @@
 class DedupImpl {
     using hash_t = uint64_t;
     using time_t = uint32_t;
-
+    DedupImpl() : _start_time(std::chrono::system_clock::now())
+    {
+    }
 public:
 
     bool add_check_packet(const uint8_t* buffer, uint32_t size, uint32_t dedup_period_ms)
