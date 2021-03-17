@@ -83,6 +83,9 @@ int Endpoint::handle_read()
     while ((r = read_msg(&buf, &target_sysid, &target_compid, &src_sysid,
                          &src_compid, &crc_valid, &msg_id)) > 0) {
         if (allowed_by_filter(msg_id) && allowed_by_dropout() && allowed_by_dedup(&buf))
+            if (r == ReadOk) {
+                _add_sys_comp_id(((uint16_t)src_sysid << 8) | src_compid);
+            }
             Mainloop::get_instance().route_msg(&buf, target_sysid, target_compid,
                                                src_sysid, src_compid, crc_valid, msg_id);
     }
