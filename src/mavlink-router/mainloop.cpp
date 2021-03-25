@@ -542,7 +542,7 @@ Timeout *Mainloop::add_timeout(uint32_t timeout_msec, std::function<bool(void*)>
 
     assert_or_return(t, NULL);
 
-    t->fd = timerfd_create(CLOCK_MONOTONIC, 0);
+    t->fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
     if (t->fd < 0) {
         log_error("Unable to create timerfd: %m");
         goto error;
