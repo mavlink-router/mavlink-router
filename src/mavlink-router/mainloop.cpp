@@ -38,7 +38,7 @@ bool Mainloop::_initialized = false;
 
 static void exit_signal_handler(int signum)
 {
-    Mainloop::instance().request_exit();
+    Mainloop::instance().request_exit(0);
 }
 
 static void setup_signal_handlers()
@@ -68,13 +68,17 @@ Mainloop &Mainloop::instance()
     return _instance;
 }
 
-void Mainloop::request_exit()
+void Mainloop::request_exit(int retcode)
 {
+    _retcode = retcode;
+    _initialized = false;
     should_exit.store(true, std::memory_order_relaxed);
 }
 
 int Mainloop::open()
 {
+    _retcode = -1;
+
     if (epollfd != -1)
         return -EBUSY;
 
@@ -84,6 +88,8 @@ int Mainloop::open()
         log_error("%m");
         return -1;
     }
+
+    _retcode = 0;
 
     return 0;
 }
@@ -313,7 +319,7 @@ int Mainloop::loop()
                  * mavlink-router
                  */
                 if (p->is_valid())
-                    request_exit();
+                    request_exit(0);
             }
         }
 
@@ -335,7 +341,7 @@ int Mainloop::loop()
         delete current;
     }
 
-    return 0;
+    return _retcode;
 }
 
 bool Mainloop::_log_aggregate_timeout(void *data)

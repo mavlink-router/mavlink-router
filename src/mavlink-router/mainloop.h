@@ -73,7 +73,7 @@ public:
     /*
      * Request that loop exits on next iteration.
      */
-    void request_exit();
+    void request_exit(int retcode);
 
 
 private:
@@ -89,6 +89,8 @@ private:
     struct {
         uint32_t msg_to_unknown = 0;
     } _errors_aggregate;
+
+    int _retcode;
 
     int tcp_open(unsigned long tcp_port);
     void _del_timeouts();
