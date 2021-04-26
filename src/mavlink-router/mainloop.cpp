@@ -319,7 +319,7 @@ int Mainloop::loop()
                  * mavlink-router
                  */
                 if (p->is_valid())
-                    request_exit(0);
+                    request_exit(EXIT_FAILURE);
             }
         }
 
