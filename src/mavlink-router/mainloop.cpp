@@ -279,10 +279,11 @@ void Mainloop::loop()
                 handle_tcp_connection();
                 continue;
             }
+
             Pollable *p = static_cast<Pollable *>(events[i].data.ptr);
 
             if (events[i].events & EPOLLIN) {
-              int rd = p->handle_read();
+                int rd = p->handle_read();
                 if (rd < 0 && !p->is_valid()) {
                     // Only TcpEndpoint may become invalid after a read
                     should_process_tcp_hangups = true;
@@ -294,12 +295,20 @@ void Mainloop::loop()
                     mod_fd(p->fd, p, EPOLLIN);
                 }
             }
+
             if (events[i].events & EPOLLERR) {
-                log_error("poll error for fd %i, closing it", p->fd);
-                remove_fd(p->fd);
-                // make poll errors fatal so that an external component can
-                // restart mavlink-router
-                request_exit();
+                log_error("poll error for fd %i", p->fd);
+
+                /*
+                 * TCP Pollables can be added/removed dynamically and
+                 * is_valid() is set when it becomes not available anymore.
+                 * Otherwise it's a unkonwn error or another bus has a
+                 * unexpected disconnect (e.g. when removing a usb-serial
+                 * device), so make it fatal: external components may restart
+                 * mavlink-router
+                 */
+                if (p->is_valid())
+                    request_exit();
             }
         }
 
