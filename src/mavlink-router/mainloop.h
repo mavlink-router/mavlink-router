@@ -68,10 +68,13 @@ public:
      */
     static Mainloop &init();
 
+    static Mainloop &instance();
+
     /*
-     * Request that loop exits "eventually".
+     * Request that loop exits on next iteration.
      */
-    static void request_exit();
+    void request_exit();
+
 
 private:
     static const unsigned int LOG_AGGREGATE_INTERVAL_SEC = 5;

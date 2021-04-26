@@ -38,7 +38,7 @@ bool Mainloop::_initialized = false;
 
 static void exit_signal_handler(int signum)
 {
-    Mainloop::request_exit();
+    Mainloop::instance().request_exit();
 }
 
 static void setup_signal_handlers()
@@ -60,6 +60,11 @@ Mainloop &Mainloop::init()
 
     _initialized = true;
 
+    return _instance;
+}
+
+Mainloop &Mainloop::instance()
+{
     return _instance;
 }
 
