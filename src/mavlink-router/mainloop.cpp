@@ -253,14 +253,14 @@ accept_error:
     delete tcp;
 }
 
-void Mainloop::loop()
+int Mainloop::loop()
 {
     const int max_events = 8;
     struct epoll_event events[max_events];
     int r;
 
     if (epollfd < 0)
-        return;
+        return -EINVAL;
 
     setup_signal_handlers();
 
@@ -329,6 +329,8 @@ void Mainloop::loop()
         remove_fd(current->fd);
         delete current;
     }
+
+    return 0;
 }
 
 bool Mainloop::_log_aggregate_timeout(void *data)
