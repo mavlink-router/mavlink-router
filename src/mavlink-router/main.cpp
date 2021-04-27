@@ -890,6 +890,7 @@ fail:
 int main(int argc, char *argv[])
 {
     Mainloop &mainloop = Mainloop::init();
+    int retcode;
 
     Log::open();
 
@@ -917,7 +918,7 @@ int main(int argc, char *argv[])
     if (!mainloop.add_endpoints(mainloop, &opt))
         goto endpoint_error;
 
-    mainloop.loop();
+    retcode = mainloop.loop();
 
     mainloop.free_endpoints(&opt);
 
@@ -925,7 +926,7 @@ int main(int argc, char *argv[])
 
     Log::close();
 
-    return 0;
+    return retcode ? EXIT_FAILURE : 0;
 
 endpoint_error:
     mainloop.free_endpoints(&opt);

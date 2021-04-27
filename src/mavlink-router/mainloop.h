@@ -34,7 +34,7 @@ public:
     int add_fd(int fd, void *data, int events);
     int mod_fd(int fd, void *data, int events);
     int remove_fd(int fd);
-    void loop();
+    int loop();
     void route_msg(struct buffer *buf, int target_sysid, int target_compid, int sender_sysid,
                    int sender_compid, uint32_t msg_id = UINT32_MAX);
     void handle_read(Endpoint *e);
@@ -68,10 +68,13 @@ public:
      */
     static Mainloop &init();
 
+    static Mainloop &instance();
+
     /*
-     * Request that loop exits "eventually".
+     * Request that loop exits on next iteration.
      */
-    static void request_exit();
+    void request_exit(int retcode);
+
 
 private:
     static const unsigned int LOG_AGGREGATE_INTERVAL_SEC = 5;
@@ -86,6 +89,8 @@ private:
     struct {
         uint32_t msg_to_unknown = 0;
     } _errors_aggregate;
+
+    int _retcode;
 
     int tcp_open(unsigned long tcp_port);
     void _del_timeouts();

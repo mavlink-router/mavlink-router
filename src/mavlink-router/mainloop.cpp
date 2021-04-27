@@ -38,7 +38,7 @@ bool Mainloop::_initialized = false;
 
 static void exit_signal_handler(int signum)
 {
-    Mainloop::request_exit();
+    Mainloop::instance().request_exit(0);
 }
 
 static void setup_signal_handlers()
@@ -63,13 +63,22 @@ Mainloop &Mainloop::init()
     return _instance;
 }
 
-void Mainloop::request_exit()
+Mainloop &Mainloop::instance()
 {
+    return _instance;
+}
+
+void Mainloop::request_exit(int retcode)
+{
+    _retcode = retcode;
+    _initialized = false;
     should_exit.store(true, std::memory_order_relaxed);
 }
 
 int Mainloop::open()
 {
+    _retcode = -1;
+
     if (epollfd != -1)
         return -EBUSY;
 
@@ -79,6 +88,8 @@ int Mainloop::open()
         log_error("%m");
         return -1;
     }
+
+    _retcode = 0;
 
     return 0;
 }
@@ -253,14 +264,14 @@ accept_error:
     delete tcp;
 }
 
-void Mainloop::loop()
+int Mainloop::loop()
 {
     const int max_events = 8;
     struct epoll_event events[max_events];
     int r;
 
     if (epollfd < 0)
-        return;
+        return -EINVAL;
 
     setup_signal_handlers();
 
@@ -279,10 +290,11 @@ void Mainloop::loop()
                 handle_tcp_connection();
                 continue;
             }
+
             Pollable *p = static_cast<Pollable *>(events[i].data.ptr);
 
             if (events[i].events & EPOLLIN) {
-              int rd = p->handle_read();
+                int rd = p->handle_read();
                 if (rd < 0 && !p->is_valid()) {
                     // Only TcpEndpoint may become invalid after a read
                     should_process_tcp_hangups = true;
@@ -294,12 +306,20 @@ void Mainloop::loop()
                     mod_fd(p->fd, p, EPOLLIN);
                 }
             }
+
             if (events[i].events & EPOLLERR) {
-                log_error("poll error for fd %i, closing it", p->fd);
-                remove_fd(p->fd);
-                // make poll errors fatal so that an external component can
-                // restart mavlink-router
-                request_exit();
+                log_error("poll error for fd %i", p->fd);
+
+                /*
+                 * TCP Pollables can be added/removed dynamically and
+                 * is_valid() is set when it becomes not available anymore.
+                 * Otherwise it's a unkonwn error or another bus has a
+                 * unexpected disconnect (e.g. when removing a usb-serial
+                 * device), so make it fatal: external components may restart
+                 * mavlink-router
+                 */
+                if (p->is_valid())
+                    request_exit(EXIT_FAILURE);
             }
         }
 
@@ -320,6 +340,8 @@ void Mainloop::loop()
         remove_fd(current->fd);
         delete current;
     }
+
+    return _retcode;
 }
 
 bool Mainloop::_log_aggregate_timeout(void *data)

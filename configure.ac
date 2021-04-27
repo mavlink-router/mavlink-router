@@ -207,4 +207,6 @@ AC_MSG_RESULT([
 
 	C compiler:		${CC}
 	C++ compiler:		${CXX}
+
+	enable_tests:           ${HAVE_GTEST}
 ])
