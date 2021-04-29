@@ -220,6 +220,7 @@ public:
     }
 
     bool is_valid() override { return _valid; };
+    bool is_critical() override { return false; };
 
 protected:
     ssize_t _read_msg(uint8_t *buf, size_t len) override;

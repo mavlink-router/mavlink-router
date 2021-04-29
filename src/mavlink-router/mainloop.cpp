@@ -310,16 +310,12 @@ int Mainloop::loop()
             if (events[i].events & EPOLLERR) {
                 log_error("poll error for fd %i", p->fd);
 
-                /*
-                 * TCP Pollables can be added/removed dynamically and
-                 * is_valid() is set when it becomes not available anymore.
-                 * Otherwise it's a unkonwn error or another bus has a
-                 * unexpected disconnect (e.g. when removing a usb-serial
-                 * device), so make it fatal: external components may restart
-                 * mavlink-router
-                 */
-                if (p->is_valid())
+                if (p->is_critical()) {
+                    log_error("Critical fd %i got error, exiting", p->fd);
                     request_exit(EXIT_FAILURE);
+                } else {
+                    log_debug("Non-critical fd %i, error is okay.", p->fd);
+                }
             }
         }
 
