@@ -23,6 +23,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <net/if.h>
+#include <netinet/tcp.h>
 #include <ifaddrs.h>
 #include <netdb.h>
 #include <stdio.h>
@@ -959,6 +960,12 @@ int TcpEndpoint::accept(int listener_fd)
         return -1;
 
     log_info("TCP connection [%d] accepted", fd);
+
+    int tcp_nodelay_state = 1;
+    if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *) &tcp_nodelay_state, sizeof(int)) < 0) {
+        log_error("Setting TCP_NODELAY failed [%d]", fd);
+        return -1;
+    }
 
     return fd;
 }
