@@ -36,12 +36,10 @@ jobs:
       - uses: actions/checkout@v1
         with:
           submodules: recursive
-      - name: install tools
-        run: sudo apt-get install -y python3-pip python3-setuptools && pip3 install future pymavlink
       - name: setup dockcross
         run: docker run --rm dockcross/${{ matrix.arch_name }} > ./dockcross; chmod +x ./dockcross
       - name: configure
-        run: ./dockcross /bin/bash -c "./autogen.sh c --with-systemdsystemunitdir=/usr/lib/systemd/system --host=arm"
+        run: ./dockcross /bin/bash -c "./autogen.sh c --with-systemdsystemunitdir=/usr/lib/systemd/system --host=amd64"
       - name: build
         run: ./dockcross /bin/bash -c "make -j"
       - name: test
@@ -50,8 +48,30 @@ jobs:
         run: cp mavlink-routerd mavlink-routerd-libc-${{ matrix.name }}
       - name: package-deb
         run: |
-          mkdir -p .debpkg/usr/bin
-          cp mavlink-routerd .debpkg/usr/bin/mavlink-routerd
+          mkdir -p .debpkg
+          ./dockcross --args "-v $(pwd)/.debpkg:$(pwd)/.debpkg" /bin/bash -c "make -j DESTDIR=$(pwd)/.debpkg install"
+          # mkdir -p .debpkg/usr/bin
+          # cp mavlink-routerd .debpkg/usr/bin
+          mkdir -p .debpkg/usr/share/doc/mavlink-router
+          cat > .debpkg/usr/share/doc/mavlink-router/copyright << EOL
+          Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+          Source: http://github.com/mavlink-router/mavlink-router
+          Upstream-Name: mavlink-router
+          Files: *
+          Copyright: 2021 MAVLink-Router Developers
+          License: Apache-2
+           On Debian systems, the full text of the Apache License
+           Version 2.0 can be found in the file
+           /usr/share/common-licenses/Apache-2.0.
+          EOL
+          cat > .debpkg/usr/share/doc/mavlink-router/changelog << EOL
+          mavlink-router (2.0) ${{ matrix.distro_name }}; urgency=low
+
+            * Initial Debian package support
+
+           -- Vincent Wang <vwangsf@gmail.com>  Tue, 08 Jun 2021 03:37:10 -0700
+          EOL
+          gzip --best .debpkg/usr/share/doc/mavlink-router/changelog
           mkdir -p .debpkg/DEBIAN
           export VERSION=$([[ "${{ github.ref }}" == refs/tags/* ]] && echo $(echo ${{ github.ref }} | sed s#"refs/tags/v"##) || echo "0.0.0")
           export PKGSIZE=$(du mavlink-routerd)
@@ -64,10 +84,11 @@ jobs:
           Architecture: ${{ matrix.name }}
           Essential: no
           Installed-Size: ${PKGSIZE}
-          Maintainer: MAVLink-Router Developers
+          Maintainer: MAVLink-Router Developers <lucas.demarchi@intel.com>
           Description: Route mavlink packets between endpoints
+            mavlink-router is a tool for routing MAVLink packets. The usual configuration is to have one "master" endpoint that is the flight stack (either on UART or UDP) and other components that can be on UDP or TCP or UART endpoints. This is not strictly required and other configurations are possible: mavlink-router mainly routes mavlink packets from one endpoint to the other endpoints without differentiating what they are.
           EOL
-          dpkg-deb --build .debpkg
+          fakeroot dpkg-deb --build .debpkg
           mv .debpkg.deb mavlink-router-ubuntu-${{ matrix.distro }}_${{ matrix.name }}.deb
       - uses: actions/upload-artifact@master
         with:
