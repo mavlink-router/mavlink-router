@@ -4,31 +4,113 @@ on: [push, pull_request]
 
 jobs:
   ubuntu:
-    name: ubuntu (latest)
-    runs-on: ubuntu-latest
+    name: ubuntu-${{ matrix.distro }} ${{ matrix.name }}
+    runs-on: ubuntu-${{ matrix.distro }}
+    strategy:
+      matrix:
+        include:
+          - name: armhf
+            arch_name: linux-armv7
+            distro: 18.04
+          - name: arm64
+            arch_name: linux-arm64
+            distro: 18.04
+            distro_name: bionic
+          - name: amd64
+            arch_name: linux-x64
+            distro: 18.04
+            distro_name: bionic
+          - name: armhf
+            arch_name: linux-armv7
+            distro: 20.04
+            distro_name: bionic
+          - name: arm64
+            arch_name: linux-arm64
+            distro: 20.04
+            distro_name: focal
+          - name: amd64
+            arch_name: linux-x64
+            distro: 20.04
+            distro_name: focal
     steps:
       - uses: actions/checkout@v1
         with:
           submodules: recursive
-      - name: install tools
-        run: sudo apt-get install -y python3-pip python3-setuptools && pip3 install future pymavlink
+      - name: setup dockcross
+        run: docker run --rm dockcross/${{ matrix.arch_name }} > ./dockcross; chmod +x ./dockcross
       - name: configure
-        run: ./autogen.sh c --with-systemdsystemunitdir=/usr/lib/systemd/system
+        run: ./dockcross /bin/bash -c "./autogen.sh c --with-systemdsystemunitdir=/usr/lib/systemd/system --host=amd64"
       - name: build
-        run: make -j
+        run: ./dockcross /bin/bash -c "make -j"
       - name: test
-        run: make check PYTHON=python3
+        run: ./dockcross /bin/bash -c "make check PYTHON=python3"
       - name: Rename
-        run: cp mavlink-routerd mavlink-routerd-libc-x86-64
+        run: cp mavlink-routerd mavlink-routerd-libc-${{ matrix.name }}
+      - name: package-deb
+        run: |
+          mkdir -p .debpkg
+          ./dockcross --args "-v $(pwd)/.debpkg:$(pwd)/.debpkg" /bin/bash -c "make -j DESTDIR=$(pwd)/.debpkg install"
+          # mkdir -p .debpkg/usr/bin
+          # cp mavlink-routerd .debpkg/usr/bin
+          mkdir -p .debpkg/usr/share/doc/mavlink-router
+          cat > .debpkg/usr/share/doc/mavlink-router/copyright << EOL
+          Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+          Source: http://github.com/mavlink-router/mavlink-router
+          Upstream-Name: mavlink-router
+          Files: *
+          Copyright: 2021 MAVLink-Router Developers
+          License: Apache-2
+           On Debian systems, the full text of the Apache License
+           Version 2.0 can be found in the file
+           /usr/share/common-licenses/Apache-2.0.
+          EOL
+          cat > .debpkg/usr/share/doc/mavlink-router/changelog << EOL
+          mavlink-router (2.0) ${{ matrix.distro_name }}; urgency=low
+
+            * Initial Debian package support
+
+           -- Vincent Wang <vwangsf@gmail.com>  Tue, 08 Jun 2021 03:37:10 -0700
+          EOL
+          gzip --best .debpkg/usr/share/doc/mavlink-router/changelog
+          mkdir -p .debpkg/DEBIAN
+          export VERSION=$([[ "${{ github.ref }}" == refs/tags/* ]] && echo $(echo ${{ github.ref }} | sed s#"refs/tags/v"##) || echo "0.0.0")
+          export PKGSIZE=$(du mavlink-routerd)
+          echo "Building mavlink-router version: ${VERSION}"
+          cat > .debpkg/DEBIAN/control << EOL
+          Package: mavlink-router
+          Version: ${VERSION}
+          Section: custom
+          Priority: optional
+          Architecture: ${{ matrix.name }}
+          Essential: no
+          Installed-Size: ${PKGSIZE}
+          Maintainer: MAVLink-Router Developers <lucas.demarchi@intel.com>
+          Description: Route mavlink packets between endpoints
+            mavlink-router is a tool for routing MAVLink packets. The usual configuration is to have one "master" endpoint that is the flight stack (either on UART or UDP) and other components that can be on UDP or TCP or UART endpoints. This is not strictly required and other configurations are possible: mavlink-router mainly routes mavlink packets from one endpoint to the other endpoints without differentiating what they are.
+          EOL
+          fakeroot dpkg-deb --build .debpkg
+          mv .debpkg.deb mavlink-router-ubuntu-${{ matrix.distro }}_${{ matrix.name }}.deb
       - uses: actions/upload-artifact@master
         with:
-          path: mavlink-routerd-libc-x86-64
+          path: mavlink-routerd-libc-${{ matrix.name }}
+      - uses: actions/upload-artifact@master
+        with:
+          path: mavlink-router-ubuntu-${{ matrix.distro }}_${{ matrix.name }}.deb
       - uses: svenstaro/upload-release-action@v2
         name: Upload binaries to release
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: mavlink-routerd-libc-x86-64
+          file: mavlink-routerd-libc-${{ matrix.name }}
+          tag: ${{ github.ref }}
+          prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+          overwrite: true
+      - uses: svenstaro/upload-release-action@v2
+        name: Upload .debs to release
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          path: mavlink-router-ubuntu-${{ matrix.distro }}_${{ matrix.name }}.deb
           tag: ${{ github.ref }}
           prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}
           overwrite: true
