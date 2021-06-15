@@ -100,6 +100,23 @@ if (test "${enable_ipv6}" != "no"); then
 fi
 
 #####################################################################
+# Version information
+#####################################################################
+
+AS_IF([test -d "$srcdir/.git"],[
+	GIT_DESCRIPTION=$(git describe --always)
+	GIT_DATE=$(git --git-dir=$PWD/.git log --pretty='%as' -1)
+	BUILD_VERSION="\"Version $GIT_DESCRIPTION from $GIT_DATE\""
+],[
+	GIT_DESCRIPTION="v0-0-00000000"
+	BUILD_VERSION="1970-01-01"
+	BUILD_VERSION="\"Unknown version\""
+])
+
+AC_MSG_RESULT([$BUILD_VERSION])
+AC_DEFINE_UNQUOTED(BUILD_VERSION, $BUILD_VERSION, "Version information")
+
+#####################################################################
 # Default CFLAGS and LDFLAGS
 #####################################################################
 
