@@ -398,7 +398,7 @@ static bool pre_parse_argv(int argc, char *argv[])
             break;
         }
         case 'V':
-            puts(PACKAGE " version " VERSION);
+            puts(PACKAGE BUILD_VERSION);
             return false;
         }
     }
