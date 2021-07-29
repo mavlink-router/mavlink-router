@@ -624,7 +624,8 @@ int UartEndpoint::open(const char *path)
 
         result =  ioctl(fd, TIOCSSERIAL, &serial_ctl);
         if (result < 0) {
-            log_warning("Error while trying to write serial port latency: %m");
+            if (errno != ENODEV && errno != ENOTTY)
+                log_warning("Error while trying to write serial port latency: %m");
         }
     }
 
