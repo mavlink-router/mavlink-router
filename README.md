@@ -8,7 +8,9 @@ The usual configuration is to have one "master" endpoint that is the flight
 stack (either on UART or UDP) and other components that can be on UDP or TCP
 or UART endpoints. This is not strictly required and other configurations are
 possible: mavlink-router mainly routes mavlink packets from one endpoint to
-the other endpoints without differentiating what they are.
+the other endpoints without differentiating what they are. However the
+user is still able to differentiate them by targeting just a subset of the
+packets by using message filters.
 
 TCP endpoints are added automatically if the TCP server is enabled, allowing clients
 to simply connect to mavlink-router without changing its configuration.
