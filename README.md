@@ -27,21 +27,29 @@ system during compilation. The corresponding submodule should be fetched:
 
     $ git submodule update --init --recursive
 
-The following libraries need also to be installed :
+We need some additional packages as build dependencies. Packages for some distros:
 
-    $ sudo apt install python-future
-    $ sudo apt install python3-future
-    $ sudo apt install libtool
-    $ sudo apt install autoconf
+Debian/Ubuntu:
+
+    $ sudo apt install git python3 python3-future python3-lxml \
+        build-essential libtool autoconf pkg-config gcc g++ \
+        systemd
+
+Fedora:
+
+    $ sudo dnf install git python3 python3-future python3-lxml \
+        libtool autoconf automake gcc g++ systemd
+
+Archlinux:
+
+    $ sudo pacman -S git python3 python-future python-lxml \
+        libtool autoconf automake make pkg-config gcc \
+        systemd
 
 #### Build ####
 
 The build system follows the usual configure/build/install cycle. Configuration is needed
 to be done only once.
-
-Autoconfig may fail on debian build if `pkg-config` isn't installed
-
-    $ sudo apt-get install pkg-config
 
 A typical configuration for a 64-bit system is shown below:
 
