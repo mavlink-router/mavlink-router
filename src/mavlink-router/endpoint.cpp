@@ -617,7 +617,7 @@ int UartEndpoint::open(const char *path)
 
         int result = ioctl(fd, TIOCGSERIAL, &serial_ctl);
         if (result < 0) {
-            log_warning("Error while trying to read serial port configuration: %s", strerror(result));
+            log_warning("Error while trying to read serial port configuration: %m");
             goto set_latency_failed;
         }
 
@@ -625,7 +625,8 @@ int UartEndpoint::open(const char *path)
 
         result =  ioctl(fd, TIOCSSERIAL, &serial_ctl);
         if (result < 0) {
-            log_warning("Error while trying to write serial port latency: %s", strerror(result));
+            if (errno != ENODEV && errno != ENOTTY)
+                log_warning("Error while trying to write serial port latency: %m");
         }
     }
 
