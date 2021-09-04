@@ -166,7 +166,7 @@ void BinLog::_send_ack(uint32_t seqno)
     // Message filled a gap, or is duplicated. just send the ack
     if (seqno < _last_acked_seqno) {
         mavlink_msg_remote_log_block_status_pack(LOG_ENDPOINT_SYSTEM_ID, MAV_COMP_ID_ALL, &msg,
-                                                 _target_system_id, MAV_COMP_ID_ALL, seqno, 1);
+                                                 _target_system_id, MAV_COMP_ID_ALL, seqno, MAV_REMOTE_LOG_DATA_BLOCK_ACK);
         _send_msg(&msg, _target_system_id);
         return;
     }
@@ -174,15 +174,15 @@ void BinLog::_send_ack(uint32_t seqno)
     // TODO maybe a threshould of [n]acks to be sent?
     // TODO send ack to source only?
     // Send nacks regarding unseen seqno
-    for (uint32_t i = _last_acked_seqno; i < seqno; i++) {
+    for (uint32_t i = _last_acked_seqno + 1; i < seqno; i++) {
         mavlink_msg_remote_log_block_status_pack(LOG_ENDPOINT_SYSTEM_ID, MAV_COMP_ID_ALL, &msg,
-                                                 _target_system_id, MAV_COMP_ID_ALL, seqno, 0);
+                                                 _target_system_id, MAV_COMP_ID_ALL, seqno, MAV_REMOTE_LOG_DATA_BLOCK_NACK);
         _send_msg(&msg, _target_system_id);
     }
 
     // Send ack to seen seqno
     mavlink_msg_remote_log_block_status_pack(LOG_ENDPOINT_SYSTEM_ID, MAV_COMP_ID_ALL, &msg, _target_system_id,
-                                             MAV_COMP_ID_ALL, seqno, 1);
+                                             MAV_COMP_ID_ALL, seqno, MAV_REMOTE_LOG_DATA_BLOCK_ACK);
     _send_msg(&msg, _target_system_id);
     _last_acked_seqno = seqno;
 }
