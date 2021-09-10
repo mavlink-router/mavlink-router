@@ -114,7 +114,7 @@
 # Following, an example of configuration file:
 [General]
 #Mavlink-router serves on this TCP port
-TcpServerPort=5790
+TcpServerPort=5760
 ReportStats=false
 MavlinkDialect=auto
 
