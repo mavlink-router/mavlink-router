@@ -8,7 +8,9 @@ The usual configuration is to have one "master" endpoint that is the flight
 stack (either on UART or UDP) and other components that can be on UDP or TCP
 or UART endpoints. This is not strictly required and other configurations are
 possible: mavlink-router mainly routes mavlink packets from one endpoint to
-the other endpoints without differentiating what they are.
+the other endpoints without differentiating what they are. However the
+user is still able to differentiate them by targeting just a subset of the
+packets by using message filters.
 
 TCP endpoints are added automatically if the TCP server is enabled, allowing clients
 to simply connect to mavlink-router without changing its configuration.
@@ -27,21 +29,29 @@ system during compilation. The corresponding submodule should be fetched:
 
     $ git submodule update --init --recursive
 
-The following libraries need also to be installed :
+We need some additional packages as build dependencies. Packages for some distros:
 
-    $ sudo apt install python-future
-    $ sudo apt install python3-future
-    $ sudo apt install libtool
-    $ sudo apt install autoconf
+Debian/Ubuntu:
+
+    $ sudo apt install git python3 python3-future python3-lxml \
+        build-essential libtool autoconf pkg-config gcc g++ \
+        systemd
+
+Fedora:
+
+    $ sudo dnf install git python3 python3-future python3-lxml \
+        libtool autoconf automake gcc g++ systemd
+
+Archlinux:
+
+    $ sudo pacman -S git python3 python-future python-lxml \
+        libtool autoconf automake make pkg-config gcc \
+        systemd
 
 #### Build ####
 
 The build system follows the usual configure/build/install cycle. Configuration is needed
 to be done only once.
-
-Autoconfig may fail on debian build if `pkg-config` isn't installed
-
-    $ sudo apt-get install pkg-config
 
 A typical configuration for a 64-bit system is shown below:
 
