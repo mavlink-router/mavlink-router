@@ -93,7 +93,7 @@ AC_ARG_ENABLE(systemd, AC_HELP_STRING([--disable-systemd],
 		[disable systemd integration]), [enable_systemd=${enableval}])
 AM_CONDITIONAL(SYSTEMD, test "${enable_systemd}" != "no")
 
-AC_ARG_ENABLE(enable_ipv6, AC_HELP_STRING([--disable-ipv6],
+AC_ARG_ENABLE(ipv6, AC_HELP_STRING([--disable-ipv6],
 		[disable IPv6 capability]), [enable_ipv6=${enableval}])
 if (test "${enable_ipv6}" != "no"); then
 	AC_DEFINE([ENABLE_IPV6], [], [Enable IPv6])
