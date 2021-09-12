@@ -30,6 +30,7 @@
 #include <common/util.h>
 
 #include "autolog.h"
+#include "tlog.h"
 
 static std::atomic<bool> should_exit {false};
 
@@ -480,6 +481,15 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
         }
         _log_endpoint->mark_unfinished_logs();
         g_endpoints[i] = _log_endpoint;
+        i++;
+    }
+
+    if (opt->tlogs_dir) {
+        auto _tlog_endpoint
+            = new TLog(opt->tlogs_dir, LogMode::always, opt->min_free_space, opt->max_log_files);
+        _tlog_endpoint->mark_unfinished_logs();
+        g_endpoints[i] = _tlog_endpoint;
+        i++;
     }
 
     if (opt->report_msg_statistics)

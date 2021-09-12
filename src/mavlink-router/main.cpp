@@ -48,6 +48,7 @@ static struct options opt = {
     .tcp_port = ULONG_MAX,
     .report_msg_statistics = false,
     .logs_dir = nullptr,
+    .tlogs_dir = nullptr,
     .log_mode = LogMode::always,
     .debug_log_level = (int)Log::Level::INFO,
     .mavlink_dialect = Auto,
@@ -63,13 +64,14 @@ static const struct option long_options[] = {
     { "tcp-port",               required_argument,  NULL,   't' },
     { "tcp-endpoint",           required_argument,  NULL,   'p' },
     { "log",                    required_argument,  NULL,   'l' },
+    { "tlog",                   required_argument,  NULL,   'L' },
     { "debug-log-level",        required_argument,  NULL,   'g' },
     { "verbose",                no_argument,        NULL,   'v' },
     { "version",                no_argument,        NULL,   'V' },
     { }
 };
 
-static const char* short_options = "he:rt:c:d:l:p:g:vV";
+static const char* short_options = "he:rt:c:d:l:L:p:g:vV";
 
 static void help(FILE *fp) {
     fprintf(fp,
@@ -90,6 +92,7 @@ static void help(FILE *fp) {
             "  -d --conf-dir <dir>          Directory where to look for .conf files overriding\n"
             "                               default conf file.\n"
             "  -l --log <directory>         Enable Flight Stack logging\n"
+            "  -L --tlog <directory>        Enable Telemetry logging\n"
             "  -g --debug-log-level <level> Set debug log level. Levels are\n"
             "                               <error|warning|info|debug>\n"
             "  -v --verbose                 Verbose. Same as --debug-log-level=debug\n"
@@ -457,6 +460,10 @@ static int parse_argv(int argc, char *argv[])
             opt.logs_dir = strdup(optarg);
             break;
         }
+        case 'L': {
+            opt.tlogs_dir = strdup(optarg);
+            break;
+        }
         case 'g': {
             int lvl = log_level_from_str(optarg);
             if (lvl == -EINVAL) {
@@ -695,6 +702,7 @@ static int parse_confs(ConfFile &conf)
         {"MavlinkDialect", false, parse_mavlink_dialect,
          OPTIONS_TABLE_STRUCT_FIELD(options, mavlink_dialect)},
         {"Log", false, ConfFile::parse_str_dup, OPTIONS_TABLE_STRUCT_FIELD(options, logs_dir)},
+        {"TLog", false, ConfFile::parse_str_dup, OPTIONS_TABLE_STRUCT_FIELD(options, tlogs_dir)},
         {"LogMode", false, parse_log_mode, OPTIONS_TABLE_STRUCT_FIELD(options, log_mode)},
         {"DebugLogLevel", false, parse_log_level,
          OPTIONS_TABLE_STRUCT_FIELD(options, debug_log_level)},
@@ -923,6 +931,7 @@ int main(int argc, char *argv[])
     mainloop.free_endpoints(&opt);
 
     free(opt.logs_dir);
+    free(opt.tlogs_dir);
 
     Log::close();
 
@@ -931,6 +940,7 @@ int main(int argc, char *argv[])
 endpoint_error:
     mainloop.free_endpoints(&opt);
     free(opt.logs_dir);
+    free(opt.tlogs_dir);
 
 close_log:
     Log::close();

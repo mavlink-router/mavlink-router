@@ -93,6 +93,8 @@ mavlink_routerd_SOURCES = \
 	src/mavlink-router/pollable.cpp \
 	src/mavlink-router/timeout.h \
 	src/mavlink-router/timeout.cpp \
+	src/mavlink-router/tlog.h \
+	src/mavlink-router/tlog.cpp \
 	src/mavlink-router/ulog.h \
 	src/mavlink-router/ulog.cpp \
 	src/common/util.c \
