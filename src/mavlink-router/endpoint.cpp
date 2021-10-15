@@ -48,6 +48,63 @@
 
 #define UART_BAUD_RETRY_SEC 5
 
+static bool is_ipv6(const char *ip)
+{
+    /* Square brackets always exist on IPv6 addresses b/c of input validation */
+    if (strchr(ip, '[') != nullptr) {
+        return true;
+    }
+    return false;
+}
+
+static bool ipv6_is_linklocal(const char *ip)
+{
+    /* link-local addresses start with fe80 */
+    if (strncmp(ip, "fe80", 4) == 0) {
+        return true;
+    }
+    return false;
+}
+
+static bool ipv6_is_multicast(const char *ip)
+{
+    /* link-local addresses start with ff0x */
+    if (strncmp(ip, "ff0", 3) == 0) {
+        return true;
+    }
+    return false;
+}
+
+static unsigned int ipv6_get_scope_id(const char *ip)
+{
+    struct ifaddrs *addrs;
+    char ipAddress[NI_MAXHOST];
+    unsigned scope=0;
+    getifaddrs(&addrs);
+
+    /* search for our address in all interface addresses */
+    for(ifaddrs *addr = addrs; addr; addr = addr->ifa_next){
+        if (addr->ifa_addr && addr->ifa_addr->sa_family == AF_INET6){
+            getnameinfo(addr->ifa_addr, sizeof(struct sockaddr_in6), ipAddress, sizeof(ipAddress), NULL, 0, NI_NUMERICHOST);
+
+            /* cut the interface name from the end of a link-local address */
+            auto search = strrchr(ipAddress, '%');
+            if (search != nullptr) {
+                *search = '\0';
+            }
+
+            /* convert to a scope ID, if it's our interface */
+            if(strcmp(ipAddress, ip) == 0){
+                scope = if_nametoindex(addr->ifa_name);
+                break;
+            }
+        }
+    }
+
+    freeifaddrs(addrs);
+    return scope;
+}
+
 Endpoint::Endpoint(const char *name)
     : _name{name}
 {
@@ -427,63 +484,6 @@ void Endpoint::log_aggregate(unsigned int interval_sec)
     }
 }
 
-bool Endpoint::is_ipv6(const char *ip)
-{
-    /* Square brackets always exist on IPv6 addresses b/c of input validation */
-    if (strchr(ip, '[') != nullptr) {
-        return true;
-    }
-    return false;
-}
-
-bool Endpoint::ipv6_is_linklocal(const char *ip)
-{
-    /* link-local addresses start with fe80 */
-    if (strncmp(ip, "fe80", 4) == 0) {
-        return true;
-    }
-    return false;
-}
-
-bool Endpoint::ipv6_is_multicast(const char *ip)
-{
-    /* link-local addresses start with ff0x */
-    if (strncmp(ip, "ff0", 3) == 0) {
-        return true;
-    }
-    return false;
-}
-
-unsigned int Endpoint::ipv6_get_scope_id(const char *ip)
-{
-    struct ifaddrs *addrs;
-    char ipAddress[NI_MAXHOST];
-    unsigned scope=0;
-    getifaddrs(&addrs);
-
-    /* search for our address in all interface addresses */
-    for(ifaddrs *addr = addrs; addr; addr = addr->ifa_next){
-        if (addr->ifa_addr && addr->ifa_addr->sa_family == AF_INET6){
-            getnameinfo(addr->ifa_addr, sizeof(struct sockaddr_in6), ipAddress, sizeof(ipAddress), NULL, 0, NI_NUMERICHOST);
-
-            /* cut the interface name from the end of a link-local address */
-            auto search = strrchr(ipAddress, '%');
-            if (search != nullptr) {
-                *search = '\0';
-            }
-
-            /* convert to a scope ID, if it's our interface */
-            if(strcmp(ipAddress, ip) == 0){
-                scope = if_nametoindex(addr->ifa_name);
-                break;
-            }
-        }
-    }
-
-    freeifaddrs(addrs);
-    return scope;
-}
-
 UartEndpoint::~UartEndpoint()
 {
     if (fd > 0) {
@@ -733,69 +733,105 @@ UdpEndpoint::UdpEndpoint()
     bzero(&sockaddr6, sizeof(sockaddr6));
 }
 
-int UdpEndpoint::open(const char *ip, unsigned long port, bool to_bind)
+int UdpEndpoint::open_ipv6(const char *ip, unsigned long port, bool server)
+{
+    fd = socket(AF_INET6, SOCK_DGRAM, 0);
+    if (fd < 0) {
+        log_error("Could not create socket (%m)");
+        return -errno;
+    }
+
+    /* strip square brackets from ip string */
+    char *ip_str = strdup(&ip[1]);
+    ip_str[strlen(ip_str) - 1] = '\0';
+
+    sockaddr6.sin6_family = AF_INET6;
+    sockaddr6.sin6_port = htons(port);
+
+    /* multicast address needs to listen to all, but "filter" incoming packets */
+    if (server && ipv6_is_multicast(ip_str)) {
+        sockaddr6.sin6_addr = in6addr_any;
+
+        struct ipv6_mreq group;
+        inet_pton(AF_INET6, ip_str, &group.ipv6mr_multiaddr);
+        if (setsockopt(fd, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, &group, sizeof(group)) < 0){
+            log_error("Error setting IPv6 multicast socket options (%m)");
+            goto fail;
+        }
+    } else {
+        inet_pton(AF_INET6, ip_str, &sockaddr6.sin6_addr);
+    }
+
+    /* link-local address needs a scope ID */
+    if (ipv6_is_linklocal(ip_str)) {
+        sockaddr6.sin6_scope_id = ipv6_get_scope_id(ip_str);
+    }
+
+    free(ip_str);
+
+    if (server) {
+        if (bind(fd, (struct sockaddr *)&sockaddr6, sizeof(sockaddr6)) < 0) {
+            log_error("Error binding IPv6 socket (%m)");
+            goto fail;
+        }
+        sockaddr6.sin6_port = 0;
+    }
+
+    return fd;
+
+fail:
+    free(ip_str);
+    ::close(fd);
+    fd = -1;
+    return -EINVAL;
+}
+
+
+int UdpEndpoint::open_ipv4(const char *ip, unsigned long port, bool server)
+{
+    fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd < 0) {
+        log_error("Could not create socket (%m)");
+        return -errno;
+    }
+
+    sockaddr.sin_family = AF_INET;
+    sockaddr.sin_addr.s_addr = inet_addr(ip);
+    sockaddr.sin_port = htons(port);
+
+    if (server) {
+        if (bind(fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) < 0) {
+            log_error("Error binding socket (%m)");
+            goto fail;
+        }
+        sockaddr.sin_port = 0;
+    }
+
+    return fd;
+
+fail:
+    ::close(fd);
+    fd = -1;
+    return -EINVAL;
+}
+
+int UdpEndpoint::open(const char *ip, unsigned long port, bool server)
 {
     const int broadcast_val = 1;
 
-    this->is_ipv6 = Endpoint::is_ipv6(ip);
-    if (this->is_ipv6) {
-        fd = socket(AF_INET6, SOCK_DGRAM, 0);
-    } else {
-        fd = socket(AF_INET, SOCK_DGRAM, 0);
-    }
+    this->ipv6 = is_ipv6(ip);
 
-    if (fd == -1) {
-        log_error("Could not create socket (%m)");
+    // setup the special ipv6/ipv4 part
+    if (this->ipv6)
+        open_ipv6(ip, port, server);
+    else
+        open_ipv4(ip, port, server);
+
+    if (fd < 0)
         return -1;
-    }
 
-    if (this->is_ipv6) {
-        /* strip square brackets from ip string */
-        char *ip_str = strdup(&ip[1]);
-        ip_str[strlen(ip_str) - 1] = '\0';
-
-        sockaddr6.sin6_family = AF_INET6;
-        sockaddr6.sin6_port = htons(port);
-        
-        /* multicast address needs to listen to all, but "filter" incoming packets */
-        if (to_bind && Endpoint::ipv6_is_multicast(ip_str)) {
-            sockaddr6.sin6_addr = in6addr_any;
-
-            struct ipv6_mreq group;
-            inet_pton(AF_INET6, ip_str, &group.ipv6mr_multiaddr);
-            if (setsockopt(fd, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, &group, sizeof(group)) < 0){
-                log_error("Error setting IPv6 multicast socket options (%m)");
-                goto fail;
-            }
-        } else {
-            inet_pton(AF_INET6, ip_str, &sockaddr6.sin6_addr);
-        }
-
-        /* link-local address needs a scope ID */
-        if (Endpoint::ipv6_is_linklocal(ip_str)) {
-            sockaddr6.sin6_scope_id = ipv6_get_scope_id(ip_str);
-        }
-
-        free(ip_str);
-    } else {
-        sockaddr.sin_family = AF_INET;
-        sockaddr.sin_addr.s_addr = inet_addr(ip);
-        sockaddr.sin_port = htons(port);
-    }
-
-    if (to_bind) {
-        if (this->is_ipv6) {
-            if (bind(fd, (struct sockaddr *)&sockaddr6, sizeof(sockaddr6)) < 0) {
-                log_error("Error binding IPv6 socket (%m)");
-                goto fail;
-            }
-        } else {
-            if (bind(fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) < 0) {
-                log_error("Error binding socket (%m)");
-                goto fail;
-            }
-        }
-    } else {
+    // common setup
+    if (!server) {
         if (setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &broadcast_val, sizeof(broadcast_val))) {
             log_error("Error enabling broadcast in socket (%m)");
             goto fail;
@@ -807,15 +843,7 @@ int UdpEndpoint::open(const char *ip, unsigned long port, bool to_bind)
         goto fail;
     }
 
-    if (to_bind) {
-        if (this->is_ipv6) {
-            sockaddr6.sin6_port = 0;
-        } else {
-            sockaddr.sin_port = 0;
-        }
-    }
-
-    log_info("Open UDP [%d] %s:%lu %c", fd, ip, port, to_bind ? '*' : ' ');
+    log_info("Open UDP [%d] %s:%lu %c", fd, ip, port, server ? '*' : ' ');
 
     return fd;
 
@@ -829,15 +857,19 @@ fail:
 
 ssize_t UdpEndpoint::_read_msg(uint8_t *buf, size_t len)
 {
-    socklen_t addrlen = sizeof(sockaddr);
+    socklen_t addrlen;
+    struct sockaddr *sock;
     ssize_t r = 0;
-    if (this->is_ipv6) {
+
+    if (this->ipv6) {
         addrlen = sizeof(sockaddr6);
-        r = ::recvfrom(fd, buf, len, 0, (struct sockaddr *)&sockaddr6, &addrlen);
+        sock = (struct sockaddr *)&sockaddr6;
     } else {
-        r = ::recvfrom(fd, buf, len, 0, (struct sockaddr *)&sockaddr, &addrlen);
+        addrlen = sizeof(sockaddr);
+        sock = (struct sockaddr *)&sockaddr;
     }
 
+    r = ::recvfrom(fd, buf, len, 0, sock, &addrlen);
     if (r == -1 && errno == EAGAIN)
         return 0;
     if (r == -1)
@@ -848,6 +880,9 @@ ssize_t UdpEndpoint::_read_msg(uint8_t *buf, size_t len)
 
 int UdpEndpoint::write_msg(const struct buffer *pbuf)
 {
+    struct sockaddr *sock;
+    socklen_t addrlen;
+
     if (fd < 0) {
         log_error("Trying to write invalid fd");
         return -EINVAL;
@@ -859,9 +894,13 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
     }
 
     bool sock_connected = false;
-    if (is_ipv6) {
+    if (this->ipv6) {
+        addrlen = sizeof(sockaddr6);
+        sock = (struct sockaddr *)&sockaddr6;
         sock_connected = sockaddr6.sin6_port != 0;
     } else {
+        addrlen = sizeof(sockaddr);
+        sock = (struct sockaddr *)&sockaddr;
         sock_connected = sockaddr.sin_port != 0;
     }
 
@@ -870,13 +909,7 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
         return 0;
     }
 
-    ssize_t r = 0;
-    if (this->is_ipv6) {
-        r = ::sendto(fd, pbuf->data, pbuf->len, 0, (struct sockaddr *)&sockaddr6, sizeof(sockaddr6));
-    } else {
-        r = ::sendto(fd, pbuf->data, pbuf->len, 0, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
-    }
-
+    ssize_t r = ::sendto(fd, pbuf->data, pbuf->len, 0, sock, addrlen);
     if (r == -1) {
         if (errno != EAGAIN && errno != ECONNREFUSED && errno != ENETUNREACH)
             log_error("Error sending udp packet (%m)");
@@ -913,7 +946,7 @@ TcpEndpoint::~TcpEndpoint()
 int TcpEndpoint::accept(int listener_fd)
 {
     socklen_t addrlen = sizeof(sockaddr);
-    if (this->is_ipv6) {
+    if (this->ipv6) {
         addrlen = sizeof(sockaddr6);
         fd = accept4(listener_fd, (struct sockaddr *)&sockaddr6, &addrlen, SOCK_NONBLOCK);
     } else {
@@ -944,8 +977,8 @@ int TcpEndpoint::open(const char *ip, unsigned long port)
 
     assert_or_return(_ip, -ENOMEM);
 
-    this->is_ipv6 = Endpoint::is_ipv6(ip);
-    if (this->is_ipv6) {
+    this->ipv6 = is_ipv6(ip);
+    if (this->ipv6) {
         fd = socket(AF_INET6, SOCK_STREAM, 0);
     } else {
         fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -956,13 +989,13 @@ int TcpEndpoint::open(const char *ip, unsigned long port)
         return -1;
     }
 
-    if (this->is_ipv6) {
+    if (this->ipv6) {
         /* strip square brackets from ip string */
         char *ip_str = strdup(&_ip[1]);
         ip_str[strlen(ip_str) - 1] = '\0';
 
         /* multicast address is not allowed for TCP sockets */
-        if (Endpoint::ipv6_is_multicast(ip_str)) {
+        if (ipv6_is_multicast(ip_str)) {
             log_error("TCP socket does not support multicast address");
             goto fail;
         }
@@ -972,7 +1005,7 @@ int TcpEndpoint::open(const char *ip, unsigned long port)
         inet_pton(AF_INET6, ip_str, &sockaddr6.sin6_addr);
 
         /* link-local address needs a scope ID */
-        if (Endpoint::ipv6_is_linklocal(ip_str)) {
+        if (ipv6_is_linklocal(ip_str)) {
             sockaddr6.sin6_scope_id = ipv6_get_scope_id(ip_str);
         }
 
@@ -983,7 +1016,7 @@ int TcpEndpoint::open(const char *ip, unsigned long port)
         sockaddr.sin_port = htons(port);
     }
 
-    if (this->is_ipv6) {
+    if (this->ipv6) {
         if (connect(fd, (struct sockaddr *)&sockaddr6, sizeof(sockaddr6)) < 0) {
             log_error("Error connecting to IPv6 socket (%m)");
             goto fail;
@@ -1016,7 +1049,7 @@ ssize_t TcpEndpoint::_read_msg(uint8_t *buf, size_t len)
     errno = 0;
     ssize_t r = 0;
 
-    if (this->is_ipv6) {
+    if (this->ipv6) {
         addrlen = sizeof(sockaddr6);
         r = ::recvfrom(fd, buf, len, 0, (struct sockaddr *)&sockaddr6, &addrlen);
     } else {
@@ -1050,7 +1083,7 @@ int TcpEndpoint::write_msg(const struct buffer *pbuf)
     }
 
     ssize_t r = 0;
-    if (this->is_ipv6) {
+    if (this->ipv6) {
         r = ::sendto(fd, pbuf->data, pbuf->len, 0, (struct sockaddr *)&sockaddr6, sizeof(sockaddr6));
     } else {
         r = ::sendto(fd, pbuf->data, pbuf->len, 0, (struct sockaddr *)&sockaddr, sizeof(sockaddr));

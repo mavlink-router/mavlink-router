@@ -110,11 +110,6 @@ protected:
     bool _check_crc(const mavlink_msg_entry_t *msg_entry);
     void _add_sys_comp_id(uint16_t sys_comp_id);
 
-    static bool is_ipv6(const char *ip);
-    static bool ipv6_is_linklocal(const char *ip);
-    static bool ipv6_is_multicast(const char *ip);
-    static unsigned int ipv6_get_scope_id(const char *ip);
-
     const char *_name;
     size_t _last_packet_len = 0;
 
@@ -178,13 +173,18 @@ public:
     int write_msg(const struct buffer *pbuf) override;
     int flush_pending_msgs() override { return -ENOSYS; }
 
-    int open(const char *ip, unsigned long port, bool bind = false);
+    int open(const char *ip, unsigned long port, bool server = false);
 
     struct sockaddr_in sockaddr;
     struct sockaddr_in6 sockaddr6;
-    bool is_ipv6;
+
+
+    bool ipv6;
 
 protected:
+    int open_ipv4(const char *ip, unsigned long port, bool server);
+    int open_ipv6(const char *ip, unsigned long port, bool server);
+
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
 };
 
@@ -202,7 +202,7 @@ public:
 
     struct sockaddr_in sockaddr;
     struct sockaddr_in6 sockaddr6;
-    bool is_ipv6;
+    bool ipv6;
     int retry_timeout = 0;
 
     inline const char *get_ip() {
