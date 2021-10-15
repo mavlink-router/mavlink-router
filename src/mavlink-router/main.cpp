@@ -139,14 +139,9 @@ static int split_on_last_colon(const char *str, char **base, unsigned long *numb
 
 static bool validate_ipv6(const char *ip)
 {
-#ifdef ENABLE_IPV6
     // simplyfied pattern
     std::regex ipv6_regex("\\[(([a-f\\d]{0,4}:)+[a-f\\d]{0,4})\\]");
     return std::regex_match(ip, ipv6_regex);
-#else
-
-    return false;
-#endif
 }
 
 static bool validate_ipv4(const char *ip)

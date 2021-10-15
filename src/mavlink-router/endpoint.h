@@ -110,12 +110,10 @@ protected:
     bool _check_crc(const mavlink_msg_entry_t *msg_entry);
     void _add_sys_comp_id(uint16_t sys_comp_id);
 
-#ifdef ENABLE_IPV6
     static bool is_ipv6(const char *ip);
     static bool ipv6_is_linklocal(const char *ip);
     static bool ipv6_is_multicast(const char *ip);
     static unsigned int ipv6_get_scope_id(const char *ip);
-#endif
 
     const char *_name;
     size_t _last_packet_len = 0;
@@ -183,10 +181,8 @@ public:
     int open(const char *ip, unsigned long port, bool bind = false);
 
     struct sockaddr_in sockaddr;
-#ifdef ENABLE_IPV6
     struct sockaddr_in6 sockaddr6;
     bool is_ipv6;
-#endif
 
 protected:
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
@@ -205,10 +201,8 @@ public:
     int flush_pending_msgs() override { return -ENOSYS; }
 
     struct sockaddr_in sockaddr;
-#ifdef ENABLE_IPV6
     struct sockaddr_in6 sockaddr6;
     bool is_ipv6;
-#endif
     int retry_timeout = 0;
 
     inline const char *get_ip() {
