@@ -217,6 +217,9 @@ public:
     bool is_critical() override { return false; };
 
 protected:
+    int open_ipv4(const char *ip, unsigned long port);
+    int open_ipv6(const char *ip, unsigned long port);
+
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
 
 private:

@@ -945,14 +945,18 @@ TcpEndpoint::~TcpEndpoint()
 
 int TcpEndpoint::accept(int listener_fd)
 {
-    socklen_t addrlen = sizeof(sockaddr);
+    struct sockaddr *sock;
+    socklen_t addrlen;
+
     if (this->ipv6) {
         addrlen = sizeof(sockaddr6);
-        fd = accept4(listener_fd, (struct sockaddr *)&sockaddr6, &addrlen, SOCK_NONBLOCK);
+        sock = (struct sockaddr *)&sockaddr6;
     } else {
-        fd = accept4(listener_fd, (struct sockaddr *)&sockaddr, &addrlen, SOCK_NONBLOCK);
+        addrlen = sizeof(sockaddr);
+        sock = (struct sockaddr *)&sockaddr;
     }
 
+    fd = accept4(listener_fd, sock, &addrlen, SOCK_NONBLOCK);
     if (fd == -1)
         return -1;
 
@@ -967,8 +971,63 @@ int TcpEndpoint::accept(int listener_fd)
     return fd;
 }
 
+int TcpEndpoint::open_ipv6(const char *ip, unsigned long port)
+{
+    fd = socket(AF_INET6, SOCK_STREAM, 0);
+    if (fd == -1) {
+        log_error("Could not create socket (%m)");
+        return -1;
+    }
+
+    /* strip square brackets from ip string */
+    char *ip_str = strdup(&_ip[1]);
+    ip_str[strlen(ip_str) - 1] = '\0';
+
+    /* multicast address is not allowed for TCP sockets */
+    if (ipv6_is_multicast(ip_str)) {
+        log_error("TCP socket does not support multicast address");
+        goto fail;
+    }
+
+    sockaddr6.sin6_family = AF_INET6;
+    sockaddr6.sin6_port = htons(port);
+    inet_pton(AF_INET6, ip_str, &sockaddr6.sin6_addr);
+
+    /* link-local address needs a scope ID */
+    if (ipv6_is_linklocal(ip_str)) {
+        sockaddr6.sin6_scope_id = ipv6_get_scope_id(ip_str);
+    }
+
+    free(ip_str);
+
+    return fd;
+
+fail:
+    free(ip_str);
+    fd = -1;
+    return fd;
+}
+
+int TcpEndpoint::open_ipv4(const char *ip, unsigned long port)
+{
+    fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd == -1) {
+        log_error("Could not create socket (%m)");
+        return -1;
+    }
+
+    sockaddr.sin_family = AF_INET;
+    sockaddr.sin_addr.s_addr = inet_addr(ip);
+    sockaddr.sin_port = htons(port);
+
+    return fd;
+}
+
 int TcpEndpoint::open(const char *ip, unsigned long port)
 {
+    struct sockaddr *sock;
+    socklen_t addrlen;
+
     if (!_ip || strcmp(ip, _ip)) {
         free(_ip);
         _ip = strdup(ip);
@@ -978,54 +1037,25 @@ int TcpEndpoint::open(const char *ip, unsigned long port)
     assert_or_return(_ip, -ENOMEM);
 
     this->ipv6 = is_ipv6(ip);
+
+    // setup the special ipv6/ipv4 part
     if (this->ipv6) {
-        fd = socket(AF_INET6, SOCK_STREAM, 0);
+        open_ipv6(ip, port);
+        sock = (struct sockaddr *)&this->sockaddr6;
+        addrlen = sizeof(sockaddr6);
     } else {
-        fd = socket(AF_INET, SOCK_STREAM, 0);
+        open_ipv4(ip, port);
+        sock = (struct sockaddr *)&this->sockaddr;
+        addrlen = sizeof(sockaddr);
     }
 
-    if (fd == -1) {
-        log_error("Could not create socket (%m)");
+    if (fd < 0)
         return -1;
-    }
 
-    if (this->ipv6) {
-        /* strip square brackets from ip string */
-        char *ip_str = strdup(&_ip[1]);
-        ip_str[strlen(ip_str) - 1] = '\0';
-
-        /* multicast address is not allowed for TCP sockets */
-        if (ipv6_is_multicast(ip_str)) {
-            log_error("TCP socket does not support multicast address");
-            goto fail;
-        }
-
-        sockaddr6.sin6_family = AF_INET6;
-        sockaddr6.sin6_port = htons(port);
-        inet_pton(AF_INET6, ip_str, &sockaddr6.sin6_addr);
-
-        /* link-local address needs a scope ID */
-        if (ipv6_is_linklocal(ip_str)) {
-            sockaddr6.sin6_scope_id = ipv6_get_scope_id(ip_str);
-        }
-
-        free(ip_str);
-    } else {
-        sockaddr.sin_family = AF_INET;
-        sockaddr.sin_addr.s_addr = inet_addr(ip);
-        sockaddr.sin_port = htons(port);
-    }
-
-    if (this->ipv6) {
-        if (connect(fd, (struct sockaddr *)&sockaddr6, sizeof(sockaddr6)) < 0) {
-            log_error("Error connecting to IPv6 socket (%m)");
-            goto fail;
-        }
-    } else {
-        if (connect(fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) < 0) {
-            log_error("Error connecting to socket (%m)");
-            goto fail;
-        }
+    // common setup
+    if (connect(fd, sock, addrlen) < 0) {
+        log_error("Error connecting to IPv6 socket (%m)");
+        goto fail;
     }
 
     if (fcntl(fd, F_SETFL, O_NONBLOCK | FASYNC) < 0) {
@@ -1045,17 +1075,19 @@ fail:
 
 ssize_t TcpEndpoint::_read_msg(uint8_t *buf, size_t len)
 {
-    socklen_t addrlen = sizeof(sockaddr);
-    errno = 0;
-    ssize_t r = 0;
+    struct sockaddr *sock;
+    socklen_t addrlen;
+    ssize_t r;
 
     if (this->ipv6) {
+        sock = (struct sockaddr *)&sockaddr6;
         addrlen = sizeof(sockaddr6);
-        r = ::recvfrom(fd, buf, len, 0, (struct sockaddr *)&sockaddr6, &addrlen);
     } else {
-        r = ::recvfrom(fd, buf, len, 0, (struct sockaddr *)&sockaddr, &addrlen);
+        sock = (struct sockaddr *)&sockaddr;
+        addrlen = sizeof(sockaddr);
     }
 
+    r = ::recvfrom(fd, buf, len, 0, sock, &addrlen);
     if (r == -1 && errno == EAGAIN)
         return 0;
     if (r == -1)
@@ -1072,6 +1104,9 @@ ssize_t TcpEndpoint::_read_msg(uint8_t *buf, size_t len)
 
 int TcpEndpoint::write_msg(const struct buffer *pbuf)
 {
+    struct sockaddr *sock;
+    socklen_t addrlen;
+
     if (fd < 0) {
         log_error("Trying to write invalid fd");
         return -EINVAL;
@@ -1082,13 +1117,15 @@ int TcpEndpoint::write_msg(const struct buffer *pbuf)
         ;
     }
 
-    ssize_t r = 0;
     if (this->ipv6) {
-        r = ::sendto(fd, pbuf->data, pbuf->len, 0, (struct sockaddr *)&sockaddr6, sizeof(sockaddr6));
+        sock = (struct sockaddr *)&sockaddr6;
+        addrlen = sizeof(sockaddr6);
     } else {
-        r = ::sendto(fd, pbuf->data, pbuf->len, 0, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
+        sock = (struct sockaddr *)&sockaddr;
+        addrlen = sizeof(sockaddr);
     }
 
+    ssize_t r = ::sendto(fd, pbuf->data, pbuf->len, 0, sock, addrlen);
     if (r == -1) {
         if (errno != EAGAIN && errno != ECONNREFUSED)
             log_error("Error sending tcp packet (%m)");
