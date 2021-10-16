@@ -119,7 +119,7 @@ struct endpoint_config {
             char *address;
             long unsigned port;
             int retry_timeout;
-            bool eavesdropping;
+            bool server;
         };
         struct {
             char *device;

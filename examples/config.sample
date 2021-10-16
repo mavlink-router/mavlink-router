@@ -75,7 +75,7 @@
 # Keys:
 #   Address
 #       If on `Normal` mode, IP to which mavlink-router will
-#       route messages to (and from). If on `Eavesdropping` mode,
+#       route messages to (and from). If on `Server` mode,
 #       IP of interface to which mavlink-router will listen for
 #       incoming packets. In this case, `0.0.0.0` means that
 #       mavlink-router will listen on all interfaces.
@@ -83,15 +83,18 @@
 #       No default value. Must be defined.
 #
 #   Mode
-#       One of <normal> or <eavesdropping>. See `Address` for more
-#       information.
+#       One of <normal> or <server>. See `Address` for more
+#       information. <eavesdropping> is also accepted for compatibility
+#       reasons and has the same behavior as <server>.
 #       No default value. Must be defined
 #
 #   Port
 #       Numeric value defining in which port mavlink-router will send
 #       packets (or listen for them).
 #       Default value: Increasing value, starting from 14550, when
-#       mode is `Normal`. Must be defined if on `Eavesdropping` mode.
+#       mode is `Normal`. Must be defined if on `Server` mode: mavlink-router
+#       will bind to this port and wait for a first packet to be received to
+#       know to where it needs to send packets.
 #
 # Section [TcpEndpoint]: This section must have a name
 #

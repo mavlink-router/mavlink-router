@@ -227,7 +227,7 @@ fail:
 }
 
 static int add_endpoint_address(const char *name, size_t name_len, const char *ip,
-                                long unsigned port, bool eavesdropping, const char *filter)
+                                long unsigned port, bool server, const char *filter)
 {
     int ret;
 
@@ -275,7 +275,7 @@ static int add_endpoint_address(const char *name, size_t name_len, const char *i
         conf->port = find_next_endpoint_port(conf->address);
     }
 
-    conf->eavesdropping = eavesdropping;
+    conf->server = server;
 
     conf->next = opt.endpoints;
     opt.endpoints = conf;
@@ -668,11 +668,14 @@ static int parse_mode(const char *val, size_t val_len, void *storage, size_t sto
     if (val_len > INT_MAX)
         return -EINVAL;
 
-    bool *eavesdropping = (bool *)storage;
+    bool *server = (bool *)storage;
     if (memcaseeq(val, val_len, "normal", sizeof("normal") - 1)) {
-        *eavesdropping = false;
+        *server = false;
     } else if (memcaseeq(val, val_len, "eavesdropping", sizeof("eavesdropping") - 1)) {
-        *eavesdropping = true;
+        log_warning("Eavesdropping mode is deprecated and rather act like udpin/server");
+        *server = true;
+    } else if (memcaseeq(val, val_len, "server", sizeof("server") - 1)) {
+        *server = true;
     } else {
         log_error("Unknown 'mode' key: %.*s", (int)val_len, val);
         return -EINVAL;
@@ -717,13 +720,13 @@ static int parse_confs(ConfFile &conf)
 
     struct option_udp {
         char *addr;
-        bool eavesdropping;
+        bool server;
         unsigned long port;
         char *filter;
     };
     static const ConfFile::OptionsTable option_table_udp[] = {
         {"address", true,   ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_udp, addr)},
-        {"mode",    true,   parse_mode,                 OPTIONS_TABLE_STRUCT_FIELD(option_udp, eavesdropping)},
+        {"mode",    true,   parse_mode,                 OPTIONS_TABLE_STRUCT_FIELD(option_udp, server)},
         {"port",    false,  ConfFile::parse_ul,         OPTIONS_TABLE_STRUCT_FIELD(option_udp, port)},
         {"filter",  false,  ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_udp, filter)},
     };
@@ -766,7 +769,7 @@ static int parse_confs(ConfFile &conf)
         struct option_udp opt_udp = {nullptr, false, ULONG_MAX};
         ret = conf.extract_options(&iter, option_table_udp, ARRAY_SIZE(option_table_udp), &opt_udp);
         if (ret == 0) {
-            if (opt_udp.eavesdropping && opt_udp.port == ULONG_MAX) {
+            if (opt_udp.server && opt_udp.port == ULONG_MAX) {
                 log_error("Expected 'port' key for section %.*s", (int)iter.name_len, iter.name);
                 ret = -EINVAL;
             } else {
@@ -775,7 +778,7 @@ static int parse_confs(ConfFile &conf)
                     ret = -EINVAL;
                 } else {
                     ret = add_endpoint_address(iter.name + offset, iter.name_len - offset, opt_udp.addr,
-                                               opt_udp.port, opt_udp.eavesdropping, opt_udp.filter);
+                                               opt_udp.port, opt_udp.server, opt_udp.filter);
                 }
             }
         }
