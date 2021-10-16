@@ -70,35 +70,36 @@ AM_LDFLAGS = \
 
 bin_PROGRAMS += mavlink-routerd
 mavlink_routerd_SOURCES = \
-	src/mavlink-router/autolog.cpp \
-	src/mavlink-router/autolog.h \
-	src/mavlink-router/binlog.cpp \
-	src/mavlink-router/binlog.h \
-	src/mavlink-router/comm.h \
 	src/common/conf_file.cpp \
 	src/common/conf_file.h \
 	src/common/dbg.h \
-	src/common/mavlink.h \
-	src/mavlink-router/endpoint.cpp \
-	src/mavlink-router/endpoint.h \
 	src/common/log.cpp \
 	src/common/log.h \
-	src/mavlink-router/logendpoint.cpp \
-	src/mavlink-router/logendpoint.h \
 	src/common/macro.h \
-	src/mavlink-router/main.cpp \
-	src/mavlink-router/mainloop.cpp \
-	src/mavlink-router/mainloop.h \
-	src/mavlink-router/pollable.h \
-	src/mavlink-router/pollable.cpp \
-	src/mavlink-router/timeout.h \
-	src/mavlink-router/timeout.cpp \
-	src/mavlink-router/ulog.h \
-	src/mavlink-router/ulog.cpp \
+	src/common/mavlink.h \
 	src/common/util.c \
 	src/common/util.h \
 	src/common/xtermios.cpp \
-	src/common/xtermios.h
+	src/common/xtermios.h \
+	src/autolog.cpp \
+	src/autolog.h \
+	src/binlog.cpp \
+	src/binlog.h \
+	src/comm.h \
+	src/endpoint.cpp \
+	src/endpoint.h \
+	src/logendpoint.cpp \
+	src/logendpoint.h \
+	src/main.cpp \
+	src/mainloop.cpp \
+	src/mainloop.h \
+	src/pollable.cpp \
+	src/pollable.h \
+	src/timeout.cpp \
+	src/timeout.h \
+	src/ulog.cpp \
+	src/ulog.h \
+	$(EMPTY)
 
 noinst_PROGRAMS += heartbeat-print
 heartbeat_print_SOURCES = \
@@ -147,14 +148,16 @@ mainloop_test_SOURCES = \
 	src/common/log.h \
 	src/common/util.c \
 	src/common/util.h \
-	src/mavlink-router/endpoint.cpp \
-	src/mavlink-router/endpoint.h \
-	src/mavlink-router/mainloop_test.cpp \
-	src/mavlink-router/mainloop.cpp \
-	src/mavlink-router/pollable.cpp \
-	src/mavlink-router/pollable.h \
-	src/mavlink-router/timeout.cpp \
-	src/mavlink-router/timeout.h
+	src/endpoint.cpp \
+	src/endpoint.h \
+	src/mainloop.cpp \
+	src/mainloop_test.cpp \
+	src/pollable.cpp \
+	src/pollable.h \
+	src/timeout.cpp \
+	src/timeout.h \
+	$(EMPTY)
+
 mainloop_test_LDADD = $(GTEST_LIBS)
 
 # ------------------------------------------------------------------------------
