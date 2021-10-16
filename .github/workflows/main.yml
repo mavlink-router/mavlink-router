@@ -36,14 +36,24 @@ jobs:
       - uses: actions/checkout@v1
         with:
           submodules: recursive
+
       - name: setup dockcross
         run: docker run --rm dockcross/${{ matrix.arch_name }} > ./dockcross; chmod +x ./dockcross
+
+      - name: install dependencies
+        run: |
+          docker run --name buildcontainer dockcross/${{ matrix.arch_name }} sudo apt install python3-future
+          docker commit buildcontainer local/buildimage
+
       - name: configure
-        run: ./dockcross /bin/bash -c "./autogen.sh c --with-systemdsystemunitdir=/usr/lib/systemd/system --host=amd64"
+        run: ./dockcross -i local/buildimage ./autogen.sh c --with-systemdsystemunitdir=/usr/lib/systemd/system --host=amd64
+
       - name: build
-        run: ./dockcross /bin/bash -c "make -j"
+        run: ./dockcross -i local/buildimage make -j
+
       - name: test
-        run: ./dockcross /bin/bash -c "make check PYTHON=python3"
+        run: ./dockcross -i local/buildimage /bin/bash -c "make check PYTHON=python3"
+
       - name: Rename
         run: cp mavlink-routerd mavlink-routerd-libc-${{ matrix.name }}
       - name: package-deb
