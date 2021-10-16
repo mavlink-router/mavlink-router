@@ -17,15 +17,17 @@
  */
 #include "endpoint.h"
 
-#include <arpa/inet.h>
 #include <algorithm>
+
+#include <arpa/inet.h>
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <net/if.h>
-#include <netinet/tcp.h>
 #include <ifaddrs.h>
+#include <linux/serial.h>
+#include <net/if.h>
 #include <netdb.h>
+#include <netinet/tcp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -38,8 +40,6 @@
 #include <common/log.h>
 #include <common/util.h>
 #include <common/xtermios.h>
-
-#include <linux/serial.h>
 
 #include "mainloop.h"
 
@@ -79,13 +79,14 @@ static unsigned int ipv6_get_scope_id(const char *ip)
 {
     struct ifaddrs *addrs;
     char ipAddress[NI_MAXHOST];
-    unsigned scope=0;
+    unsigned scope = 0;
     getifaddrs(&addrs);
 
     /* search for our address in all interface addresses */
-    for(ifaddrs *addr = addrs; addr; addr = addr->ifa_next){
-        if (addr->ifa_addr && addr->ifa_addr->sa_family == AF_INET6){
-            getnameinfo(addr->ifa_addr, sizeof(struct sockaddr_in6), ipAddress, sizeof(ipAddress), NULL, 0, NI_NUMERICHOST);
+    for (ifaddrs *addr = addrs; addr; addr = addr->ifa_next) {
+        if (addr->ifa_addr && addr->ifa_addr->sa_family == AF_INET6) {
+            getnameinfo(addr->ifa_addr, sizeof(struct sockaddr_in6), ipAddress, sizeof(ipAddress),
+                        NULL, 0, NI_NUMERICHOST);
 
             /* cut the interface name from the end of a link-local address */
             auto search = strrchr(ipAddress, '%');
@@ -94,7 +95,7 @@ static unsigned int ipv6_get_scope_id(const char *ip)
             }
 
             /* convert to a scope ID, if it's our interface */
-            if(strcmp(ipAddress, ip) == 0){
+            if (strcmp(ipAddress, ip) == 0) {
                 scope = if_nametoindex(addr->ifa_name);
                 break;
             }
@@ -108,9 +109,9 @@ static unsigned int ipv6_get_scope_id(const char *ip)
 Endpoint::Endpoint(const char *name)
     : _name{name}
 {
-    rx_buf.data = (uint8_t *) malloc(RX_BUF_MAX_SIZE);
+    rx_buf.data = (uint8_t *)malloc(RX_BUF_MAX_SIZE);
     rx_buf.len = 0;
-    tx_buf.data = (uint8_t *) malloc(TX_BUF_MAX_SIZE);
+    tx_buf.data = (uint8_t *)malloc(TX_BUF_MAX_SIZE);
     tx_buf.len = 0;
 
     assert(rx_buf.data);
@@ -198,7 +199,7 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
     if (!mavlink1 && !mavlink2) {
         unsigned int stx_pos = 0;
 
-        for (unsigned int i = 1; i < (unsigned int) rx_buf.len; i++) {
+        for (unsigned int i = 1; i < (unsigned int)rx_buf.len; i++) {
             if (rx_buf.data[i] == MAVLINK_STX)
                 mavlink2 = true;
             else if (rx_buf.data[i] == MAVLINK_STX_MAVLINK1)
@@ -228,8 +229,8 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
     size_t expected_size;
 
     if (mavlink2) {
-        struct mavlink_router_mavlink2_header *hdr =
-                (struct mavlink_router_mavlink2_header *)rx_buf.data;
+        struct mavlink_router_mavlink2_header *hdr
+            = (struct mavlink_router_mavlink2_header *)rx_buf.data;
 
         if (rx_buf.len < sizeof(*hdr))
             return 0;
@@ -247,8 +248,8 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
         if (hdr->incompat_flags & MAVLINK_IFLAG_SIGNED)
             expected_size += MAVLINK_SIGNATURE_BLOCK_LEN;
     } else {
-        struct mavlink_router_mavlink1_header *hdr =
-                (struct mavlink_router_mavlink1_header *)rx_buf.data;
+        struct mavlink_router_mavlink1_header *hdr
+            = (struct mavlink_router_mavlink1_header *)rx_buf.data;
 
         if (rx_buf.len < sizeof(*hdr))
             return 0;
@@ -373,8 +374,8 @@ bool Endpoint::accept_msg(int target_sysid, int target_compid, uint8_t src_sysid
                           uint8_t src_compid, uint32_t msg_id)
 {
     if (Log::get_max_level() >= Log::Level::DEBUG) {
-        log_debug("Endpoint [%d] got message %u to %d/%d from %u/%u", fd, msg_id, target_sysid, target_compid,
-                  src_sysid, src_compid);
+        log_debug("Endpoint [%d] got message %u to %d/%d from %u/%u", fd, msg_id, target_sysid,
+                  target_compid, src_sysid, src_compid);
         log_debug("\tKnown components:");
         for (auto it = _sys_comp_ids.begin(); it != _sys_comp_ids.end(); it++) {
             log_debug("\t\t%u/%u", (*it >> 8), *it & 0xff);
@@ -402,7 +403,8 @@ bool Endpoint::accept_msg(int target_sysid, int target_compid, uint8_t src_sysid
     if (target_compid > 0 && has_sys_comp_id(target_sysid, target_compid))
         return true;
 
-    // This endpoint has the target of message (sysid, but compid is broadcast or non-existent): accept
+    // This endpoint has the target of message (sysid, but compid is broadcast or non-existent):
+    // accept
     if ((target_compid == 0 || target_compid == -1) && has_sys_id(target_sysid))
         return true;
 
@@ -417,14 +419,14 @@ bool Endpoint::_check_crc(const mavlink_msg_entry_t *msg_entry)
     uint8_t payload_len, header_len, *payload;
 
     if (mavlink2) {
-        struct mavlink_router_mavlink2_header *hdr =
-                    (struct mavlink_router_mavlink2_header *)rx_buf.data;
+        struct mavlink_router_mavlink2_header *hdr
+            = (struct mavlink_router_mavlink2_header *)rx_buf.data;
         payload = rx_buf.data + sizeof(*hdr);
         header_len = sizeof(*hdr);
         payload_len = hdr->payload_len;
     } else {
-        struct mavlink_router_mavlink1_header *hdr =
-                    (struct mavlink_router_mavlink1_header *)rx_buf.data;
+        struct mavlink_router_mavlink1_header *hdr
+            = (struct mavlink_router_mavlink1_header *)rx_buf.data;
         payload = rx_buf.data + sizeof(*hdr);
         header_len = sizeof(*hdr);
         payload_len = hdr->payload_len;
@@ -459,7 +461,8 @@ void Endpoint::print_statistics()
     printf("\n}\n");
 }
 
-uint8_t Endpoint::get_trimmed_zeros(const mavlink_msg_entry_t *msg_entry, const struct buffer *buffer)
+uint8_t Endpoint::get_trimmed_zeros(const mavlink_msg_entry_t *msg_entry,
+                                    const struct buffer *buffer)
 {
     struct mavlink_router_mavlink2_header *msg
         = (struct mavlink_router_mavlink2_header *)buffer->data;
@@ -559,7 +562,7 @@ int UartEndpoint::open(const char *path)
 {
     struct termios2 tc;
 
-    fd = ::open(path, O_RDWR|O_NONBLOCK|O_CLOEXEC|O_NOCTTY);
+    fd = ::open(path, O_RDWR | O_NONBLOCK | O_CLOEXEC | O_NOCTTY);
     if (fd < 0) {
         log_error("Could not open %s (%m)", path);
         return -1;
@@ -621,7 +624,7 @@ int UartEndpoint::open(const char *path)
 
         serial_ctl.flags |= ASYNC_LOW_LATENCY;
 
-        result =  ioctl(fd, TIOCSSERIAL, &serial_ctl);
+        result = ioctl(fd, TIOCSSERIAL, &serial_ctl);
         if (result < 0) {
             if (errno != ENODEV && errno != ENOTTY)
                 log_warning("Error while trying to write serial port latency: %m");
@@ -700,7 +703,7 @@ int UartEndpoint::write_msg(const struct buffer *pbuf)
     _stat.write.bytes += pbuf->len;
 
     /* Incomplete packet, we warn and discard the rest */
-    if (r != (ssize_t) pbuf->len) {
+    if (r != (ssize_t)pbuf->len) {
         _incomplete_msgs++;
         log_debug("Discarding packet, incomplete write %zd but len=%u", r, pbuf->len);
     }
@@ -754,7 +757,7 @@ int UdpEndpoint::open_ipv6(const char *ip, unsigned long port, bool server)
 
         struct ipv6_mreq group;
         inet_pton(AF_INET6, ip_str, &group.ipv6mr_multiaddr);
-        if (setsockopt(fd, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, &group, sizeof(group)) < 0){
+        if (setsockopt(fd, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, &group, sizeof(group)) < 0) {
             log_error("Error setting IPv6 multicast socket options (%m)");
             goto fail;
         }
@@ -785,7 +788,6 @@ fail:
     fd = -1;
     return -EINVAL;
 }
-
 
 int UdpEndpoint::open_ipv4(const char *ip, unsigned long port, bool server)
 {
@@ -920,7 +922,7 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
     _stat.write.bytes += pbuf->len;
 
     /* Incomplete packet, we warn and discard the rest */
-    if (r != (ssize_t) pbuf->len) {
+    if (r != (ssize_t)pbuf->len) {
         _incomplete_msgs++;
         log_debug("Discarding packet, incomplete write %zd but len=%u", r, pbuf->len);
     }
@@ -963,7 +965,7 @@ int TcpEndpoint::accept(int listener_fd)
     log_info("TCP connection [%d] accepted", fd);
 
     int tcp_nodelay_state = 1;
-    if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *) &tcp_nodelay_state, sizeof(int)) < 0) {
+    if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&tcp_nodelay_state, sizeof(int)) < 0) {
         log_error("Setting TCP_NODELAY failed [%d]", fd);
         return -1;
     }
@@ -1138,7 +1140,7 @@ int TcpEndpoint::write_msg(const struct buffer *pbuf)
     _stat.write.bytes += pbuf->len;
 
     /* Incomplete packet, we warn and discard the rest */
-    if (r != (ssize_t) pbuf->len) {
+    if (r != (ssize_t)pbuf->len) {
         _incomplete_msgs++;
         log_debug("Discarding packet, incomplete write %zd but len=%u", r, pbuf->len);
     }
