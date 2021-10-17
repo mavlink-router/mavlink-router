@@ -186,10 +186,3 @@ coverity-sync: mavlink-router-coverity-$(shell git rev-parse --short HEAD 2>/dev
 
 coverity-clean:
 	rm -rf mavlink-router-coverity-*.tar.xz cov-int
-
-# ------------------------------------------------------------------------------
-# mkosi
-# ------------------------------------------------------------------------------
-
-mkosi:
-	mkosi -C $(top_srcdir)/tests/osi --build-sources ../../ -f
