@@ -352,7 +352,7 @@ bool LogEndpoint::start()
         MSEC_PER_SEC, std::bind(&LogEndpoint::_start_timeout, this), this);
     if (!_logging_start_timeout) {
         log_error("Unable to add timeout");
-        goto timeout_error;
+        goto logging_timeout_error;
     }
 
     // Call fsync once per second
@@ -360,19 +360,17 @@ bool LogEndpoint::start()
         MSEC_PER_SEC, std::bind(&LogEndpoint::_fsync, this), this);
     if (!_fsync_timeout) {
         log_error("Unable to add timeout");
-        goto timeout_error;
+        goto fsync_timeout_error;
     }
 
     log_info("Logging target system_id=%u on %s", _target_system_id, _filename);
 
     return true;
 
-timeout_error:
-    if (_logging_start_timeout) {
-        Mainloop::get_instance().del_timeout(_fsync_timeout);
-        _fsync_timeout = nullptr;
-    }
-
+fsync_timeout_error:
+    Mainloop::get_instance().del_timeout(_logging_start_timeout);
+    _logging_start_timeout = nullptr;
+logging_timeout_error:
     close(_file);
     _file = -1;
     return false;
