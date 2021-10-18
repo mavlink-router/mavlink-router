@@ -41,6 +41,8 @@
 #define DEFAULT_CONF_DIR "/etc/mavlink-router/config.d"
 #define DEFAULT_RETRY_TCP_TIMEOUT 5
 
+extern const char *BUILD_VERSION;
+
 static struct options opt = {
     .endpoints = nullptr,
     .conf_file_name = nullptr,
@@ -398,7 +400,7 @@ static bool pre_parse_argv(int argc, char *argv[])
             break;
         }
         case 'V':
-            puts(PACKAGE " version " VERSION);
+            printf(PACKAGE " version %s\n", BUILD_VERSION);
             return false;
         }
     }

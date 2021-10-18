@@ -88,6 +88,7 @@ mavlink_routerd_SOURCES = \
 	src/comm.h \
 	src/endpoint.cpp \
 	src/endpoint.h \
+	src/git_version.cpp \
 	src/logendpoint.cpp \
 	src/logendpoint.h \
 	src/main.cpp \
@@ -100,6 +101,22 @@ mavlink_routerd_SOURCES = \
 	src/ulog.cpp \
 	src/ulog.h \
 	$(EMPTY)
+
+src/git_version.h: FORCE
+	$(AM_V_GEN) ( \
+		$(srcdir)/tools/gen-git-version.sh $(top_srcdir) > $@.tmp; \
+		if ! cmp $@.tmp $@; then \
+			cat $@.tmp > $@ ;\
+		fi )
+
+.PHONY: FORCE
+
+src/git_version.$(OBJEXT): src/git_version.h
+
+CLEANFILES += src/git_version.h
+
+nodist_mavlink_routerd_SOURCES = \
+	src/git_version.h
 
 noinst_PROGRAMS += heartbeat-print
 heartbeat_print_SOURCES = \
