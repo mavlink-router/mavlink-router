@@ -58,11 +58,11 @@ protected:
     unsigned long _max_files;
     LogMode _mode;
 
-    Timeout *_fsync_timeout = nullptr;
     Timeout *_alive_check_timeout = nullptr;
 
     struct {
         Timeout *logging_start = nullptr;
+        Timeout *fsync = nullptr;
     } _timeout;
     uint32_t _timeout_write_total = 0;
     aiocb _fsync_cb = {};

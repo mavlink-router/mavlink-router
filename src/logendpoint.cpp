@@ -315,9 +315,9 @@ void LogEndpoint::stop()
         _alive_check_timeout = nullptr;
     }
 
-    if (_fsync_timeout) {
-        mainloop.del_timeout(_fsync_timeout);
-        _fsync_timeout = nullptr;
+    if (_timeout.fsync) {
+        mainloop.del_timeout(_timeout.fsync);
+        _timeout.fsync = nullptr;
     }
 
     fsync(_file);
@@ -356,9 +356,9 @@ bool LogEndpoint::start()
     }
 
     // Call fsync once per second
-    _fsync_timeout = Mainloop::get_instance().add_timeout(
+    _timeout.fsync = Mainloop::get_instance().add_timeout(
         MSEC_PER_SEC, std::bind(&LogEndpoint::_fsync, this), this);
-    if (!_fsync_timeout) {
+    if (!_timeout.fsync) {
         log_error("Unable to add timeout");
         goto fsync_timeout_error;
     }
