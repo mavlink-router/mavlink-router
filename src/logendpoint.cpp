@@ -310,9 +310,9 @@ void LogEndpoint::stop()
         _timeout.logging_start = nullptr;
     }
 
-    if (_alive_check_timeout) {
-        mainloop.del_timeout(_alive_check_timeout);
-        _alive_check_timeout = nullptr;
+    if (_timeout.alive) {
+        mainloop.del_timeout(_timeout.alive);
+        _timeout.alive = nullptr;
     }
 
     if (_timeout.fsync) {
@@ -414,9 +414,9 @@ void LogEndpoint::_remove_logging_start_timeout()
 
 bool LogEndpoint::_start_alive_timeout()
 {
-    _alive_check_timeout = Mainloop::get_instance().add_timeout(
+    _timeout.alive = Mainloop::get_instance().add_timeout(
         MSEC_PER_SEC * ALIVE_TIMEOUT, std::bind(&LogEndpoint::_alive_timeout, this), this);
-    return !!_alive_check_timeout;
+    return !!_timeout.alive;
 }
 
 void LogEndpoint::_handle_auto_start_stop(uint32_t msg_id, uint8_t source_system_id,
