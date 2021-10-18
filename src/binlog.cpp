@@ -28,12 +28,13 @@
 
 #include "mainloop.h"
 
-bool BinLog::_start_timeout()
+bool BinLog::_logging_start_timeout()
 {
     mavlink_message_t msg;
 
     mavlink_msg_remote_log_block_status_pack(LOG_ENDPOINT_SYSTEM_ID, MAV_COMP_ID_ALL, &msg, _target_system_id,
                                              MAV_COMP_ID_ALL, MAV_REMOTE_LOG_DATA_BLOCK_START, 1);
+
     _send_msg(&msg, _target_system_id);
 
     return true;
@@ -138,9 +139,9 @@ int BinLog::write_msg(const struct buffer *buffer)
         binlog_data = (mavlink_remote_log_data_block_t *)payload;
     }
 
-    if (_logging_start_timeout) {
+    if (_timeout.logging_start) {
         if (binlog_data->seqno == 0) {
-            _remove_start_timeout();
+            _remove_logging_start_timeout();
             if (!_start_alive_timeout()) {
                 log_warning("Could not start liveness timeout - mavlink router log won't be able "
                             "to detect if flight stack stopped");

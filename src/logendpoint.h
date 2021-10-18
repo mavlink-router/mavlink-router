@@ -58,19 +58,22 @@ protected:
     unsigned long _max_files;
     LogMode _mode;
 
-    Timeout *_logging_start_timeout = nullptr;
     Timeout *_fsync_timeout = nullptr;
     Timeout *_alive_check_timeout = nullptr;
+
+    struct {
+        Timeout *logging_start = nullptr;
+    } _timeout;
     uint32_t _timeout_write_total = 0;
     aiocb _fsync_cb = {};
 
     virtual const char *_get_logfile_extension() = 0;
 
     void _send_msg(const mavlink_message_t *msg, int target_sysid);
-    void _remove_start_timeout();
+    void _remove_logging_start_timeout();
     bool _start_alive_timeout();
 
-    virtual bool _start_timeout() = 0;
+    virtual bool _logging_start_timeout() = 0;
     virtual bool _alive_timeout();
 
     bool _fsync();

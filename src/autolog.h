@@ -42,7 +42,7 @@ protected:
 
     // These functions should never be called
     const char *_get_logfile_extension() override { return ""; };
-    bool _start_timeout() override { return true; };
+    bool _logging_start_timeout() override { return true; };
 
 private:
     std::unique_ptr<LogEndpoint> _logger;
