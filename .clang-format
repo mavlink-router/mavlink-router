@@ -11,6 +11,7 @@ Cpp11BracedListStyle: true
 SpaceBeforeCpp11BracedList: false
 DerivePointerAlignment: false
 IndentCaseLabels: false
+SpaceAfterCStyleCast: false
 Language: Cpp
 NamespaceIndentation: None
 PointerAlignment: Right

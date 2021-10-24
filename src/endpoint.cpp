@@ -17,15 +17,17 @@
  */
 #include "endpoint.h"
 
-#include <arpa/inet.h>
 #include <algorithm>
+
+#include <arpa/inet.h>
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <net/if.h>
-#include <netinet/tcp.h>
 #include <ifaddrs.h>
+#include <linux/serial.h>
+#include <net/if.h>
 #include <netdb.h>
+#include <netinet/tcp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,8 +41,6 @@
 #include <common/util.h>
 #include <common/xtermios.h>
 
-#include <linux/serial.h>
-
 #include "mainloop.h"
 
 #define RX_BUF_MAX_SIZE (MAVLINK_MAX_PACKET_LEN * 4)
@@ -48,12 +48,70 @@
 
 #define UART_BAUD_RETRY_SEC 5
 
+static bool is_ipv6(const char *ip)
+{
+    /* Square brackets always exist on IPv6 addresses b/c of input validation */
+    if (strchr(ip, '[') != nullptr) {
+        return true;
+    }
+    return false;
+}
+
+static bool ipv6_is_linklocal(const char *ip)
+{
+    /* link-local addresses start with fe80 */
+    if (strncmp(ip, "fe80", 4) == 0) {
+        return true;
+    }
+    return false;
+}
+
+static bool ipv6_is_multicast(const char *ip)
+{
+    /* link-local addresses start with ff0x */
+    if (strncmp(ip, "ff0", 3) == 0) {
+        return true;
+    }
+    return false;
+}
+
+static unsigned int ipv6_get_scope_id(const char *ip)
+{
+    struct ifaddrs *addrs;
+    char ipAddress[NI_MAXHOST];
+    unsigned scope = 0;
+    getifaddrs(&addrs);
+
+    /* search for our address in all interface addresses */
+    for (ifaddrs *addr = addrs; addr; addr = addr->ifa_next) {
+        if (addr->ifa_addr && addr->ifa_addr->sa_family == AF_INET6) {
+            getnameinfo(addr->ifa_addr, sizeof(struct sockaddr_in6), ipAddress, sizeof(ipAddress),
+                        NULL, 0, NI_NUMERICHOST);
+
+            /* cut the interface name from the end of a link-local address */
+            auto search = strrchr(ipAddress, '%');
+            if (search != nullptr) {
+                *search = '\0';
+            }
+
+            /* convert to a scope ID, if it's our interface */
+            if (strcmp(ipAddress, ip) == 0) {
+                scope = if_nametoindex(addr->ifa_name);
+                break;
+            }
+        }
+    }
+
+    freeifaddrs(addrs);
+    return scope;
+}
+
 Endpoint::Endpoint(const char *name)
     : _name{name}
 {
-    rx_buf.data = (uint8_t *) malloc(RX_BUF_MAX_SIZE);
+    rx_buf.data = (uint8_t *)malloc(RX_BUF_MAX_SIZE);
     rx_buf.len = 0;
-    tx_buf.data = (uint8_t *) malloc(TX_BUF_MAX_SIZE);
+    tx_buf.data = (uint8_t *)malloc(TX_BUF_MAX_SIZE);
     tx_buf.len = 0;
 
     assert(rx_buf.data);
@@ -141,7 +199,7 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
     if (!mavlink1 && !mavlink2) {
         unsigned int stx_pos = 0;
 
-        for (unsigned int i = 1; i < (unsigned int) rx_buf.len; i++) {
+        for (unsigned int i = 1; i < (unsigned int)rx_buf.len; i++) {
             if (rx_buf.data[i] == MAVLINK_STX)
                 mavlink2 = true;
             else if (rx_buf.data[i] == MAVLINK_STX_MAVLINK1)
@@ -171,8 +229,8 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
     size_t expected_size;
 
     if (mavlink2) {
-        struct mavlink_router_mavlink2_header *hdr =
-                (struct mavlink_router_mavlink2_header *)rx_buf.data;
+        struct mavlink_router_mavlink2_header *hdr
+            = (struct mavlink_router_mavlink2_header *)rx_buf.data;
 
         if (rx_buf.len < sizeof(*hdr))
             return 0;
@@ -190,8 +248,8 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
         if (hdr->incompat_flags & MAVLINK_IFLAG_SIGNED)
             expected_size += MAVLINK_SIGNATURE_BLOCK_LEN;
     } else {
-        struct mavlink_router_mavlink1_header *hdr =
-                (struct mavlink_router_mavlink1_header *)rx_buf.data;
+        struct mavlink_router_mavlink1_header *hdr
+            = (struct mavlink_router_mavlink1_header *)rx_buf.data;
 
         if (rx_buf.len < sizeof(*hdr))
             return 0;
@@ -316,8 +374,8 @@ bool Endpoint::accept_msg(int target_sysid, int target_compid, uint8_t src_sysid
                           uint8_t src_compid, uint32_t msg_id)
 {
     if (Log::get_max_level() >= Log::Level::DEBUG) {
-        log_debug("Endpoint [%d] got message %u to %d/%d from %u/%u", fd, msg_id, target_sysid, target_compid,
-                  src_sysid, src_compid);
+        log_debug("Endpoint [%d] got message %u to %d/%d from %u/%u", fd, msg_id, target_sysid,
+                  target_compid, src_sysid, src_compid);
         log_debug("\tKnown components:");
         for (auto it = _sys_comp_ids.begin(); it != _sys_comp_ids.end(); it++) {
             log_debug("\t\t%u/%u", (*it >> 8), *it & 0xff);
@@ -329,8 +387,8 @@ bool Endpoint::accept_msg(int target_sysid, int target_compid, uint8_t src_sysid
     if (has_sys_comp_id(src_sysid, src_compid))
         return false;
 
-    if (msg_id != UINT32_MAX && 
-        _message_filter.size() > 0 && 
+    if (msg_id != UINT32_MAX &&
+        _message_filter.size() > 0 &&
         std::find(_message_filter.begin(), _message_filter.end(), msg_id) == _message_filter.end()) {
 
         // if filter is defined and message is not in the set then discard it
@@ -345,7 +403,8 @@ bool Endpoint::accept_msg(int target_sysid, int target_compid, uint8_t src_sysid
     if (target_compid > 0 && has_sys_comp_id(target_sysid, target_compid))
         return true;
 
-    // This endpoint has the target of message (sysid, but compid is broadcast or non-existent): accept
+    // This endpoint has the target of message (sysid, but compid is broadcast or non-existent):
+    // accept
     if ((target_compid == 0 || target_compid == -1) && has_sys_id(target_sysid))
         return true;
 
@@ -360,14 +419,14 @@ bool Endpoint::_check_crc(const mavlink_msg_entry_t *msg_entry)
     uint8_t payload_len, header_len, *payload;
 
     if (mavlink2) {
-        struct mavlink_router_mavlink2_header *hdr =
-                    (struct mavlink_router_mavlink2_header *)rx_buf.data;
+        struct mavlink_router_mavlink2_header *hdr
+            = (struct mavlink_router_mavlink2_header *)rx_buf.data;
         payload = rx_buf.data + sizeof(*hdr);
         header_len = sizeof(*hdr);
         payload_len = hdr->payload_len;
     } else {
-        struct mavlink_router_mavlink1_header *hdr =
-                    (struct mavlink_router_mavlink1_header *)rx_buf.data;
+        struct mavlink_router_mavlink1_header *hdr
+            = (struct mavlink_router_mavlink1_header *)rx_buf.data;
         payload = rx_buf.data + sizeof(*hdr);
         header_len = sizeof(*hdr);
         payload_len = hdr->payload_len;
@@ -402,7 +461,8 @@ void Endpoint::print_statistics()
     printf("\n}\n");
 }
 
-uint8_t Endpoint::get_trimmed_zeros(const mavlink_msg_entry_t *msg_entry, const struct buffer *buffer)
+uint8_t Endpoint::get_trimmed_zeros(const mavlink_msg_entry_t *msg_entry,
+                                    const struct buffer *buffer)
 {
     struct mavlink_router_mavlink2_header *msg
         = (struct mavlink_router_mavlink2_header *)buffer->data;
@@ -426,65 +486,6 @@ void Endpoint::log_aggregate(unsigned int interval_sec)
         _incomplete_msgs = 0;
     }
 }
-
-#ifdef ENABLE_IPV6
-bool Endpoint::is_ipv6(const char *ip)
-{
-    /* Square brackets always exist on IPv6 addresses b/c of input validation */
-    if (strchr(ip, '[') != nullptr) {
-        return true;
-    }
-    return false;
-}
-
-bool Endpoint::ipv6_is_linklocal(const char *ip)
-{
-    /* link-local addresses start with fe80 */
-    if (strncmp(ip, "fe80", 4) == 0) {
-        return true;
-    }
-    return false;
-}
-
-bool Endpoint::ipv6_is_multicast(const char *ip)
-{
-    /* link-local addresses start with ff0x */
-    if (strncmp(ip, "ff0", 3) == 0) {
-        return true;
-    }
-    return false;
-}
-
-unsigned int Endpoint::ipv6_get_scope_id(const char *ip)
-{
-    struct ifaddrs *addrs;
-    char ipAddress[NI_MAXHOST];
-    unsigned scope=0;
-    getifaddrs(&addrs);
-
-    /* search for our address in all interface addresses */
-    for(ifaddrs *addr = addrs; addr; addr = addr->ifa_next){
-        if (addr->ifa_addr && addr->ifa_addr->sa_family == AF_INET6){
-            getnameinfo(addr->ifa_addr, sizeof(struct sockaddr_in6), ipAddress, sizeof(ipAddress), NULL, 0, NI_NUMERICHOST);
-
-            /* cut the interface name from the end of a link-local address */
-            auto search = strrchr(ipAddress, '%');
-            if (search != nullptr) {
-                *search = '\0';
-            }
-
-            /* convert to a scope ID, if it's our interface */
-            if(strcmp(ipAddress, ip) == 0){
-                scope = if_nametoindex(addr->ifa_name);
-                break;
-            }
-        }
-    }
-
-    freeifaddrs(addrs);
-    return scope;
-}
-#endif
 
 UartEndpoint::~UartEndpoint()
 {
@@ -561,7 +562,7 @@ int UartEndpoint::open(const char *path)
 {
     struct termios2 tc;
 
-    fd = ::open(path, O_RDWR|O_NONBLOCK|O_CLOEXEC|O_NOCTTY);
+    fd = ::open(path, O_RDWR | O_NONBLOCK | O_CLOEXEC | O_NOCTTY);
     if (fd < 0) {
         log_error("Could not open %s (%m)", path);
         return -1;
@@ -623,7 +624,7 @@ int UartEndpoint::open(const char *path)
 
         serial_ctl.flags |= ASYNC_LOW_LATENCY;
 
-        result =  ioctl(fd, TIOCSSERIAL, &serial_ctl);
+        result = ioctl(fd, TIOCSSERIAL, &serial_ctl);
         if (result < 0) {
             if (errno != ENODEV && errno != ENOTTY)
                 log_warning("Error while trying to write serial port latency: %m");
@@ -702,7 +703,7 @@ int UartEndpoint::write_msg(const struct buffer *pbuf)
     _stat.write.bytes += pbuf->len;
 
     /* Incomplete packet, we warn and discard the rest */
-    if (r != (ssize_t) pbuf->len) {
+    if (r != (ssize_t)pbuf->len) {
         _incomplete_msgs++;
         log_debug("Discarding packet, incomplete write %zd but len=%u", r, pbuf->len);
     }
@@ -732,87 +733,107 @@ UdpEndpoint::UdpEndpoint()
     : Endpoint{"UDP"}
 {
     bzero(&sockaddr, sizeof(sockaddr));
-#ifdef ENABLE_IPV6
     bzero(&sockaddr6, sizeof(sockaddr6));
-#endif
 }
 
-int UdpEndpoint::open(const char *ip, unsigned long port, bool to_bind)
+int UdpEndpoint::open_ipv6(const char *ip, unsigned long port, bool server)
 {
-    const int broadcast_val = 1;
-
-#ifdef ENABLE_IPV6
-    this->is_ipv6 = Endpoint::is_ipv6(ip);
-    if (this->is_ipv6) {
-        fd = socket(AF_INET6, SOCK_DGRAM, 0);
-    } else {
-#endif
-    fd = socket(AF_INET, SOCK_DGRAM, 0);
-
-#ifdef ENABLE_IPV6
-    }
-#endif
-
-    if (fd == -1) {
+    fd = socket(AF_INET6, SOCK_DGRAM, 0);
+    if (fd < 0) {
         log_error("Could not create socket (%m)");
-        return -1;
+        return -errno;
     }
 
-#ifdef ENABLE_IPV6
-    if (this->is_ipv6) {
-        /* strip square brackets from ip string */
-        char *ip_str = strdup(&ip[1]);
-        ip_str[strlen(ip_str) - 1] = '\0';
+    /* strip square brackets from ip string */
+    char *ip_str = strdup(&ip[1]);
+    ip_str[strlen(ip_str) - 1] = '\0';
 
-        sockaddr6.sin6_family = AF_INET6;
-        sockaddr6.sin6_port = htons(port);
-        
-        /* multicast address needs to listen to all, but "filter" incoming packets */
-        if (to_bind && Endpoint::ipv6_is_multicast(ip_str)) {
-            sockaddr6.sin6_addr = in6addr_any;
+    sockaddr6.sin6_family = AF_INET6;
+    sockaddr6.sin6_port = htons(port);
 
-            struct ipv6_mreq group;
-            inet_pton(AF_INET6, ip_str, &group.ipv6mr_multiaddr);
-            if (setsockopt(fd, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, &group, sizeof(group)) < 0){
-                log_error("Error setting IPv6 multicast socket options (%m)");
-                goto fail;
-            }
-        } else {
-            inet_pton(AF_INET6, ip_str, &sockaddr6.sin6_addr);
+    /* multicast address needs to listen to all, but "filter" incoming packets */
+    if (server && ipv6_is_multicast(ip_str)) {
+        sockaddr6.sin6_addr = in6addr_any;
+
+        struct ipv6_mreq group;
+        inet_pton(AF_INET6, ip_str, &group.ipv6mr_multiaddr);
+        if (setsockopt(fd, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, &group, sizeof(group)) < 0) {
+            log_error("Error setting IPv6 multicast socket options (%m)");
+            goto fail;
         }
-
-        /* link-local address needs a scope ID */
-        if (Endpoint::ipv6_is_linklocal(ip_str)) {
-            sockaddr6.sin6_scope_id = ipv6_get_scope_id(ip_str);
-        }
-
-        free(ip_str);
     } else {
-#endif
+        inet_pton(AF_INET6, ip_str, &sockaddr6.sin6_addr);
+    }
+
+    /* link-local address needs a scope ID */
+    if (ipv6_is_linklocal(ip_str)) {
+        sockaddr6.sin6_scope_id = ipv6_get_scope_id(ip_str);
+    }
+
+    free(ip_str);
+
+    if (server) {
+        if (bind(fd, (struct sockaddr *)&sockaddr6, sizeof(sockaddr6)) < 0) {
+            log_error("Error binding IPv6 socket (%m)");
+            goto fail;
+        }
+        sockaddr6.sin6_port = 0;
+    }
+
+    return fd;
+
+fail:
+    free(ip_str);
+    ::close(fd);
+    fd = -1;
+    return -EINVAL;
+}
+
+int UdpEndpoint::open_ipv4(const char *ip, unsigned long port, bool server)
+{
+    fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd < 0) {
+        log_error("Could not create socket (%m)");
+        return -errno;
+    }
+
     sockaddr.sin_family = AF_INET;
     sockaddr.sin_addr.s_addr = inet_addr(ip);
     sockaddr.sin_port = htons(port);
-#ifdef ENABLE_IPV6
-    }
-#endif
 
-    if (to_bind) {
-#ifdef ENABLE_IPV6
-        if (this->is_ipv6) {
-            if (bind(fd, (struct sockaddr *)&sockaddr6, sizeof(sockaddr6)) < 0) {
-                log_error("Error binding IPv6 socket (%m)");
-                goto fail;
-            }
-        } else {
-#endif
+    if (server) {
         if (bind(fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) < 0) {
             log_error("Error binding socket (%m)");
             goto fail;
         }
-#ifdef ENABLE_IPV6
-        }
-#endif
-    } else {
+        sockaddr.sin_port = 0;
+    }
+
+    return fd;
+
+fail:
+    ::close(fd);
+    fd = -1;
+    return -EINVAL;
+}
+
+int UdpEndpoint::open(const char *ip, unsigned long port, bool server)
+{
+    const int broadcast_val = 1;
+
+    this->ipv6 = is_ipv6(ip);
+
+    // setup the special ipv6/ipv4 part
+    if (this->ipv6)
+        open_ipv6(ip, port, server);
+    else
+        open_ipv4(ip, port, server);
+
+    if (fd < 0)
+        return -1;
+
+    // common setup
+    if (!server) {
         if (setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &broadcast_val, sizeof(broadcast_val))) {
             log_error("Error enabling broadcast in socket (%m)");
             goto fail;
@@ -824,18 +845,7 @@ int UdpEndpoint::open(const char *ip, unsigned long port, bool to_bind)
         goto fail;
     }
 
-    if (to_bind) {
-#ifdef ENABLE_IPV6
-        if (this->is_ipv6) {
-            sockaddr6.sin6_port = 0;
-        } else {
-#endif
-        sockaddr.sin_port = 0;
-#ifdef ENABLE_IPV6
-        }
-#endif
-    }
-    log_info("Open UDP [%d] %s:%lu %c", fd, ip, port, to_bind ? '*' : ' ');
+    log_info("Open UDP [%d] %s:%lu %c", fd, ip, port, server ? '*' : ' ');
 
     return fd;
 
@@ -849,19 +859,19 @@ fail:
 
 ssize_t UdpEndpoint::_read_msg(uint8_t *buf, size_t len)
 {
-    socklen_t addrlen = sizeof(sockaddr);
+    socklen_t addrlen;
+    struct sockaddr *sock;
     ssize_t r = 0;
-#ifdef ENABLE_IPV6
-    if (this->is_ipv6) {
-        addrlen = sizeof(sockaddr6);
-        r = ::recvfrom(fd, buf, len, 0, (struct sockaddr *)&sockaddr6, &addrlen);
-    } else {
-#endif
-    r = ::recvfrom(fd, buf, len, 0, (struct sockaddr *)&sockaddr, &addrlen);
-#ifdef ENABLE_IPV6
-    }
-#endif
 
+    if (this->ipv6) {
+        addrlen = sizeof(sockaddr6);
+        sock = (struct sockaddr *)&sockaddr6;
+    } else {
+        addrlen = sizeof(sockaddr);
+        sock = (struct sockaddr *)&sockaddr;
+    }
+
+    r = ::recvfrom(fd, buf, len, 0, sock, &addrlen);
     if (r == -1 && errno == EAGAIN)
         return 0;
     if (r == -1)
@@ -872,6 +882,9 @@ ssize_t UdpEndpoint::_read_msg(uint8_t *buf, size_t len)
 
 int UdpEndpoint::write_msg(const struct buffer *pbuf)
 {
+    struct sockaddr *sock;
+    socklen_t addrlen;
+
     if (fd < 0) {
         log_error("Trying to write invalid fd");
         return -EINVAL;
@@ -882,32 +895,23 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
         ;
     }
 
-#ifdef ENABLE_IPV6
     bool sock_connected = false;
-    if (is_ipv6) {
+    if (this->ipv6) {
+        addrlen = sizeof(sockaddr6);
+        sock = (struct sockaddr *)&sockaddr6;
         sock_connected = sockaddr6.sin6_port != 0;
     } else {
+        addrlen = sizeof(sockaddr);
+        sock = (struct sockaddr *)&sockaddr;
         sock_connected = sockaddr.sin_port != 0;
     }
+
     if (!sock_connected) {
-#else
-    if (!sockaddr.sin_port) {
-#endif
         log_debug("No one ever connected to %d. No one to write for", fd);
         return 0;
     }
 
-    ssize_t r = 0;
-#ifdef ENABLE_IPV6
-    if (this->is_ipv6) {
-        r = ::sendto(fd, pbuf->data, pbuf->len, 0, (struct sockaddr *)&sockaddr6, sizeof(sockaddr6));
-    } else {
-#endif
-    r = ::sendto(fd, pbuf->data, pbuf->len, 0, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
-#ifdef ENABLE_IPV6
-    }
-#endif
-
+    ssize_t r = ::sendto(fd, pbuf->data, pbuf->len, 0, sock, addrlen);
     if (r == -1) {
         if (errno != EAGAIN && errno != ECONNREFUSED && errno != ENETUNREACH)
             log_error("Error sending udp packet (%m)");
@@ -918,7 +922,7 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
     _stat.write.bytes += pbuf->len;
 
     /* Incomplete packet, we warn and discard the rest */
-    if (r != (ssize_t) pbuf->len) {
+    if (r != (ssize_t)pbuf->len) {
         _incomplete_msgs++;
         log_debug("Discarding packet, incomplete write %zd but len=%u", r, pbuf->len);
     }
@@ -932,9 +936,7 @@ TcpEndpoint::TcpEndpoint()
     : Endpoint{"TCP"}
 {
     bzero(&sockaddr, sizeof(sockaddr));
-#ifdef ENABLE_IPV6
     bzero(&sockaddr6, sizeof(sockaddr6));
-#endif
 }
 
 TcpEndpoint::~TcpEndpoint()
@@ -945,25 +947,25 @@ TcpEndpoint::~TcpEndpoint()
 
 int TcpEndpoint::accept(int listener_fd)
 {
-    socklen_t addrlen = sizeof(sockaddr);
-#ifdef ENABLE_IPV6
-    if (this->is_ipv6) {
-        addrlen = sizeof(sockaddr6);
-        fd = accept4(listener_fd, (struct sockaddr *)&sockaddr6, &addrlen, SOCK_NONBLOCK);
-    } else {
-#endif
-    fd = accept4(listener_fd, (struct sockaddr *)&sockaddr, &addrlen, SOCK_NONBLOCK);
-#ifdef ENABLE_IPV6
-    }
-#endif
+    struct sockaddr *sock;
+    socklen_t addrlen;
 
+    if (this->ipv6) {
+        addrlen = sizeof(sockaddr6);
+        sock = (struct sockaddr *)&sockaddr6;
+    } else {
+        addrlen = sizeof(sockaddr);
+        sock = (struct sockaddr *)&sockaddr;
+    }
+
+    fd = accept4(listener_fd, sock, &addrlen, SOCK_NONBLOCK);
     if (fd == -1)
         return -1;
 
     log_info("TCP connection [%d] accepted", fd);
 
     int tcp_nodelay_state = 1;
-    if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *) &tcp_nodelay_state, sizeof(int)) < 0) {
+    if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&tcp_nodelay_state, sizeof(int)) < 0) {
         log_error("Setting TCP_NODELAY failed [%d]", fd);
         return -1;
     }
@@ -971,8 +973,63 @@ int TcpEndpoint::accept(int listener_fd)
     return fd;
 }
 
+int TcpEndpoint::open_ipv6(const char *ip, unsigned long port)
+{
+    fd = socket(AF_INET6, SOCK_STREAM, 0);
+    if (fd == -1) {
+        log_error("Could not create socket (%m)");
+        return -1;
+    }
+
+    /* strip square brackets from ip string */
+    char *ip_str = strdup(&_ip[1]);
+    ip_str[strlen(ip_str) - 1] = '\0';
+
+    /* multicast address is not allowed for TCP sockets */
+    if (ipv6_is_multicast(ip_str)) {
+        log_error("TCP socket does not support multicast address");
+        goto fail;
+    }
+
+    sockaddr6.sin6_family = AF_INET6;
+    sockaddr6.sin6_port = htons(port);
+    inet_pton(AF_INET6, ip_str, &sockaddr6.sin6_addr);
+
+    /* link-local address needs a scope ID */
+    if (ipv6_is_linklocal(ip_str)) {
+        sockaddr6.sin6_scope_id = ipv6_get_scope_id(ip_str);
+    }
+
+    free(ip_str);
+
+    return fd;
+
+fail:
+    free(ip_str);
+    fd = -1;
+    return fd;
+}
+
+int TcpEndpoint::open_ipv4(const char *ip, unsigned long port)
+{
+    fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd == -1) {
+        log_error("Could not create socket (%m)");
+        return -1;
+    }
+
+    sockaddr.sin_family = AF_INET;
+    sockaddr.sin_addr.s_addr = inet_addr(ip);
+    sockaddr.sin_port = htons(port);
+
+    return fd;
+}
+
 int TcpEndpoint::open(const char *ip, unsigned long port)
 {
+    struct sockaddr *sock;
+    socklen_t addrlen;
+
     if (!_ip || strcmp(ip, _ip)) {
         free(_ip);
         _ip = strdup(ip);
@@ -981,69 +1038,27 @@ int TcpEndpoint::open(const char *ip, unsigned long port)
 
     assert_or_return(_ip, -ENOMEM);
 
-#ifdef ENABLE_IPV6
-    this->is_ipv6 = Endpoint::is_ipv6(ip);
-    if (this->is_ipv6) {
-        fd = socket(AF_INET6, SOCK_STREAM, 0);
+    this->ipv6 = is_ipv6(ip);
+
+    // setup the special ipv6/ipv4 part
+    if (this->ipv6) {
+        open_ipv6(ip, port);
+        sock = (struct sockaddr *)&this->sockaddr6;
+        addrlen = sizeof(sockaddr6);
     } else {
-#endif
-    fd = socket(AF_INET, SOCK_STREAM, 0);
-
-#ifdef ENABLE_IPV6
+        open_ipv4(ip, port);
+        sock = (struct sockaddr *)&this->sockaddr;
+        addrlen = sizeof(sockaddr);
     }
-#endif
 
-    if (fd == -1) {
-        log_error("Could not create socket (%m)");
+    if (fd < 0)
         return -1;
-    }
 
-#ifdef ENABLE_IPV6
-    if (this->is_ipv6) {
-        /* strip square brackets from ip string */
-        char *ip_str = strdup(&_ip[1]);
-        ip_str[strlen(ip_str) - 1] = '\0';
-
-        /* multicast address is not allowed for TCP sockets */
-        if (Endpoint::ipv6_is_multicast(ip_str)) {
-            log_error("TCP socket does not support multicast address");
-            goto fail;
-        }
-
-        sockaddr6.sin6_family = AF_INET6;
-        sockaddr6.sin6_port = htons(port);
-        inet_pton(AF_INET6, ip_str, &sockaddr6.sin6_addr);
-
-        /* link-local address needs a scope ID */
-        if (Endpoint::ipv6_is_linklocal(ip_str)) {
-            sockaddr6.sin6_scope_id = ipv6_get_scope_id(ip_str);
-        }
-
-        free(ip_str);
-    } else {
-#endif
-    sockaddr.sin_family = AF_INET;
-    sockaddr.sin_addr.s_addr = inet_addr(ip);
-    sockaddr.sin_port = htons(port);
-#ifdef ENABLE_IPV6
-    }
-#endif
-
-#ifdef ENABLE_IPV6
-    if (this->is_ipv6) {
-        if (connect(fd, (struct sockaddr *)&sockaddr6, sizeof(sockaddr6)) < 0) {
-            log_error("Error connecting to IPv6 socket (%m)");
-            goto fail;
-        }
-    } else {
-#endif
-    if (connect(fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) < 0) {
-        log_error("Error connecting to socket (%m)");
+    // common setup
+    if (connect(fd, sock, addrlen) < 0) {
+        log_error("Error connecting to IPv6 socket (%m)");
         goto fail;
     }
-#ifdef ENABLE_IPV6
-    }
-#endif
 
     if (fcntl(fd, F_SETFL, O_NONBLOCK | FASYNC) < 0) {
         log_error("Error setting socket fd as non-blocking (%m)");
@@ -1062,20 +1077,19 @@ fail:
 
 ssize_t TcpEndpoint::_read_msg(uint8_t *buf, size_t len)
 {
-    socklen_t addrlen = sizeof(sockaddr);
-    errno = 0;
-    ssize_t r = 0;
-#ifdef ENABLE_IPV6
-    if (this->is_ipv6) {
-        addrlen = sizeof(sockaddr6);
-        r = ::recvfrom(fd, buf, len, 0, (struct sockaddr *)&sockaddr6, &addrlen);
-    } else {
-#endif
-    r = ::recvfrom(fd, buf, len, 0, (struct sockaddr *)&sockaddr, &addrlen);
-#ifdef ENABLE_IPV6
-    }
-#endif
+    struct sockaddr *sock;
+    socklen_t addrlen;
+    ssize_t r;
 
+    if (this->ipv6) {
+        sock = (struct sockaddr *)&sockaddr6;
+        addrlen = sizeof(sockaddr6);
+    } else {
+        sock = (struct sockaddr *)&sockaddr;
+        addrlen = sizeof(sockaddr);
+    }
+
+    r = ::recvfrom(fd, buf, len, 0, sock, &addrlen);
     if (r == -1 && errno == EAGAIN)
         return 0;
     if (r == -1)
@@ -1092,6 +1106,9 @@ ssize_t TcpEndpoint::_read_msg(uint8_t *buf, size_t len)
 
 int TcpEndpoint::write_msg(const struct buffer *pbuf)
 {
+    struct sockaddr *sock;
+    socklen_t addrlen;
+
     if (fd < 0) {
         log_error("Trying to write invalid fd");
         return -EINVAL;
@@ -1102,17 +1119,15 @@ int TcpEndpoint::write_msg(const struct buffer *pbuf)
         ;
     }
 
-    ssize_t r = 0;
-#ifdef ENABLE_IPV6
-    if (this->is_ipv6) {
-        r = ::sendto(fd, pbuf->data, pbuf->len, 0, (struct sockaddr *)&sockaddr6, sizeof(sockaddr6));
+    if (this->ipv6) {
+        sock = (struct sockaddr *)&sockaddr6;
+        addrlen = sizeof(sockaddr6);
     } else {
-#endif
-    r = ::sendto(fd, pbuf->data, pbuf->len, 0, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
-#ifdef ENABLE_IPV6
+        sock = (struct sockaddr *)&sockaddr;
+        addrlen = sizeof(sockaddr);
     }
-#endif
 
+    ssize_t r = ::sendto(fd, pbuf->data, pbuf->len, 0, sock, addrlen);
     if (r == -1) {
         if (errno != EAGAIN && errno != ECONNREFUSED)
             log_error("Error sending tcp packet (%m)");
@@ -1125,7 +1140,7 @@ int TcpEndpoint::write_msg(const struct buffer *pbuf)
     _stat.write.bytes += pbuf->len;
 
     /* Incomplete packet, we warn and discard the rest */
-    if (r != (ssize_t) pbuf->len) {
+    if (r != (ssize_t)pbuf->len) {
         _incomplete_msgs++;
         log_debug("Discarding packet, incomplete write %zd but len=%u", r, pbuf->len);
     }

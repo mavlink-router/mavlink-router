@@ -41,6 +41,8 @@
 #define DEFAULT_CONF_DIR "/etc/mavlink-router/config.d"
 #define DEFAULT_RETRY_TCP_TIMEOUT 5
 
+extern const char *BUILD_VERSION;
+
 static struct options opt = {
     .endpoints = nullptr,
     .conf_file_name = nullptr,
@@ -137,22 +139,22 @@ static int split_on_last_colon(const char *str, char **base, unsigned long *numb
     return 0;
 }
 
-static int validate_ip(const char* ip)
+static bool validate_ipv6(const char *ip)
 {
-    std::string ip_addr(ip);
+    // simplyfied pattern
+    std::regex ipv6_regex("\\[(([a-f\\d]{0,4}:)+[a-f\\d]{0,4})\\]");
+    return std::regex_match(ip, ipv6_regex);
+}
 
+static bool validate_ipv4(const char *ip)
+{
     std::regex ipv4_regex("(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})");
-#ifdef ENABLE_IPV6
-    std::regex ipv6_regex("\\[(([a-f\\d]{0,4}:)+[a-f\\d]{0,4})\\]"); // simplyfied pattern
+    return regex_match(ip, ipv4_regex);
+}
 
-    if (!std::regex_match(ip_addr, ipv4_regex) && !std::regex_match(ip_addr, ipv6_regex)) {
-#else
-    if (!std::regex_match(ip_addr, ipv4_regex)) {
-#endif
-        return -EINVAL;
-    }
-
-    return 0;
+static bool validate_ip(const char* ip)
+{
+    return validate_ipv4(ip) || validate_ipv6(ip);
 }
 
 static int log_level_from_str(const char *str)
@@ -227,7 +229,7 @@ fail:
 }
 
 static int add_endpoint_address(const char *name, size_t name_len, const char *ip,
-                                long unsigned port, bool eavesdropping, const char *filter)
+                                long unsigned port, bool server, const char *filter)
 {
     int ret;
 
@@ -275,7 +277,7 @@ static int add_endpoint_address(const char *name, size_t name_len, const char *i
         conf->port = find_next_endpoint_port(conf->address);
     }
 
-    conf->eavesdropping = eavesdropping;
+    conf->server = server;
 
     conf->next = opt.endpoints;
     opt.endpoints = conf;
@@ -398,7 +400,7 @@ static bool pre_parse_argv(int argc, char *argv[])
             break;
         }
         case 'V':
-            puts(PACKAGE " version " VERSION);
+            printf(PACKAGE " version %s\n", BUILD_VERSION);
             return false;
         }
     }
@@ -431,7 +433,7 @@ static int parse_argv(int argc, char *argv[])
                 help(stderr);
                 return -EINVAL;
             }
-            if (validate_ip(ip) < 0) {
+            if (!validate_ip(ip)) {
                 log_error("Invalid IP address in argument: %s", optarg);
                 help(stderr);
                 return -EINVAL;
@@ -486,7 +488,7 @@ static int parse_argv(int argc, char *argv[])
                 help(stderr);
                 return -EINVAL;
             }
-            if (validate_ip(ip) < 0) {
+            if (!validate_ip(ip)) {
                 log_error("Invalid IP address in argument: %s", optarg);
                 help(stderr);
                 return -EINVAL;
@@ -527,7 +529,7 @@ static int parse_argv(int argc, char *argv[])
                 free(base);
                 return -EINVAL;
             }
-            if (validate_ip(base) < 0) {
+            if (!validate_ip(base)) {
                 log_error("Invalid IP address in argument: %s", argv[optind]);
                 help(stderr);
                 return -EINVAL;
@@ -668,11 +670,14 @@ static int parse_mode(const char *val, size_t val_len, void *storage, size_t sto
     if (val_len > INT_MAX)
         return -EINVAL;
 
-    bool *eavesdropping = (bool *)storage;
+    bool *server = (bool *)storage;
     if (memcaseeq(val, val_len, "normal", sizeof("normal") - 1)) {
-        *eavesdropping = false;
+        *server = false;
     } else if (memcaseeq(val, val_len, "eavesdropping", sizeof("eavesdropping") - 1)) {
-        *eavesdropping = true;
+        log_warning("Eavesdropping mode is deprecated and rather act like udpin/server");
+        *server = true;
+    } else if (memcaseeq(val, val_len, "server", sizeof("server") - 1)) {
+        *server = true;
     } else {
         log_error("Unknown 'mode' key: %.*s", (int)val_len, val);
         return -EINVAL;
@@ -717,13 +722,13 @@ static int parse_confs(ConfFile &conf)
 
     struct option_udp {
         char *addr;
-        bool eavesdropping;
+        bool server;
         unsigned long port;
         char *filter;
     };
     static const ConfFile::OptionsTable option_table_udp[] = {
         {"address", true,   ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_udp, addr)},
-        {"mode",    true,   parse_mode,                 OPTIONS_TABLE_STRUCT_FIELD(option_udp, eavesdropping)},
+        {"mode",    true,   parse_mode,                 OPTIONS_TABLE_STRUCT_FIELD(option_udp, server)},
         {"port",    false,  ConfFile::parse_ul,         OPTIONS_TABLE_STRUCT_FIELD(option_udp, port)},
         {"filter",  false,  ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_udp, filter)},
     };
@@ -766,16 +771,16 @@ static int parse_confs(ConfFile &conf)
         struct option_udp opt_udp = {nullptr, false, ULONG_MAX};
         ret = conf.extract_options(&iter, option_table_udp, ARRAY_SIZE(option_table_udp), &opt_udp);
         if (ret == 0) {
-            if (opt_udp.eavesdropping && opt_udp.port == ULONG_MAX) {
+            if (opt_udp.server && opt_udp.port == ULONG_MAX) {
                 log_error("Expected 'port' key for section %.*s", (int)iter.name_len, iter.name);
                 ret = -EINVAL;
             } else {
-                if (validate_ip(opt_udp.addr) < 0) {
+                if (!validate_ip(opt_udp.addr)) {
                     log_error("Invalid IP address in section %.*s: %s", (int)iter.name_len, iter.name, opt_udp.addr);
                     ret = -EINVAL;
                 } else {
                     ret = add_endpoint_address(iter.name + offset, iter.name_len - offset, opt_udp.addr,
-                                               opt_udp.port, opt_udp.eavesdropping, opt_udp.filter);
+                                               opt_udp.port, opt_udp.server, opt_udp.filter);
                 }
             }
         }
@@ -793,7 +798,7 @@ static int parse_confs(ConfFile &conf)
         ret = conf.extract_options(&iter, option_table_tcp, ARRAY_SIZE(option_table_tcp), &opt_tcp);
 
         if (ret == 0) {
-            if (validate_ip(opt_tcp.addr) < 0) {
+            if (!validate_ip(opt_tcp.addr)) {
                 log_error("Invalid IP address in section %.*s: %s", (int)iter.name_len, iter.name, opt_tcp.addr);
                 ret = -EINVAL;
             } else {

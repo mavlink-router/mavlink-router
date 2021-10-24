@@ -39,7 +39,7 @@ struct _packed_ ulog_msg_header {
     uint8_t msg_type;
 };
 
-bool ULog::_start_timeout()
+bool ULog::_logging_start_timeout()
 {
     mavlink_message_t msg;
     mavlink_command_long_t cmd;
@@ -167,11 +167,11 @@ int ULog::write_msg(const struct buffer *buffer)
         if (trimmed_zeros)
             memset(((uint8_t *)&cmd) + payload_len, 0, trimmed_zeros);
 
-        if (!_logging_start_timeout || cmd.command != MAV_CMD_LOGGING_START)
+        if (!_timeout.logging_start || cmd.command != MAV_CMD_LOGGING_START)
             return buffer->len;
 
         if (cmd.result == MAV_RESULT_ACCEPTED) {
-            _remove_start_timeout();
+            _remove_logging_start_timeout();
             if (!_start_alive_timeout()) {
                 log_warning("Could not start liveness timeout - mavlink router log won't be able "
                             "to detect if flight stack stopped");

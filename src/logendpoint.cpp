@@ -305,19 +305,19 @@ int LogEndpoint::_get_file(const char *extension)
 void LogEndpoint::stop()
 {
     Mainloop &mainloop = Mainloop::get_instance();
-    if (_logging_start_timeout) {
-        mainloop.del_timeout(_logging_start_timeout);
-        _logging_start_timeout = nullptr;
+    if (_timeout.logging_start) {
+        mainloop.del_timeout(_timeout.logging_start);
+        _timeout.logging_start = nullptr;
     }
 
-    if (_alive_check_timeout) {
-        mainloop.del_timeout(_alive_check_timeout);
-        _alive_check_timeout = nullptr;
+    if (_timeout.alive) {
+        mainloop.del_timeout(_timeout.alive);
+        _timeout.alive = nullptr;
     }
 
-    if (_fsync_timeout) {
-        mainloop.del_timeout(_fsync_timeout);
-        _fsync_timeout = nullptr;
+    if (_timeout.fsync) {
+        mainloop.del_timeout(_timeout.fsync);
+        _timeout.fsync = nullptr;
     }
 
     fsync(_file);
@@ -348,31 +348,29 @@ bool LogEndpoint::start()
         return false;
     }
 
-    _logging_start_timeout = Mainloop::get_instance().add_timeout(
-        MSEC_PER_SEC, std::bind(&LogEndpoint::_start_timeout, this), this);
-    if (!_logging_start_timeout) {
+    _timeout.logging_start = Mainloop::get_instance().add_timeout(
+        MSEC_PER_SEC, std::bind(&LogEndpoint::_logging_start_timeout, this), this);
+    if (!_timeout.logging_start) {
         log_error("Unable to add timeout");
-        goto timeout_error;
+        goto logging_timeout_error;
     }
 
     // Call fsync once per second
-    _fsync_timeout = Mainloop::get_instance().add_timeout(
+    _timeout.fsync = Mainloop::get_instance().add_timeout(
         MSEC_PER_SEC, std::bind(&LogEndpoint::_fsync, this), this);
-    if (!_fsync_timeout) {
+    if (!_timeout.fsync) {
         log_error("Unable to add timeout");
-        goto timeout_error;
+        goto fsync_timeout_error;
     }
 
     log_info("Logging target system_id=%u on %s", _target_system_id, _filename);
 
     return true;
 
-timeout_error:
-    if (_logging_start_timeout) {
-        Mainloop::get_instance().del_timeout(_fsync_timeout);
-        _fsync_timeout = nullptr;
-    }
-
+fsync_timeout_error:
+    Mainloop::get_instance().del_timeout(_timeout.logging_start);
+    _timeout.logging_start = nullptr;
+logging_timeout_error:
     close(_file);
     _file = -1;
     return false;
@@ -408,17 +406,17 @@ bool LogEndpoint::_fsync()
     return true;
 }
 
-void LogEndpoint::_remove_start_timeout()
+void LogEndpoint::_remove_logging_start_timeout()
 {
-    Mainloop::get_instance().del_timeout(_logging_start_timeout);
-    _logging_start_timeout = nullptr;
+    Mainloop::get_instance().del_timeout(_timeout.logging_start);
+    _timeout.logging_start = nullptr;
 }
 
 bool LogEndpoint::_start_alive_timeout()
 {
-    _alive_check_timeout = Mainloop::get_instance().add_timeout(
+    _timeout.alive = Mainloop::get_instance().add_timeout(
         MSEC_PER_SEC * ALIVE_TIMEOUT, std::bind(&LogEndpoint::_alive_timeout, this), this);
-    return !!_alive_check_timeout;
+    return !!_timeout.alive;
 }
 
 void LogEndpoint::_handle_auto_start_stop(uint32_t msg_id, uint8_t source_system_id,
