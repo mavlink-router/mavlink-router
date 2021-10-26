@@ -38,6 +38,7 @@ systemdsystemunit_DATA = mavlink-router.service
 AM_CPPFLAGS = \
 	-include $(top_builddir)/config.h \
 	-I$(top_builddir) \
+	-I$(top_builddir)/src \
 	-I$(top_srcdir)/src \
 	-I$(top_builddir)/include/mavlink \
 	-I$(top_builddir)/include/mavlink/ardupilotmega \
@@ -104,8 +105,8 @@ mavlink_routerd_SOURCES = \
 
 src/git_version.h: FORCE
 	$(AM_V_GEN) ( \
-		$(srcdir)/tools/gen-git-version.sh $(top_srcdir) > $@.tmp; \
-		if ! cmp $@.tmp $@; then \
+		$(srcdir)/tools/gen-git-version.sh $(top_srcdir) > $@.tmp && \
+		if [ ! -f $@ ] || ! cmp $@.tmp $@; then \
 			cat $@.tmp > $@ ;\
 		fi )
 
