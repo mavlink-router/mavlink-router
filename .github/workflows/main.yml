@@ -153,3 +153,24 @@ jobs:
           tag: ${{ github.ref }}
           prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}
           overwrite: true
+
+  native-external-build-dir:
+    name: external build dir
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+
+      - name: install dependencies
+        run: sudo apt-get install -y python3-pip python3-setuptools && pip3 install future pymavlink
+
+      - name: configure
+        run: |
+          ./autogen.sh
+          mkdir build
+          cd build
+          ../configure CFLAGS='-g -O2' CXXFLAGS='-g -O2' --sysconfdir=/etc --localstatedir=/var --libdir=/usr/li
+
+      - name: build
+        run: cd build && make -j$(nproc)
