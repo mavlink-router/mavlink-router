@@ -33,7 +33,7 @@ jobs:
             distro: 20.04
             distro_name: focal
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
         with:
           submodules: recursive
 
@@ -42,7 +42,7 @@ jobs:
 
       - name: install dependencies
         run: |
-          docker run --name buildcontainer dockcross/${{ matrix.arch_name }} sudo apt install python3-future
+          docker run --name buildcontainer dockcross/${{ matrix.arch_name }} sudo apt install
           docker commit buildcontainer local/buildimage
 
       - name: configure
@@ -52,7 +52,7 @@ jobs:
         run: ./dockcross -i local/buildimage make -j
 
       - name: test
-        run: ./dockcross -i local/buildimage /bin/bash -c "make check PYTHON=python3"
+        run: ./dockcross -i local/buildimage /bin/bash -c "make check"
 
       - name: Rename
         run: cp mavlink-routerd mavlink-routerd-libc-${{ matrix.name }}
@@ -126,15 +126,17 @@ jobs:
           overwrite: true
 
   alpine-linux:
-    name: alpine 3.11.6 (musl)
-    runs-on: ubuntu-18.04
-    container: alpine:3.11.6
+    name: alpine 3.14 (musl)
+    runs-on: ubuntu-20.04
+    container: alpine:3.14
     steps:
-      - uses: actions/checkout@v1
+      - name: install tools
+        run: apk update && apk add autoconf automake build-base git libtool linux-headers openssl-dev perl-extutils-pkgconfig
+
+      - uses: actions/checkout@v2
         with:
           submodules: recursive
-      - name: install tools
-        run: apk update && apk add autoconf automake build-base git libtool linux-headers openssl-dev perl-extutils-pkgconfig python3 && pip3 install future
+
       - name: configure
         run: ./autogen.sh && ./configure CFLAGS='-g -O2' --sysconfdir=/etc --localstatedir=/var --libdir=/usr/lib --disable-systemd --prefix=/usr
       - name: build
@@ -162,15 +164,12 @@ jobs:
         with:
           submodules: recursive
 
-      - name: install dependencies
-        run: sudo apt-get install -y python3-pip python3-setuptools && pip3 install future pymavlink
-
       - name: configure
         run: |
           ./autogen.sh
           mkdir build
           cd build
-          ../configure CFLAGS='-g -O2' CXXFLAGS='-g -O2' --sysconfdir=/etc --localstatedir=/var --libdir=/usr/li
+          ../configure CFLAGS='-g -O2' CXXFLAGS='-g -O2' --sysconfdir=/etc --localstatedir=/var --libdir=/usr/lib
 
       - name: build
         run: cd build && make -j$(nproc)

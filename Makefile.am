@@ -16,19 +16,6 @@ GTEST_CFLAGS = @GTEST_CFLAGS@
 GCC_COLORS ?= 'yes'
 export GCC_COLORS
 
-BUILT_SOURCES = include/mavlink/ardupilotmega/mavlink.h
-
-clean-local:
-	rm -rf $(top_builddir)/include/mavlink
-	rm -f $(top_builddir)/tests/unit_test
-
-include/mavlink/ardupilotmega/mavlink.h: modules/mavlink/pymavlink/tools/mavgen.py modules/mavlink/message_definitions/v1.0/ardupilotmega.xml
-	$(AM_V_GEN)python3 $(srcdir)/modules/mavlink/pymavlink/tools/mavgen.py \
-		-o include/mavlink \
-		--lang C \
-		--wire-protocol 2.0 \
-		$(srcdir)/modules/mavlink/message_definitions/v1.0/ardupilotmega.xml
-
 #if SYSTEMD
 systemdsystemunitdir = @SYSTEMD_SYSTEMUNITDIR@
 systemdsystemunit_DATA = mavlink-router.service
@@ -40,8 +27,8 @@ AM_CPPFLAGS = \
 	-I$(top_builddir) \
 	-I$(top_builddir)/src \
 	-I$(top_srcdir)/src \
-	-I$(top_builddir)/include/mavlink \
-	-I$(top_builddir)/include/mavlink/ardupilotmega \
+	-I$(top_srcdir)/modules/mavlink_c_library_v2 \
+	-I$(top_srcdir)/modules/mavlink_c_library_v2/ardupilotmega \
 	-DSYSCONFDIR=\""$(sysconfdir)"\"
 
 AM_CFLAGS = \
