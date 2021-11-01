@@ -120,7 +120,7 @@ arm_authorizer_SOURCES = \
 	examples/arm-authorizer.cpp
 
 SED_PROCESS = $(AM_V_GEN) $(MKDIR_P) $(dir $@) && \
-	 $(SED) -e 's,@bindir\@,$(bindir),g' \
+	 $(SED) -e 's,@BINDIR\@,$(bindir),g' \
 	 < $< > $@
 
 %.service: %.service.in Makefile
