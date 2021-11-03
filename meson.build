@@ -33,6 +33,8 @@ if systemd_system_unit_dir == 'auto'
 		systemd_system_unit_dir = dep_systemd.get_pkgconfig_variable('systemdsystemunitdir')
 endif
 
+dep_gtest = dependency('gtest', main : true, required : false)
+
 # Additional warnings
 possible_cc_flags = [
 	    '-Wno-inline',
