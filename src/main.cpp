@@ -35,10 +35,10 @@
 #include "endpoint.h"
 #include "mainloop.h"
 
-#define MAVLINK_TCP_PORT 5760
-#define DEFAULT_BAUDRATE 115200U
-#define DEFAULT_CONFFILE "/etc/mavlink-router/main.conf"
-#define DEFAULT_CONF_DIR "/etc/mavlink-router/config.d"
+#define MAVLINK_TCP_PORT          5760
+#define DEFAULT_BAUDRATE          115200U
+#define DEFAULT_CONFFILE          "/etc/mavlink-router/main.conf"
+#define DEFAULT_CONF_DIR          "/etc/mavlink-router/config.d"
 #define DEFAULT_RETRY_TCP_TIMEOUT 5
 
 extern const char *BUILD_VERSION;

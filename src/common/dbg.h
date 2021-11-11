@@ -30,17 +30,17 @@
 #include "log.h"
 
 #ifndef LOG_DEBUG
-#define dbg(...) \
-    do {         \
-    } while (0)
+#    define dbg(...) \
+        do {         \
+        } while (0)
 #else
-#ifdef dbg
-#undef dbg
-#endif
+#    ifdef dbg
+#        undef dbg
+#    endif
 
-#ifndef LOG_DEBUG_LEVEL
-#define LOG_DEBUG_LEVEL Log::Level::DEBUG
-#endif
+#    ifndef LOG_DEBUG_LEVEL
+#        define LOG_DEBUG_LEVEL Log::Level::DEBUG
+#    endif
 
-#define dbg(...) Log::log(LOG_DEBUG_LEVEL, __VA_ARGS__)
+#    define dbg(...) Log::log(LOG_DEBUG_LEVEL, __VA_ARGS__)
 #endif

@@ -13,11 +13,18 @@ SpaceAfterCStyleCast: false
 SpaceInEmptyParentheses: false
 
 AlignAfterOpenBracket: true
-AlignEscapedNewlinesLeft: true
+AlignEscapedNewlines: Left
 AlignTrailingComments: true
 AllowShortBlocksOnASingleLine: false
 AllowShortFunctionsOnASingleLine: Inline
+AlignConsecutiveDeclarations: false
+AlignConsecutiveAssignments: false
+AlignConsecutiveMacros: Consecutive
 Cpp11BracedListStyle: true
 SpaceBeforeCpp11BracedList: false
 IndentCaseLabels: false
+IndentPPDirectives: AfterHash
 NamespaceIndentation: None
+
+FixNamespaceComments: true
+ReflowComments: false

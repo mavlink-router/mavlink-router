@@ -41,7 +41,7 @@
 #include "mainloop.h"
 
 #define ALIVE_TIMEOUT 5
-#define MAX_RETRIES 10
+#define MAX_RETRIES   10
 
 LogEndpoint::LogEndpoint(const char *name, const char *logs_dir, LogMode mode,
                          unsigned long min_free_space, unsigned long max_files)
