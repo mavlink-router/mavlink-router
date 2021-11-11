@@ -1,0 +1,6 @@
+[constants]
+rootfs = '@sysroot@'
+
+[properties]
+sys_root = rootfs
+pkg_config_libdir = rootfs + '/usr/share/pkgconfig:' + rootfs + '/usr/lib/pkgconfig'
