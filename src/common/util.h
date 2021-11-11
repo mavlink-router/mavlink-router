@@ -15,7 +15,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 #pragma once
 
 #include <fcntl.h>
@@ -31,17 +30,17 @@ extern "C" {
 
 typedef uint64_t usec_t;
 typedef uint64_t nsec_t;
-#define USEC_INFINITY ((usec_t) -1)
+#define USEC_INFINITY ((usec_t)-1)
 
-#define MSEC_PER_SEC  1000ULL
-#define USEC_PER_SEC  ((usec_t) 1000000ULL)
-#define USEC_PER_MSEC ((usec_t) 1000ULL)
-#define NSEC_PER_SEC  ((nsec_t) 1000000000ULL)
-#define NSEC_PER_MSEC ((nsec_t) 1000000ULL)
-#define NSEC_PER_USEC ((nsec_t) 1000ULL)
+#define MSEC_PER_SEC 1000ULL
+#define USEC_PER_SEC ((usec_t)1000000ULL)
+#define USEC_PER_MSEC ((usec_t)1000ULL)
+#define NSEC_PER_SEC ((nsec_t)1000000000ULL)
+#define NSEC_PER_MSEC ((nsec_t)1000000ULL)
+#define NSEC_PER_USEC ((nsec_t)1000ULL)
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
-#define streq(a,b) (strcmp((a),(b)) == 0)
+#define streq(a, b) (strcmp((a), (b)) == 0)
 #define strcaseeq(a, b) (strcasecmp((a), (b)) == 0)
 #define strncaseeq(a, b, len) (strncasecmp((a), (b), (len)) == 0)
 #define memcaseeq(a, len_a, b, len_b) ((len_a) == (len_b) && strncaseeq(a, b, len_a))
@@ -58,12 +57,14 @@ int mkdir_p(const char *path, int len, mode_t mode);
 #endif
 
 #ifndef strndupa
-#define strndupa(s, n) \
-       (__extension__ ({const char *__in = (s); \
-                        size_t __len = strnlen (__in, (n)); \
-                        char *__out = (char *) alloca (__len + 1); \
-                        __out[__len] = '\0'; \
-                        (char *) memcpy (__out, __in, __len);}))
+#define strndupa(s, n)                           \
+    (__extension__({                             \
+        const char *__in = (s);                  \
+        size_t __len = strnlen(__in, (n));       \
+        char *__out = (char *)alloca(__len + 1); \
+        __out[__len] = '\0';                     \
+        (char *)memcpy(__out, __in, __len);      \
+    }))
 
 #include <asm/ioctls.h>
 #endif

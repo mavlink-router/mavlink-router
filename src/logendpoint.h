@@ -26,14 +26,12 @@
 
 #define LOG_ENDPOINT_SYSTEM_ID 2
 
-
 enum class LogMode {
-    always = 0,         ///< Log from start until mavlink-router exits
-    while_armed,        ///< Start logging when the vehicle is armed until it's disarmed
+    always = 0,  ///< Log from start until mavlink-router exits
+    while_armed, ///< Start logging when the vehicle is armed until it's disarmed
 
-    disabled            ///< Do not try to start logging (only used internally)
+    disabled ///< Do not try to start logging (only used internally)
 };
-
 
 class LogEndpoint : public Endpoint {
 public:
@@ -78,7 +76,7 @@ protected:
     bool _fsync();
 
     void _handle_auto_start_stop(uint32_t msg_id, uint8_t source_system_id,
-            uint8_t source_component_id, uint8_t *payload);
+                                 uint8_t source_component_id, uint8_t *payload);
 
 private:
     int _get_file(const char *extension);

@@ -56,7 +56,7 @@ LogEndpoint::LogEndpoint(const char *name, const char *logs_dir, LogMode mode,
     _fsync_cb.aio_fildes = -1;
 
 #if HAVE_DECL_AIO_INIT
-    aioinit aio_init_data {};
+    aioinit aio_init_data{};
     aio_init_data.aio_threads = 1;
     aio_init_data.aio_num = 1;
     aio_init_data.aio_idle_time = 3; // make sure to keep the thread running
@@ -119,7 +119,7 @@ void LogEndpoint::_delete_old_logs()
     struct statvfs buf;
     uint64_t free_space;
     if (statvfs(_logs_dir, &buf) == 0) {
-        free_space = (uint64_t) buf.f_bsize * buf.f_bavail;
+        free_space = (uint64_t)buf.f_bsize * buf.f_bavail;
     } else {
         free_space = UINT64_MAX;
         log_error("[Log Deletion] Error when measuring free disk space: %m");
@@ -327,8 +327,9 @@ void LogEndpoint::stop()
 
     // change file permissions to read-only to mark them as finished
     char log_file[PATH_MAX];
-    if (snprintf(log_file, sizeof(log_file), "%s/%s", _logs_dir, _filename) < (int)sizeof(log_file)) {
-        chmod(log_file, S_IRUSR|S_IRGRP|S_IROTH);
+    if (snprintf(log_file, sizeof(log_file), "%s/%s", _logs_dir, _filename)
+        < (int)sizeof(log_file)) {
+        chmod(log_file, S_IRUSR | S_IRGRP | S_IROTH);
     }
 }
 
@@ -420,14 +421,15 @@ bool LogEndpoint::_start_alive_timeout()
 }
 
 void LogEndpoint::_handle_auto_start_stop(uint32_t msg_id, uint8_t source_system_id,
-        uint8_t source_component_id, uint8_t *payload)
+                                          uint8_t source_component_id, uint8_t *payload)
 {
     if (_target_system_id == -1) { // wait until initialized
         return;
     }
     if (_mode == LogMode::always) {
         if (_file == -1) {
-            if (!start()) _mode = LogMode::disabled;
+            if (!start())
+                _mode = LogMode::disabled;
         }
     } else if (_mode == LogMode::while_armed) {
         if (msg_id == MAVLINK_MSG_ID_HEARTBEAT && source_system_id == _target_system_id
@@ -437,7 +439,8 @@ void LogEndpoint::_handle_auto_start_stop(uint32_t msg_id, uint8_t source_system
             const bool is_armed = heartbeat->base_mode & MAV_MODE_FLAG_SAFETY_ARMED;
 
             if (_file == -1 && is_armed) {
-                if (!start()) _mode = LogMode::disabled;
+                if (!start())
+                    _mode = LogMode::disabled;
             } else if (_file != -1 && !is_armed) {
                 stop();
             }

@@ -42,7 +42,7 @@ public:
     void handle_tcp_connection();
     int write_msg(Endpoint *e, const struct buffer *buf);
     void process_tcp_hangups();
-    Timeout *add_timeout(uint32_t timeout_msec, std::function<bool(void*)> cb, const void *data);
+    Timeout *add_timeout(uint32_t timeout_msec, std::function<bool(void *)> cb, const void *data);
     void del_timeout(Timeout *t);
 
     void free_endpoints(struct options *opt);
@@ -74,7 +74,6 @@ public:
      * Request that loop exits on next iteration.
      */
     void request_exit(int retcode);
-
 
 private:
     static const unsigned int LOG_AGGREGATE_INTERVAL_SEC = 5;

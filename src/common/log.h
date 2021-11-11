@@ -56,10 +56,10 @@ protected:
 #define log_warning(...) Log::log(Log::Level::WARNING, __VA_ARGS__)
 #define log_error(...) Log::log(Log::Level::ERROR, __VA_ARGS__)
 
-#define assert_or_return(exp, ...)                              \
-    do {                                                        \
-        if (__builtin_expect(!(exp), 0)) {                      \
-            log_warning("Expresssion `" #exp "` is false");     \
-            return __VA_ARGS__;                                 \
-        }                                                       \
+#define assert_or_return(exp, ...)                          \
+    do {                                                    \
+        if (__builtin_expect(!(exp), 0)) {                  \
+            log_warning("Expresssion `" #exp "` is false"); \
+            return __VA_ARGS__;                             \
+        }                                                   \
     } while (0)

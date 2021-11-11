@@ -43,6 +43,7 @@ protected:
     bool _logging_start_timeout() override;
 
     const char *_get_logfile_extension() override { return "bin"; };
+
 private:
     uint32_t _last_acked_seqno = 0;
 
