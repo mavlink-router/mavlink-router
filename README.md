@@ -1,17 +1,10 @@
 # MAVLink Router
 
-Route mavlink packets between endpoints.
-
-The usual configuration is to have one connection to the flight stack (either
-on UART or UDP) and other components that can be on UDP or TCP or UART
-endpoints. This is not strictly required and other configurations are possible:
-mavlink-router mainly routes mavlink packets from one endpoint to the other
-endpoints without differentiating what they are. However the user is still able
-to differentiate them by targeting just a subset of the packets by using
-message filters.
-
-TCP endpoints are added automatically if the TCP server is enabled, allowing
-clients to simply connect to mavlink-router without changing its configuration.
+MAVLink Router is an application to distribute [MAVLink](https://mavlink.io/en/)
+messages between multiple endpoints (connections). It distributes packets to a
+single port or multiple endpoints depending on the target address. Connections
+can be made via UART, UDP or TCP (see the [endpoints chapter](#endpoints) for
+details).
 
 
 ## Compilation and Installation
@@ -83,17 +76,22 @@ Or in order to install to another root directory:
 
 ## Running
 
-There are two ways to configure mavlink-router which can be used in
-combination: Configuration file(s) and command line parameters. The
-configuration file has a more fine-grained control (and is used by the systemd
-unit) while the CLI options enable a quick setup of endpoints.
+There are two ways to configure mavlink-router: Configuration file(s) and
+command line parameters. You can use just config files or just CLI options or
+even both at the same time. The CLI options will be merged with the settings
+from the config file in the latter case.  
+The configuration file gives more fine-grained control over the endpoints while
+the CLI options enable a quick configuration. When using the systemd unit
+added by the install step, it's recommended to use the configuration file
+instead of editing the systemd file.
 
 ### Conf File
 
-By default, mavlink-routerd looks for a file `/etc/mavlink-router/main.conf`.
+By default, mavlink-routerd looks for the `/etc/mavlink-router/main.conf` file.
 The file location can be overriden via a `MAVLINK_ROUTER_CONF_FILE` environment
-variable, or via the `-c` CLI switch when running mavlink-routerd. An example
-conf file can be found in [examples/config.sample](examples/config.sample).
+variable, or via the `-c` CLI switch when running mavlink-routerd. A
+description of the config file syntax and all parameters can be found in the
+[examples/config.sample](examples/config.sample) file.
 
 ### Conf Directory
 
@@ -145,12 +143,94 @@ for a link-local address is auto-detected.
 
 ## Detailed Description of Capabilities
 
-Here are some more detailes on the additional capabilities of mavlink-router.
+To understand how MAVLink Router forwards messages between endpoints, it
+important to know, that a MAVLink message has to have a sender address, but
+only some messages have a target address (e.g. parameter requests). The sender
+and target address consist of a system and component ID each, so one UAV can
+have a flight controller as well as other services running on a companion
+computer with individual component IDs, but sharing the same system ID. In the
+target address, a component ID of 0 is used to broadcast to all components on a
+system, a sysID of 0 broadcasts to all systems.
 
-### Endpoint Configuration
+### Endpoints
+MAVLink Router supports three basic types of endpoints: UART, UDP link and TCP
+client. Additionally, it'll act as a TCP server for dynamic clients (if not
+explicitly deactivated).
 
-A description of the different endpoint operating modes and their configuration
-parameters can be found in the [examples/config.sample](examples/config.sample).
+Endpoint types (see [examples/config.sample](examples/config.sample) for the
+config file format):
+
+  - UART: For telemetry radios or other serial links
+    * Configuration: UART device path/name and baudrate
+    * Behavior: Data is received and sent without waiting for incoming data first
+  - UDP:
+    * Configuration: Mode (client or server), IP address and port
+    * Behavior in client mode: Endpoint is configured with a target IP and port
+      combination. So MAVLink messages can be sent directly after startup, but
+      will only be recevied after the first message was received by the remote
+      side, it doesn't know our IP and port otherwise.  
+      When using any non-unicast IP address, e.g. an IPv4 broadcast or IPv6
+      local network multicast (ff02::1), messages will be "broadcasted" until
+      somebody sends data back. From then on, UDP packets will only be sent to
+      the specific unicast IP of the answering device. When no MAVlink messages
+      were received for 5 seconds, the endpoint switches back to "broadcast"
+      mode (using the configured non-unicast IP address).
+    * Behavior in server mode: Endpoint is configured with a listening port and
+      IP address. This is essentially the opposite of client mode. Messages can
+      be received directly after startup, but we can only send messages out
+      after the first received message, because we don't know the remote IP and
+      port otherwise.  
+      MAVLink messages are always sent to the IP and port from which the last
+      incoming message was received.
+  - TCP Client:
+    * Configuration: Target IP address and port, reconnection interval in case
+      of disconnection
+    * Behavior: Data is received and sent right after the TCP session is
+      established
+
+Defining endpoints:
+
+  - Endpoints are created by one of these methods:
+    * An endpoint is defined in the configuration file
+    * An endpoint is defined by the corresponding command line option
+    * A TCP client has connected to the TCP server port
+  - Endpoint are destoyed, when
+    * A TCP client disconnects from the TCP server port
+    * MAVLink Router is terminated
+    * (This means that UART, UDP and TCP client endpoints are never destroyed
+      during runtime.)
+
+### Message Routing
+In general, each message received on one endpoint is delivered to all endpoints
+in which that target system/component has been seen. If it's a broadcast
+message, it's delivered to all endpoints. A message is never sent back to the
+same endpoint it came from.  
+Details on broadcast rules can be found in the official
+[MAVLink documentation](http://mavlink.io/en/guide/routing.html).
+
+Routing rules:
+
+  - Each endpoint remembers from which systems (system and component ID) it has
+    received messages during it's whole lifetime. (See [endpoints chapter](#endpoints)
+    for information when an endpoint is created and destroyed.)
+  - A message received on one endpoint is offered to all endpoints but the one
+    it was received on. An endpoint will:
+    1. Reject the message, if message's sender address **is** in the list of
+      connected systems on this endpoint (to prevent message loops)
+    2. Reject the message based on the outgoing message filters (if enabled)
+    3. Accept the message, if it's targeted to any of the systems in the list
+      of connected systems on this endpoint. Broadcast rules apply when
+      checking if the targeted is reachable via this endpoint. Messages without
+      target address count as broadcast.  
+      If the list of connected systems is empty, only system-ID broadcast
+      messages will be sent, but no component-ID broadcasts since the targeted
+      system isn't known to be reachable via this endpoint.
+    4. Reject all other messages
+
+Message filters:
+
+  - AllowMsgIdOut: If set, only allow messages with the listed message IDs to
+    be sent via this endpoint
 
 ### Flight Stack Logging
 
