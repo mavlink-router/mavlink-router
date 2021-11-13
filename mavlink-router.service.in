@@ -3,7 +3,7 @@ Description=MAVLink Router
 
 [Service]
 Type=simple
-ExecStart=@bindir@/mavlink-routerd
+ExecStart=@BINDIR@/mavlink-routerd
 Restart=on-failure
 
 [Install]

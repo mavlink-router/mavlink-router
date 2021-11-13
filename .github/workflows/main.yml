@@ -3,173 +3,88 @@ name: Build and Test
 on: [push, pull_request]
 
 jobs:
-  ubuntu:
-    name: ubuntu-${{ matrix.distro }} ${{ matrix.name }}
-    runs-on: ubuntu-${{ matrix.distro }}
+  build:
+    runs-on: ubuntu-20.04
     strategy:
       matrix:
         include:
           - name: armhf
-            arch_name: linux-armv7
-            distro: 18.04
-          - name: arm64
-            arch_name: linux-arm64
-            distro: 18.04
-            distro_name: bionic
-          - name: amd64
-            arch_name: linux-x64
-            distro: 18.04
-            distro_name: bionic
-          - name: armhf
-            arch_name: linux-armv7
-            distro: 20.04
-            distro_name: bionic
-          - name: arm64
-            arch_name: linux-arm64
-            distro: 20.04
-            distro_name: focal
-          - name: amd64
-            arch_name: linux-x64
-            distro: 20.04
-            distro_name: focal
+            arch: arm-linux-gnueabihf
+          - name: aarch64
+            arch: aarch64-linux-gnu
+          - name: native
+            arch: native
     steps:
       - uses: actions/checkout@v2
         with:
           submodules: recursive
 
-      - name: setup dockcross
-        run: docker run --rm dockcross/${{ matrix.arch_name }} > ./dockcross; chmod +x ./dockcross
-
-      - name: install dependencies
+      - name: install dependencies (native)
+        if: ${{ matrix.arch == 'native' }}
         run: |
-          docker run --name buildcontainer dockcross/${{ matrix.arch_name }} sudo apt install
-          docker commit buildcontainer local/buildimage
+          sudo apt-get install --yes ninja-build python3-pip
+          pip3 install meson
+      - name: install dependencies (cross)
+        if: ${{ matrix.arch != 'native' }}
+        run: |
+          sudo apt-get install --yes ninja-build gcc-${{ matrix.arch }} g++-${{ matrix.arch }} podman python3-pip
+          pip3 install meson
 
-      - name: configure
-        run: ./dockcross -i local/buildimage ./autogen.sh c --with-systemdsystemunitdir=/usr/lib/systemd/system --host=amd64
+      - name: prepare sysroot
+        if: ${{ matrix.arch != 'native' }}
+        run: |
+          mkdir rootfs
+          tools/ci-create-rootfs.sh ${{ matrix.name }} > rootfs.tar
+          tar -xf rootfs.tar --directory=rootfs
+          sed -e "s#@sysroot@#$PWD/rootfs#g" meson-cross-sysroot.ini.in > meson-cross-sysroot.ini
+
+      - name: configure (native)
+        if: ${{ matrix.arch == 'native' }}
+        run: meson setup build-${{ matrix.name }} .
+      - name: configure (cross)
+        if: ${{ matrix.arch != 'native' }}
+        run: meson setup -Dsystemdsystemunitdir=/usr/lib/systemd/system --cross-file meson-cross-${{ matrix.name }}.ini --cross-file meson-cross-sysroot.ini build-${{ matrix.name }} .
 
       - name: build
-        run: ./dockcross -i local/buildimage make -j
+        run: ninja -C build-${{ matrix.name }}
 
       - name: test
-        run: ./dockcross -i local/buildimage /bin/bash -c "make check"
+        if: ${{ matrix.arch == 'native' }}
+        run: ninja -C build-${{ matrix.name }} test
 
-      - name: Rename
-        run: cp mavlink-routerd mavlink-routerd-libc-${{ matrix.name }}
-      - name: package-deb
-        run: |
-          mkdir -p .debpkg
-          ./dockcross --args "-v $(pwd)/.debpkg:$(pwd)/.debpkg" /bin/bash -c "make -j DESTDIR=$(pwd)/.debpkg install"
-          # mkdir -p .debpkg/usr/bin
-          # cp mavlink-routerd .debpkg/usr/bin
-          mkdir -p .debpkg/usr/share/doc/mavlink-router
-          cat > .debpkg/usr/share/doc/mavlink-router/copyright << EOL
-          Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-          Source: http://github.com/mavlink-router/mavlink-router
-          Upstream-Name: mavlink-router
-          Files: *
-          Copyright: 2021 MAVLink-Router Developers
-          License: Apache-2
-           On Debian systems, the full text of the Apache License
-           Version 2.0 can be found in the file
-           /usr/share/common-licenses/Apache-2.0.
-          EOL
-          cat > .debpkg/usr/share/doc/mavlink-router/changelog << EOL
-          mavlink-router (2.0) ${{ matrix.distro_name }}; urgency=low
-
-            * Initial Debian package support
-
-           -- Vincent Wang <vwangsf@gmail.com>  Tue, 08 Jun 2021 03:37:10 -0700
-          EOL
-          gzip --best .debpkg/usr/share/doc/mavlink-router/changelog
-          mkdir -p .debpkg/DEBIAN
-          export VERSION=$([[ "${{ github.ref }}" == refs/tags/* ]] && echo $(echo ${{ github.ref }} | sed s#"refs/tags/v"##) || echo "0.0.0")
-          export PKGSIZE=$(du mavlink-routerd)
-          echo "Building mavlink-router version: ${VERSION}"
-          cat > .debpkg/DEBIAN/control << EOL
-          Package: mavlink-router
-          Version: ${VERSION}
-          Section: custom
-          Priority: optional
-          Architecture: ${{ matrix.name }}
-          Essential: no
-          Installed-Size: ${PKGSIZE}
-          Maintainer: MAVLink-Router Developers <lucas.demarchi@intel.com>
-          Description: Route mavlink packets between endpoints
-            mavlink-router is a tool for routing MAVLink packets. The usual configuration is to have one "master" endpoint that is the flight stack (either on UART or UDP) and other components that can be on UDP or TCP or UART endpoints. This is not strictly required and other configurations are possible: mavlink-router mainly routes mavlink packets from one endpoint to the other endpoints without differentiating what they are.
-          EOL
-          fakeroot dpkg-deb --build .debpkg
-          mv .debpkg.deb mavlink-router-ubuntu-${{ matrix.distro }}_${{ matrix.name }}.deb
-      - uses: actions/upload-artifact@master
-        with:
-          path: mavlink-routerd-libc-${{ matrix.name }}
-      - uses: actions/upload-artifact@master
-        with:
-          path: mavlink-router-ubuntu-${{ matrix.distro }}_${{ matrix.name }}.deb
-      - uses: svenstaro/upload-release-action@v2
-        name: Upload binaries to release
-        if: ${{ startsWith(github.ref, 'refs/tags/') }}
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: mavlink-routerd-libc-${{ matrix.name }}
-          tag: ${{ github.ref }}
-          prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}
-          overwrite: true
-      - uses: svenstaro/upload-release-action@v2
-        name: Upload .debs to release
-        if: ${{ startsWith(github.ref, 'refs/tags/') }}
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          path: mavlink-router-ubuntu-${{ matrix.distro }}_${{ matrix.name }}.deb
-          tag: ${{ github.ref }}
-          prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}
-          overwrite: true
+      - name: install
+        run: DESTDIR=./.debpkg ninja -C build-${{ matrix.name }} install
 
   alpine-linux:
     name: alpine 3.14 (musl)
     runs-on: ubuntu-20.04
     container: alpine:3.14
     steps:
-      - name: install tools
-        run: apk update && apk add autoconf automake build-base git libtool linux-headers openssl-dev perl-extutils-pkgconfig
+      - name: install dependencies
+        run: apk update && apk add build-base git libaio-dev linux-headers pkgconf meson ninja
 
       - uses: actions/checkout@v2
         with:
           submodules: recursive
 
       - name: configure
-        run: ./autogen.sh && ./configure CFLAGS='-g -O2' --sysconfdir=/etc --localstatedir=/var --libdir=/usr/lib --disable-systemd --prefix=/usr
+        run: meson setup -Dsystemdsystemunitdir=/usr/lib/systemd/system build .
+
       - name: build
-        run: make
+        run: ninja -C build
+
       - name: Rename
-        run: cp mavlink-routerd mavlink-routerd-musl-x86-64
+        run: cp build/src/mavlink-routerd build/src/mavlink-routerd-musl-x86-64
+
       - uses: actions/upload-artifact@master
         with:
-          path: mavlink-routerd-musl-x86-64
+          path: build/src/mavlink-routerd-musl-x86-64
       - uses: svenstaro/upload-release-action@v2
         name: Upload binaries to release
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: mavlink-routerd-musl-x86-64
+          file: build/src/mavlink-routerd-musl-x86-64
           tag: ${{ github.ref }}
           prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}
           overwrite: true
-
-  native-external-build-dir:
-    name: external build dir
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          submodules: recursive
-
-      - name: configure
-        run: |
-          ./autogen.sh
-          mkdir build
-          cd build
-          ../configure CFLAGS='-g -O2' CXXFLAGS='-g -O2' --sysconfdir=/etc --localstatedir=/var --libdir=/usr/lib
-
-      - name: build
-        run: cd build && make -j$(nproc)
