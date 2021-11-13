@@ -1,50 +1,16 @@
-*.a
-*.o
-*.lo
-*.la
 /*.tar.xz
 /*.md5sum
-.deps/
-.libs/
-.dirstamp
-/Makefile
-/Makefile.in
 
-/aclocal.m4
-/autom4te.cache
 /build
-/build-aux/
-/config.h
-/config.h.in
-/config.log
-/config.status
-/configure
-/include/mavlink
-/libtool
 /mav.data
 /mav.parm
 /mav.tlog
 /mav.tlog.raw
-/mavlink-router.service
-/perf.data
-/perf.data.old
-/px4-offboard-mode
-/stamp-h1
-/test-suite.log
-/tests/routing_test.log
-/tests/routing_test.trs
-/arm-authorizer
 
 *~
 .*.swp
 cscope.out
 tags
-
-/mavlink-routerd
-/heartbeat-print
-/mainloop_test*
-
-test.log
 
 # Jetbrains IDEs
 .idea/
