@@ -7,6 +7,7 @@ project(
                 'cpp_std=gnu++11',
                 'prefix=/usr',
                 'warning_level=2',
+                'buildtype=debugoptimized',
         ],
         meson_version : '>= 0.57',
 )
