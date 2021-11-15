@@ -1,0 +1,26 @@
+FROM ubuntu:21.04
+
+# EXAMPLE Dockerfile with Ubuntu.
+# This is the lightweight version, it use a two stages build. First stage will download the developpemen dependencies
+# and compile mavlink-router, the second stage will get the binary from the first stage and use it.
+# From mavlink-router root directory, run `docker build . -t mavlink-router -f examples/Dockerfile` to build
+# then `docker run --rm -it --network=host mavlink-router` can be used to run, adapt on your need.
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y \
+    meson \
+	ninja-build \
+	gcc \
+	g++ \
+	&& apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+COPY . /mavlink-router
+
+RUN cd /mavlink-router \
+    && rm -rf build \
+    && meson setup -Dsystemdsystemunitdir=/usr/lib/systemd/system --buildtype=release build .  \
+    && ninja -C build
+
+ENTRYPOINT ["/mavlink-router/build/src/mavlink-routerd", "-e", "127.0.0.1:14650", "-e", "127.0.0.1:14651", "-t", "0", "0.0.0.0:14550"]
