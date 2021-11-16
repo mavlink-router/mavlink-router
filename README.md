@@ -52,7 +52,9 @@ A typical configuration for a x86-64 system is shown below:
     $ meson setup build .
 
 By default systemd integration is enabled. In a system without systemd you should
-pass the servie directory with -Dsystemdsystemunitdir=/usr/lib/systemd/system
+pass the service directory with `-Dsystemdsystemunitdir=/usr/lib/systemd/system`
+By default the build type is settled to "debugoptimized". It can be changed with
+`--buildtype=release`, see [Meson documentation](https://mesonbuild.com/Builtin-options.html#core-options) for more options
 
 Installation location can be changed using the -Dprefix option to `meson setup`.
 
