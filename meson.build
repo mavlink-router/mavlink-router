@@ -9,7 +9,7 @@ project(
                 'warning_level=2',
                 'buildtype=debugoptimized',
         ],
-        meson_version : '>= 0.57',
+        meson_version : '>= 0.55',
 )
 
 project_source_root = meson.current_source_dir()
