@@ -1,0 +1,48 @@
+FROM alpine:3 AS builder
+
+# EXAMPLE Dockerfile with Alpine Linux.
+# This is the lightweight version, it use a two stages build. First stage will download the developpemen dependencies
+# and compile mavlink-router, the second stage will get the binary from the first stage and use it.
+# From mavlink-router root directory, run `docker build . -t mavlink-router -f examples/Dockerfile` to build
+# then `docker run --rm -it --network=host mavlink-router` can be used to run, adapt on your need.
+
+# Make a working directory
+WORKDIR /mavlink-router
+
+################################################################################
+### Install minimal build tools and remove cache. Don't do any update
+
+RUN apk update && apk add --no-cache gcc \
+        g++ \
+        git \
+        pkgconf \
+        meson \
+        ninja \
+        linux-headers \
+        &&  rm -rf /var/cache/apk/*
+
+COPY . /mavlink-router
+
+RUN cd /mavlink-router \
+    && rm -rf build \
+    && meson setup -Dsystemdsystemunitdir=/usr/lib/systemd/system --buildtype=release build .  \
+    && ninja -C build
+
+
+# Second stage build
+FROM alpine:3
+
+WORKDIR /mavlink-router
+
+RUN apk update && apk add --no-cache libstdc++
+
+# Copy binary from previous image
+COPY --from=builder /mavlink-router/build/src/mavlink-routerd .
+
+################################################################################
+#### Setup the entrypoint == application that will launch by default
+#### Example that connect on port 14550 (SITL) and route to ports 14650 and 14651, disable tcp listen on port 5760
+#### You can also use a COPY mavlink-router.conf /mavlink-router/ to copy a configuration file into the docker container
+#### Use something like ENTRYPOINT ["/mavlink-router/mavlink-routerd", "-c", "mavlink-router.conf", "-t", "0"] to use it
+
+ENTRYPOINT ["/mavlink-router/mavlink-routerd", "-e", "127.0.0.1:14650", "-e", "127.0.0.1:14651", "-t", "0", "0.0.0.0:14550"]
