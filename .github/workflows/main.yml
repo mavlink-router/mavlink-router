@@ -61,7 +61,7 @@ jobs:
     container: alpine:3.14
     steps:
       - name: install dependencies
-        run: apk update && apk add build-base git libaio-dev linux-headers pkgconf meson ninja
+        run: apk update && apk add build-base git linux-headers pkgconf meson ninja
 
       - uses: actions/checkout@v2
         with:
