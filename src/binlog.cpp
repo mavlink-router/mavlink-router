@@ -32,8 +32,9 @@ bool BinLog::_logging_start_timeout()
 {
     mavlink_message_t msg;
 
-    mavlink_msg_remote_log_block_status_pack(LOG_ENDPOINT_SYSTEM_ID, MAV_COMP_ID_ALL, &msg, _target_system_id,
-                                             MAV_COMP_ID_ALL, MAV_REMOTE_LOG_DATA_BLOCK_START, 1);
+    mavlink_msg_remote_log_block_status_pack(LOG_ENDPOINT_SYSTEM_ID, MAV_COMP_ID_ALL, &msg,
+                                             _target_system_id, MAV_COMP_ID_ALL,
+                                             MAV_REMOTE_LOG_DATA_BLOCK_START, 1);
 
     _send_msg(&msg, _target_system_id);
 
@@ -67,8 +68,9 @@ void BinLog::_send_stop()
 {
     mavlink_message_t msg;
 
-    mavlink_msg_remote_log_block_status_pack(LOG_ENDPOINT_SYSTEM_ID, MAV_COMP_ID_ALL, &msg, _target_system_id,
-                                             MAV_COMP_ID_ALL, MAV_REMOTE_LOG_DATA_BLOCK_STOP, 1);
+    mavlink_msg_remote_log_block_status_pack(LOG_ENDPOINT_SYSTEM_ID, MAV_COMP_ID_ALL, &msg,
+                                             _target_system_id, MAV_COMP_ID_ALL,
+                                             MAV_REMOTE_LOG_DATA_BLOCK_STOP, 1);
     _send_msg(&msg, _target_system_id);
 }
 
@@ -134,7 +136,7 @@ int BinLog::write_msg(const struct buffer *buffer)
         binlog_data
             = (mavlink_remote_log_data_block_t *)alloca(sizeof(mavlink_remote_log_data_block_t));
         memcpy(binlog_data, payload, payload_len);
-        memset((uint8_t*)binlog_data + payload_len, 0, trimmed_zeros);
+        memset((uint8_t *)binlog_data + payload_len, 0, trimmed_zeros);
     } else {
         binlog_data = (mavlink_remote_log_data_block_t *)payload;
     }
@@ -167,7 +169,8 @@ void BinLog::_send_ack(uint32_t seqno)
     // Message filled a gap, or is duplicated. just send the ack
     if (seqno < _last_acked_seqno) {
         mavlink_msg_remote_log_block_status_pack(LOG_ENDPOINT_SYSTEM_ID, MAV_COMP_ID_ALL, &msg,
-                                                 _target_system_id, MAV_COMP_ID_ALL, seqno, MAV_REMOTE_LOG_DATA_BLOCK_ACK);
+                                                 _target_system_id, MAV_COMP_ID_ALL, seqno,
+                                                 MAV_REMOTE_LOG_DATA_BLOCK_ACK);
         _send_msg(&msg, _target_system_id);
         return;
     }
@@ -177,13 +180,15 @@ void BinLog::_send_ack(uint32_t seqno)
     // Send nacks regarding unseen seqno
     for (uint32_t i = _last_acked_seqno + 1; i < seqno; i++) {
         mavlink_msg_remote_log_block_status_pack(LOG_ENDPOINT_SYSTEM_ID, MAV_COMP_ID_ALL, &msg,
-                                                 _target_system_id, MAV_COMP_ID_ALL, seqno, MAV_REMOTE_LOG_DATA_BLOCK_NACK);
+                                                 _target_system_id, MAV_COMP_ID_ALL, seqno,
+                                                 MAV_REMOTE_LOG_DATA_BLOCK_NACK);
         _send_msg(&msg, _target_system_id);
     }
 
     // Send ack to seen seqno
-    mavlink_msg_remote_log_block_status_pack(LOG_ENDPOINT_SYSTEM_ID, MAV_COMP_ID_ALL, &msg, _target_system_id,
-                                             MAV_COMP_ID_ALL, seqno, MAV_REMOTE_LOG_DATA_BLOCK_ACK);
+    mavlink_msg_remote_log_block_status_pack(LOG_ENDPOINT_SYSTEM_ID, MAV_COMP_ID_ALL, &msg,
+                                             _target_system_id, MAV_COMP_ID_ALL, seqno,
+                                             MAV_REMOTE_LOG_DATA_BLOCK_ACK);
     _send_msg(&msg, _target_system_id);
     _last_acked_seqno = seqno;
 }

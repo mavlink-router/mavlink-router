@@ -20,11 +20,11 @@
 #include <dirent.h>
 #include <getopt.h>
 #include <limits.h>
+#include <regex>
 #include <stddef.h>
 #include <stdio.h>
-#include <sys/stat.h>
 #include <string>
-#include <regex>
+#include <sys/stat.h>
 
 #include <common/conf_file.h>
 #include <common/dbg.h>
@@ -35,10 +35,10 @@
 #include "endpoint.h"
 #include "mainloop.h"
 
-#define MAVLINK_TCP_PORT 5760
-#define DEFAULT_BAUDRATE 115200U
-#define DEFAULT_CONFFILE "/etc/mavlink-router/main.conf"
-#define DEFAULT_CONF_DIR "/etc/mavlink-router/config.d"
+#define MAVLINK_TCP_PORT          5760
+#define DEFAULT_BAUDRATE          115200U
+#define DEFAULT_CONFFILE          "/etc/mavlink-router/main.conf"
+#define DEFAULT_CONF_DIR          "/etc/mavlink-router/config.d"
 #define DEFAULT_RETRY_TCP_TIMEOUT 5
 
 extern const char *BUILD_VERSION;
@@ -57,47 +57,47 @@ static struct options opt = {
     .max_log_files = 0,
 };
 
-static const struct option long_options[] = {
-    { "endpoints",              required_argument,  NULL,   'e' },
-    { "conf-file",              required_argument,  NULL,   'c' },
-    { "conf-dir" ,              required_argument,  NULL,   'd' },
-    { "report_msg_statistics",  no_argument,        NULL,   'r' },
-    { "tcp-port",               required_argument,  NULL,   't' },
-    { "tcp-endpoint",           required_argument,  NULL,   'p' },
-    { "log",                    required_argument,  NULL,   'l' },
-    { "debug-log-level",        required_argument,  NULL,   'g' },
-    { "verbose",                no_argument,        NULL,   'v' },
-    { "version",                no_argument,        NULL,   'V' },
-    { }
-};
+static const struct option long_options[] = {{"endpoints", required_argument, NULL, 'e'},
+                                             {"conf-file", required_argument, NULL, 'c'},
+                                             {"conf-dir", required_argument, NULL, 'd'},
+                                             {"report_msg_statistics", no_argument, NULL, 'r'},
+                                             {"tcp-port", required_argument, NULL, 't'},
+                                             {"tcp-endpoint", required_argument, NULL, 'p'},
+                                             {"log", required_argument, NULL, 'l'},
+                                             {"debug-log-level", required_argument, NULL, 'g'},
+                                             {"verbose", no_argument, NULL, 'v'},
+                                             {"version", no_argument, NULL, 'V'},
+                                             {}};
 
-static const char* short_options = "he:rt:c:d:l:p:g:vV";
+static const char *short_options = "he:rt:c:d:l:p:g:vV";
 
-static void help(FILE *fp) {
-    fprintf(fp,
-            "%s [OPTIONS...] [<uart>|<udp_address>]\n\n"
-            "  <uart>                       UART device (<device>[:<baudrate>]) that will be routed\n"
-            "  <udp_address>                UDP address (<ip>:<port>) that will be routed\n"
-            "  -e --endpoint <ip[:port]>    Add UDP endpoint to communicate port is optional\n"
-            "                               and in case it's not given it starts in 14550 and\n"
-            "                               continues increasing not to collide with previous\n"
-            "                               ports\n"
-            "  -p --tcp-endpoint <ip:port>  Add TCP endpoint client, which will connect to given\n"
-            "                               address\n"
-            "  -r --report_msg_statistics   Report message statistics\n"
-            "  -t --tcp-port <port>         Port in which mavlink-router will listen for TCP\n"
-            "                               connections. Pass 0 to disable TCP listening.\n"
-            "                               Default port 5760\n"
-            "  -c --conf-file <file>        .conf file with configurations for mavlink-router.\n"
-            "  -d --conf-dir <dir>          Directory where to look for .conf files overriding\n"
-            "                               default conf file.\n"
-            "  -l --log <directory>         Enable Flight Stack logging\n"
-            "  -g --debug-log-level <level> Set debug log level. Levels are\n"
-            "                               <error|warning|info|debug>\n"
-            "  -v --verbose                 Verbose. Same as --debug-log-level=debug\n"
-            "  -V --version                 Show version\n"
-            "  -h --help                    Print this message\n"
-            , program_invocation_short_name);
+static void help(FILE *fp)
+{
+    fprintf(
+        fp,
+        "%s [OPTIONS...] [<uart>|<udp_address>]\n\n"
+        "  <uart>                       UART device (<device>[:<baudrate>]) that will be routed\n"
+        "  <udp_address>                UDP address (<ip>:<port>) that will be routed\n"
+        "  -e --endpoint <ip[:port]>    Add UDP endpoint to communicate port is optional\n"
+        "                               and in case it's not given it starts in 14550 and\n"
+        "                               continues increasing not to collide with previous\n"
+        "                               ports\n"
+        "  -p --tcp-endpoint <ip:port>  Add TCP endpoint client, which will connect to given\n"
+        "                               address\n"
+        "  -r --report_msg_statistics   Report message statistics\n"
+        "  -t --tcp-port <port>         Port in which mavlink-router will listen for TCP\n"
+        "                               connections. Pass 0 to disable TCP listening.\n"
+        "                               Default port 5760\n"
+        "  -c --conf-file <file>        .conf file with configurations for mavlink-router.\n"
+        "  -d --conf-dir <dir>          Directory where to look for .conf files overriding\n"
+        "                               default conf file.\n"
+        "  -l --log <directory>         Enable Flight Stack logging\n"
+        "  -g --debug-log-level <level> Set debug log level. Levels are\n"
+        "                               <error|warning|info|debug>\n"
+        "  -v --verbose                 Verbose. Same as --debug-log-level=debug\n"
+        "  -V --version                 Show version\n"
+        "  -h --help                    Print this message\n",
+        program_invocation_short_name);
 }
 
 static unsigned long find_next_endpoint_port(const char *ip)
@@ -152,7 +152,7 @@ static bool validate_ipv4(const char *ip)
     return regex_match(ip, ipv4_regex);
 }
 
-static bool validate_ip(const char* ip)
+static bool validate_ip(const char *ip)
 {
     return validate_ipv4(ip) || validate_ipv6(ip);
 }
@@ -292,10 +292,8 @@ fail:
     return ret;
 }
 
-static std::vector<unsigned long> *strlist_to_ul(const char *list,
-                                                 const char *listname,
-                                                 const char *delim,
-                                                 unsigned long default_value)
+static std::vector<unsigned long> *strlist_to_ul(const char *list, const char *listname,
+                                                 const char *delim, unsigned long default_value)
 {
     char *s, *tmp_str;
     std::unique_ptr<std::vector<unsigned long>> v{new std::vector<unsigned long>()};
@@ -658,7 +656,6 @@ static int parse_log_mode(const char *val, size_t val_len, void *storage, size_t
 }
 #undef MAX_LOG_MODE_SIZE
 
-
 static int parse_mode(const char *val, size_t val_len, void *storage, size_t storage_len)
 {
     assert(val);
@@ -715,9 +712,10 @@ static int parse_confs(ConfFile &conf)
         bool flowcontrol;
     };
     static const ConfFile::OptionsTable option_table_uart[] = {
-        {"baud",        false,  ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_uart, bauds)},
-        {"device",      true,   ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_uart, device)},
-        {"FlowControl", false,  ConfFile::parse_bool,       OPTIONS_TABLE_STRUCT_FIELD(option_uart, flowcontrol)},
+        {"baud", false, ConfFile::parse_str_dup, OPTIONS_TABLE_STRUCT_FIELD(option_uart, bauds)},
+        {"device", true, ConfFile::parse_str_dup, OPTIONS_TABLE_STRUCT_FIELD(option_uart, device)},
+        {"FlowControl", false, ConfFile::parse_bool,
+         OPTIONS_TABLE_STRUCT_FIELD(option_uart, flowcontrol)},
     };
 
     struct option_udp {
@@ -727,10 +725,10 @@ static int parse_confs(ConfFile &conf)
         char *filter;
     };
     static const ConfFile::OptionsTable option_table_udp[] = {
-        {"address", true,   ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_udp, addr)},
-        {"mode",    true,   parse_mode,                 OPTIONS_TABLE_STRUCT_FIELD(option_udp, server)},
-        {"port",    false,  ConfFile::parse_ul,         OPTIONS_TABLE_STRUCT_FIELD(option_udp, port)},
-        {"filter",  false,  ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_udp, filter)},
+        {"address", true, ConfFile::parse_str_dup, OPTIONS_TABLE_STRUCT_FIELD(option_udp, addr)},
+        {"mode", true, parse_mode, OPTIONS_TABLE_STRUCT_FIELD(option_udp, server)},
+        {"port", false, ConfFile::parse_ul, OPTIONS_TABLE_STRUCT_FIELD(option_udp, port)},
+        {"filter", false, ConfFile::parse_str_dup, OPTIONS_TABLE_STRUCT_FIELD(option_udp, filter)},
     };
 
     struct option_tcp {
@@ -739,9 +737,9 @@ static int parse_confs(ConfFile &conf)
         int timeout;
     };
     static const ConfFile::OptionsTable option_table_tcp[] = {
-        {"address",         true,   ConfFile::parse_str_dup,    OPTIONS_TABLE_STRUCT_FIELD(option_tcp, addr)},
-        {"port",            true,   ConfFile::parse_ul,         OPTIONS_TABLE_STRUCT_FIELD(option_tcp, port)},
-        {"RetryTimeout",    false,  ConfFile::parse_i,          OPTIONS_TABLE_STRUCT_FIELD(option_tcp, timeout)},
+        {"address", true, ConfFile::parse_str_dup, OPTIONS_TABLE_STRUCT_FIELD(option_tcp, addr)},
+        {"port", true, ConfFile::parse_ul, OPTIONS_TABLE_STRUCT_FIELD(option_tcp, port)},
+        {"RetryTimeout", false, ConfFile::parse_i, OPTIONS_TABLE_STRUCT_FIELD(option_tcp, timeout)},
     };
 
     ret = conf.extract_options("General", option_table, ARRAY_SIZE(option_table), &opt);
@@ -776,11 +774,13 @@ static int parse_confs(ConfFile &conf)
                 ret = -EINVAL;
             } else {
                 if (!validate_ip(opt_udp.addr)) {
-                    log_error("Invalid IP address in section %.*s: %s", (int)iter.name_len, iter.name, opt_udp.addr);
+                    log_error("Invalid IP address in section %.*s: %s", (int)iter.name_len,
+                              iter.name, opt_udp.addr);
                     ret = -EINVAL;
                 } else {
-                    ret = add_endpoint_address(iter.name + offset, iter.name_len - offset, opt_udp.addr,
-                                               opt_udp.port, opt_udp.server, opt_udp.filter);
+                    ret = add_endpoint_address(iter.name + offset, iter.name_len - offset,
+                                               opt_udp.addr, opt_udp.port, opt_udp.server,
+                                               opt_udp.filter);
                 }
             }
         }
@@ -799,11 +799,12 @@ static int parse_confs(ConfFile &conf)
 
         if (ret == 0) {
             if (!validate_ip(opt_tcp.addr)) {
-                log_error("Invalid IP address in section %.*s: %s", (int)iter.name_len, iter.name, opt_tcp.addr);
+                log_error("Invalid IP address in section %.*s: %s", (int)iter.name_len, iter.name,
+                          opt_tcp.addr);
                 ret = -EINVAL;
             } else {
-                ret = add_tcp_endpoint_address(iter.name + offset, iter.name_len - offset, opt_tcp.addr,
-                                               opt_tcp.port, opt_tcp.timeout);
+                ret = add_tcp_endpoint_address(iter.name + offset, iter.name_len - offset,
+                                               opt_tcp.addr, opt_tcp.port, opt_tcp.timeout);
             }
         }
         free(opt_tcp.addr);
@@ -910,7 +911,7 @@ int main(int argc, char *argv[])
     if (parse_argv(argc, argv) != 2)
         goto close_log;
 
-    Log::set_max_level((Log::Level) opt.debug_log_level);
+    Log::set_max_level((Log::Level)opt.debug_log_level);
 
     dbg("Cmd line and options parsed");
 

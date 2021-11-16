@@ -23,7 +23,7 @@
 
 class Timeout : public Pollable {
 public:
-    Timeout(std::function<bool(void*)> cb, const void *data);
+    Timeout(std::function<bool(void *)> cb, const void *data);
     bool remove_me = false;
     Timeout *next = nullptr;
 
@@ -31,6 +31,6 @@ public:
     bool handle_canwrite() override;
 
 private:
-    std::function<bool(void*)> _cb;
+    std::function<bool(void *)> _cb;
     const void *_data;
 };

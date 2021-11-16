@@ -19,17 +19,17 @@
 
 #include <assert.h>
 #include <limits.h>
-#include <unistd.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/uio.h>
+#include <unistd.h>
 
-#define COLOR_RED          "\033[31m"
-#define COLOR_LIGHTBLUE    "\033[34;1m"
-#define COLOR_YELLOW       "\033[33;1m"
-#define COLOR_ORANGE       "\033[0;33m"
-#define COLOR_WHITE        "\033[37;1m"
-#define COLOR_RESET        "\033[0m"
+#define COLOR_RED       "\033[31m"
+#define COLOR_LIGHTBLUE "\033[34;1m"
+#define COLOR_YELLOW    "\033[33;1m"
+#define COLOR_ORANGE    "\033[0;33m"
+#define COLOR_WHITE     "\033[37;1m"
+#define COLOR_RESET     "\033[0m"
 
 Log::Level Log::_max_level = Level::INFO;
 int Log::_target_fd = -1;
@@ -61,7 +61,7 @@ int Log::open()
     assert_or_return(_target_fd < 0, -1);
 
     /* for now, only logging is supported only to stderr */
-    _target_fd =  STDERR_FILENO;
+    _target_fd = STDERR_FILENO;
 
     if (isatty(_target_fd))
         _show_colors = true;
@@ -84,7 +84,7 @@ void Log::set_max_level(Level level)
 
 void Log::logv(Level level, const char *format, va_list ap)
 {
-    struct iovec iovec[6] = { };
+    struct iovec iovec[6] = {};
     const char *color;
     int n = 0;
     char buffer[LINE_MAX];

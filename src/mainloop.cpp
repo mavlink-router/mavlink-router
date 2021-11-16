@@ -31,7 +31,7 @@
 
 #include "autolog.h"
 
-static std::atomic<bool> should_exit {false};
+static std::atomic<bool> should_exit{false};
 
 Mainloop Mainloop::_instance{};
 bool Mainloop::_initialized = false;
@@ -43,7 +43,7 @@ static void exit_signal_handler(int signum)
 
 static void setup_signal_handlers()
 {
-    struct sigaction sa = { };
+    struct sigaction sa = {};
 
     sa.sa_flags = SA_NOCLDSTOP;
     sa.sa_handler = exit_signal_handler;
@@ -96,7 +96,7 @@ int Mainloop::open()
 
 int Mainloop::mod_fd(int fd, void *data, int events)
 {
-    struct epoll_event epev = { };
+    struct epoll_event epev = {};
 
     epev.events = events;
     epev.data.ptr = data;
@@ -111,7 +111,7 @@ int Mainloop::mod_fd(int fd, void *data, int events)
 
 int Mainloop::add_fd(int fd, void *data, int events)
 {
-    struct epoll_event epev = { };
+    struct epoll_event epev = {};
 
     epev.events = events;
     epev.data.ptr = data;
@@ -155,17 +155,18 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid
 
     for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
         if ((*e)->accept_msg(target_sysid, target_compid, sender_sysid, sender_compid, msg_id)) {
-            log_debug("Endpoint [%d] accepted message %u to %d/%d from %u/%u", (*e)->fd, msg_id, target_sysid,
-                      target_compid, sender_sysid, sender_compid);
+            log_debug("Endpoint [%d] accepted message %u to %d/%d from %u/%u", (*e)->fd, msg_id,
+                      target_sysid, target_compid, sender_sysid, sender_compid);
             write_msg(*e, buf);
             unknown = false;
         }
     }
 
     for (struct endpoint_entry *e = g_tcp_endpoints; e; e = e->next) {
-        if (e->endpoint->accept_msg(target_sysid, target_compid, sender_sysid, sender_compid, msg_id)) {
-            log_debug("Endpoint [%d] accepted message %u to %d/%d from %u/%u", e->endpoint->fd, msg_id,
-                      target_sysid, target_compid, sender_sysid, sender_compid);
+        if (e->endpoint->accept_msg(target_sysid, target_compid, sender_sysid, sender_compid,
+                                    msg_id)) {
+            log_debug("Endpoint [%d] accepted message %u to %d/%d from %u/%u", e->endpoint->fd,
+                      msg_id, target_sysid, target_compid, sender_sysid, sender_compid);
             int r = write_msg(e->endpoint, buf);
             if (r == -EPIPE) {
                 should_process_tcp_hangups = true;
@@ -392,7 +393,7 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
     if (opt->logs_dir)
         n_endpoints++;
 
-    g_endpoints = (Endpoint**) calloc(n_endpoints + 1, sizeof(Endpoint*));
+    g_endpoints = (Endpoint **)calloc(n_endpoints + 1, sizeof(Endpoint *));
     assert_or_return(g_endpoints, false);
 
     for (conf = opt->endpoints; conf; conf = conf->next) {
@@ -432,7 +433,7 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
                 while (token != NULL) {
                     udp->add_message_to_filter(atoi(token));
                     token = strtok(NULL, ",");
-                } 
+                }
             }
 
             g_endpoints[i] = udp.release();
@@ -519,7 +520,7 @@ void Mainloop::free_endpoints(struct options *opt)
 int Mainloop::tcp_open(unsigned long tcp_port)
 {
     int fd;
-    struct sockaddr_in sockaddr = { };
+    struct sockaddr_in sockaddr = {};
     int val = 1;
 
     fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
@@ -553,7 +554,8 @@ int Mainloop::tcp_open(unsigned long tcp_port)
     return fd;
 }
 
-Timeout *Mainloop::add_timeout(uint32_t timeout_msec, std::function<bool(void*)> cb, const void *data)
+Timeout *Mainloop::add_timeout(uint32_t timeout_msec, std::function<bool(void *)> cb,
+                               const void *data)
 {
     struct itimerspec ts;
     Timeout *t = new Timeout(cb, data);
@@ -620,20 +622,19 @@ void Mainloop::_del_timeouts()
 
 void Mainloop::_add_tcp_retry(TcpEndpoint *tcp)
 {
-    Timeout *t
-        ;
+    Timeout *t;
     if (tcp->retry_timeout <= 0) {
         return;
     }
 
     tcp->close();
     t = add_timeout(MSEC_PER_SEC * tcp->retry_timeout,
-            std::bind(&Mainloop::_retry_timeout_cb, this, std::placeholders::_1),
-            tcp);
+                    std::bind(&Mainloop::_retry_timeout_cb, this, std::placeholders::_1), tcp);
 
     if (t == nullptr) {
         log_warning("Could not create retry timeout for TCP endpoint %s:%lu\n"
-                    "No attempts to reconnect will be made", tcp->get_ip(), tcp->get_port());
+                    "No attempts to reconnect will be made",
+                    tcp->get_ip(), tcp->get_port());
     }
 }
 

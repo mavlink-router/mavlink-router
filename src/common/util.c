@@ -26,16 +26,13 @@
 
 usec_t ts_usec(const struct timespec *ts)
 {
-    if (ts->tv_sec == (time_t) -1 &&
-        ts->tv_nsec == (long) -1)
+    if (ts->tv_sec == (time_t)-1 && ts->tv_nsec == (long)-1)
         return USEC_INFINITY;
 
-    if ((usec_t) ts->tv_sec > (UINT64_MAX - (ts->tv_nsec / NSEC_PER_USEC)) / USEC_PER_SEC)
+    if ((usec_t)ts->tv_sec > (UINT64_MAX - (ts->tv_nsec / NSEC_PER_USEC)) / USEC_PER_SEC)
         return USEC_INFINITY;
 
-    return
-        (usec_t) ts->tv_sec * USEC_PER_SEC +
-        (usec_t) ts->tv_nsec / NSEC_PER_USEC;
+    return (usec_t)ts->tv_sec * USEC_PER_SEC + (usec_t)ts->tv_nsec / NSEC_PER_USEC;
 }
 
 usec_t now_usec(void)
@@ -99,10 +96,10 @@ int safe_atoi(const char *s, int *ret)
     if (!x || x == s || *x || errno)
         return errno > 0 ? -errno : -EINVAL;
 
-    if ((long) (int) l != l)
+    if ((long)(int)l != l)
         return -ERANGE;
 
-    *ret = (int) l;
+    *ret = (int)l;
     return 0;
 }
 

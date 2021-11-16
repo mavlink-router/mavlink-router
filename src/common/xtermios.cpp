@@ -25,11 +25,12 @@ int reset_uart(int fd)
 {
     struct termios tc = {};
     /* See termios(3) */
-    const cc_t default_cc[] = { 03, 034, 0177, 025, 04, 0, 0, 0, 021, 023, 032, 0,
-                                022, 017, 027, 026, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                0, 0, 0, 0, 0, 0 };
+    const cc_t default_cc[]
+        = {03, 034, 0177, 025, 04, 0, 0, 0, 021, 023, 032, 0, 022, 017, 027, 026,
+           0,  0,   0,    0,   0,  0, 0, 0, 0,   0,   0,   0, 0,   0,   0,   0};
 
-    static_assert(sizeof(default_cc) == sizeof(tc.c_cc), "Unknown termios struct with different size");
+    static_assert(sizeof(default_cc) == sizeof(tc.c_cc),
+                  "Unknown termios struct with different size");
 
     if (tcgetattr(fd, &tc) < 0) {
         return -1;
@@ -39,7 +40,7 @@ int reset_uart(int fd)
     tc.c_cflag = CREAD;
 
     tc.c_iflag |= BRKINT | ICRNL | IMAXBEL;
-    tc.c_iflag &= ~(INLCR | IGNCR | IUTF8 | IXOFF| IUCLC | IXANY);
+    tc.c_iflag &= ~(INLCR | IGNCR | IUTF8 | IXOFF | IUCLC | IXANY);
 
     tc.c_oflag |= OPOST | ONLCR;
     tc.c_oflag &= ~(OLCUC | OCRNL | ONLRET | OFILL | OFDEL | NL0 | CR0 | TAB0 | BS0 | VT0 | FF0);

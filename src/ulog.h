@@ -39,6 +39,7 @@ protected:
     bool _logging_start_timeout() override;
 
     const char *_get_logfile_extension() override { return "ulg"; };
+
 private:
     uint16_t _expected_seq = 0;
     bool _waiting_header = true;

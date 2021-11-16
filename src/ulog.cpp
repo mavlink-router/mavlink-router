@@ -109,7 +109,6 @@ int ULog::write_msg(const struct buffer *buffer)
     uint8_t source_system_id;
     uint8_t source_component_id;
 
-
     if (mavlink2) {
         struct mavlink_router_mavlink2_header *msg
             = (struct mavlink_router_mavlink2_header *)buffer->data;
