@@ -41,6 +41,13 @@ Fedora:
 Archlinux:
 
     $ sudo pacman -S git meson gcc systemd
+    
+Note that meson package must be version 0.55 or later. If your package manager does not have this version,
+a more recent version can be downloaded via pip:
+
+    $ sudo pip3 install meson
+    
+If using this method, meson must _not_ be installed with ``--user``.
 
 #### Build ####
 
