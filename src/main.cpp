@@ -230,7 +230,7 @@ fail:
 }
 
 static int add_endpoint_address(const char *name, size_t name_len, const char *ip,
-                                long unsigned port, bool server, const char *filter)
+                                long unsigned port, bool server, const char *msgIdFilter)
 {
     int ret;
 
@@ -262,9 +262,9 @@ static int add_endpoint_address(const char *name, size_t name_len, const char *i
         goto fail;
     }
 
-    if (filter) {
-        conf->filter = strdup(filter);
-        if (!conf->filter) {
+    if (msgIdFilter) {
+        conf->msgIdFilter = strdup(msgIdFilter);
+        if (!conf->msgIdFilter) {
             ret = -ENOMEM;
             goto fail;
         }
@@ -723,13 +723,16 @@ static int parse_confs(ConfFile &conf)
         char *addr;
         bool server;
         unsigned long port;
-        char *filter;
+        char *msgIdFilter;
     };
     static const ConfFile::OptionsTable option_table_udp[] = {
         {"address", true, ConfFile::parse_str_dup, OPTIONS_TABLE_STRUCT_FIELD(option_udp, addr)},
         {"mode", true, parse_mode, OPTIONS_TABLE_STRUCT_FIELD(option_udp, server)},
         {"port", false, ConfFile::parse_ul, OPTIONS_TABLE_STRUCT_FIELD(option_udp, port)},
-        {"filter", false, ConfFile::parse_str_dup, OPTIONS_TABLE_STRUCT_FIELD(option_udp, filter)},
+        {"filter", false, ConfFile::parse_str_dup,
+         OPTIONS_TABLE_STRUCT_FIELD(option_udp, msgIdFilter)}, // legacy AllowMsgIdOut
+        {"AllowMsgIdOut", false, ConfFile::parse_str_dup,
+         OPTIONS_TABLE_STRUCT_FIELD(option_udp, msgIdFilter)},
     };
 
     struct option_tcp {
@@ -781,7 +784,7 @@ static int parse_confs(ConfFile &conf)
                 } else {
                     ret = add_endpoint_address(iter.name + offset, iter.name_len - offset,
                                                opt_udp.addr, opt_udp.port, opt_udp.server,
-                                               opt_udp.filter);
+                                               opt_udp.msgIdFilter);
                 }
             }
         }

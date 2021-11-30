@@ -126,7 +126,7 @@ struct endpoint_config {
             bool flowcontrol;
         };
     };
-    char *filter;
+    char *msgIdFilter;
 };
 
 struct options {

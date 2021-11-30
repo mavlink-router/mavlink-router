@@ -428,10 +428,10 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
                 return false;
             }
 
-            if (conf->filter) {
-                char *token = strtok(conf->filter, ",");
+            if (conf->msgIdFilter) {
+                char *token = strtok(conf->msgIdFilter, ",");
                 while (token != NULL) {
-                    udp->add_message_to_filter(atoi(token));
+                    udp->filter_add_allowed_msg_id(atoi(token));
                     token = strtok(NULL, ",");
                 }
             }
