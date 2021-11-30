@@ -192,13 +192,13 @@ One can test mavlink-router by using `examples/sender.py` and
 sends mavlink *ping* messages to a target mavlink system-id, and second
 receives and responds to them. For instance:
 
-    $ python examples/sender.py 127.0.0.1:3000 100 0
+    $ python3 examples/sender.py 127.0.0.1:3000 100 0
 
 Will send mavlink *pings* to UDP port 3000. Those pings will have `100` as
 source system id and will have `0` as target system id (`0` means broadcast).
 Receiver could be set as:
 
-    $ python examples/receiver.py 127.0.0.1:4000 50
+    $ python3 examples/receiver.py 127.0.0.1:4000 50
 
 Where `50` is the receiver system id. Then, to route between those:
 

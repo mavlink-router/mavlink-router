@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 # This file is part of the MAVLink Router project
 #
@@ -16,10 +16,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function
-
-import pymavlink.mavutil as mavutil
 import sys
+from pymavlink import mavutil
 
 mav = mavutil.mavlink_connection('tcp:' + sys.argv[1])
 mav.wait_heartbeat()

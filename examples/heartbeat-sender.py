@@ -16,11 +16,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function
-
-import pymavlink.mavutil as mavutil
 import sys
 import time
+from pymavlink import mavutil
 
 mav = mavutil.mavlink_connection('udpin:' + sys.argv[1],
                                  source_system=1,

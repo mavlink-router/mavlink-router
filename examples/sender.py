@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 # This file is part of the MAVLink Router project
 #
@@ -16,13 +16,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function
 from threading import Thread
 from time import sleep
 
-import pymavlink.mavutil as mavutil
 import sys
 import time
+from pymavlink import mavutil
 
 if len(sys.argv) != 4:
     print("Usage: %s <ip:udp_port> <system-id> <target-system-id>" %
@@ -30,7 +29,7 @@ if len(sys.argv) != 4:
     print(
         "Send mavlink pings, using given <system-id> and <target-system-id>, "
         "to specified interface")
-    quit()
+    sys.exit()
 
 mav = mavutil.mavlink_connection('udpout:' + sys.argv[1],
                                  source_system=int(sys.argv[2]))
@@ -38,7 +37,7 @@ mav = mavutil.mavlink_connection('udpout:' + sys.argv[1],
 
 def pingloop():
     i = 0
-    while (True):
+    while True:
         mav.mav.ping_send(int(time.time() * 1000), i, int(sys.argv[3]), 1)
         i = i + 1
         sleep(1)
@@ -48,6 +47,6 @@ pingthread = Thread(target=pingloop)
 pingthread.daemon = True
 pingthread.start()
 
-while (True):
+while True:
     msg = mav.recv_match(blocking=True)
     print("Message from %d: %s" % (msg.get_srcSystem(), msg))
