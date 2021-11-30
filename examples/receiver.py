@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 # This file is part of the MAVLink Router project
 #
@@ -16,31 +16,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function
-
-import pymavlink.mavutil as mavutil
 import sys
 import time
+from pymavlink import mavutil
+
+OWN_COMP_ID = 1
 
 if len(sys.argv) != 3:
     print("Usage: %s <ip:udp_port> <system-id>" % (sys.argv[0]))
     print("Receive mavlink heartbeats on specified interface. "
           "Respond with a ping message")
-    quit()
+    sys.exit()
 
 srcSystem = int(sys.argv[2])
-mav = mavutil.mavlink_connection(
-    'udpin:' + sys.argv[1], source_system=srcSystem)
+mav = mavutil.mavlink_connection('udpin:' + sys.argv[1],
+                                 source_system=srcSystem,
+                                 source_component=OWN_COMP_ID)
 
-while (True):
+while True:
     msg = mav.recv_match(blocking=True)
     print("Message from %d: %s" % (msg.get_srcSystem(), msg))
-    if msg.target_system == 0:
-        print("\tMessage sent to all")
-    elif msg.target_system == srcSystem:
-        print("\tMessage sent to me")
+    if hasattr(msg, 'target_system'):
+        if msg.target_system == 0:
+            print("\tMessage sent to all")
+        elif msg.target_system == srcSystem:
+            print("\tMessage sent to me")
+        else:
+            print("\tMessage sent to other")
     else:
-        print("\tMessage sent to other")
-    mav.mav.ping_send(
-        int(time.time() * 1000), msg.seq,
-        msg.get_srcSystem(), msg.get_srcComponent())
+        print("\tMessage without target system")
+
+    mav.mav.ping_send(int(time.time() * 1000), msg.seq, msg.get_srcSystem(),
+                      msg.get_srcComponent())

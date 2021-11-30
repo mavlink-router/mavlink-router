@@ -23,12 +23,12 @@ jobs:
         if: ${{ matrix.arch == 'native' }}
         run: |
           sudo apt-get install --yes ninja-build python3-pip
-          pip3 install meson
+          pip3 install meson pymavlink
       - name: install dependencies (cross)
         if: ${{ matrix.arch != 'native' }}
         run: |
           sudo apt-get install --yes ninja-build gcc-${{ matrix.arch }} g++-${{ matrix.arch }} podman python3-pip
-          pip3 install meson
+          pip3 install meson pymavlink
 
       - name: prepare sysroot
         if: ${{ matrix.arch != 'native' }}
@@ -54,6 +54,10 @@ jobs:
 
       - name: install
         run: DESTDIR=./.debpkg ninja -C build-${{ matrix.name }} install
+
+      - name: run routing_test.py
+        if: ${{ matrix.arch == 'native' }}
+        run: ./tests/routing_test.py -b ./build-${{ matrix.name }}/src/mavlink-routerd
 
   alpine-linux:
     name: alpine 3.14 (musl)

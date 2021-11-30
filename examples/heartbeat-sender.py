@@ -16,11 +16,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function
-
-import pymavlink.mavutil as mavutil
 import sys
 import time
+from pymavlink import mavutil
 
 mav = mavutil.mavlink_connection('udpin:' + sys.argv[1],
                                  source_system=1,
@@ -29,8 +27,7 @@ mav.wait_heartbeat()
 
 while True:
     mav.mav.heartbeat_send(mavutil.mavlink.MAV_TYPE_QUADROTOR,
-                           mavutil.mavlink.MAV_AUTOPILOT_INVALID,
-                           0, 0, 0)
+                           mavutil.mavlink.MAV_AUTOPILOT_INVALID, 0, 0, 0)
     print(".", end="")
     sys.stdout.flush()
     time.sleep(1)
