@@ -416,6 +416,14 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
                     return false;
             }
 
+            if (conf->msgIdFilter) {
+                char *token = strtok(conf->msgIdFilter, ",");
+                while (token != NULL) {
+                    uart->filter_add_allowed_msg_id(atoi(token));
+                    token = strtok(NULL, ",");
+                }
+            }
+
             g_endpoints[i] = uart.release();
             mainloop.add_fd(g_endpoints[i]->fd, g_endpoints[i], EPOLLIN);
             i++;
@@ -450,6 +458,14 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
                     _add_tcp_retry(tcp.release());
                 }
                 continue;
+            }
+
+            if (conf->msgIdFilter) {
+                char *token = strtok(conf->msgIdFilter, ",");
+                while (token != NULL) {
+                    tcp->filter_add_allowed_msg_id(atoi(token));
+                    token = strtok(NULL, ",");
+                }
             }
 
             if (_add_tcp_endpoint(tcp.get()) < 0) {

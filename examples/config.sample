@@ -69,6 +69,11 @@
 #       defining if flow control should be enabled
 #       Default: false
 #
+#   AllowMsgIdOut
+#       Comma separated list of message IDs to transmit to this endpoint
+#       No default value. All message IDs will be accepted, when not
+#       specified.
+#
 #
 # Section [UdpEndpoint]: This section must have a name
 #
@@ -118,6 +123,11 @@
 #       to reconnect to IP in case of disconnection. A value of 0 disables
 #       reconnection.
 #       Default value: 5
+#
+#   AllowMsgIdOut
+#       Comma separated list of message IDs to transmit to this endpoint
+#       No default value. All message IDs will be accepted, when not
+#       specified.
 #
 # Following, an example of configuration file:
 [General]

@@ -389,11 +389,9 @@ bool Endpoint::accept_msg(int target_sysid, int target_compid, uint8_t src_sysid
     if (has_sys_comp_id(src_sysid, src_compid))
         return false;
 
+    // If filter is defined and message is not in the set: discard it
     if (msg_id != UINT32_MAX && _allowed_msg_ids.size() > 0
-        && std::find(_allowed_msg_ids.begin(), _allowed_msg_ids.end(), msg_id)
-            == _allowed_msg_ids.end()) {
-
-        // if filter is defined and message is not in the set then discard it
+        && !vector_contains(_allowed_msg_ids, msg_id)) {
         return false;
     }
 
