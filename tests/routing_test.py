@@ -25,9 +25,11 @@ import sys
 import time
 from pymavlink import mavutil
 
+SENDER_NUM_MESSAGES = 10
+
 
 class MavlinkSender(Thread):
-    '''MAVLink message sender'''
+    '''MavlinkSender sends some ping messages to a system and collects the answers'''
     def __init__(self, name, port, sysId, compId, targetSysId, targetCompId):
         super().__init__()
         self.name = name
@@ -36,13 +38,14 @@ class MavlinkSender(Thread):
         self.targetSysId = targetSysId
         self.targetCompId = targetCompId
         self.mav = mavutil.mavlink_connection('udpout:127.0.0.1:' + str(port),
-                                              source_system=self.sysId)
+                                              source_system=self.sysId,
+                                              source_component=self.compId)
         self.sender_thread = Thread(target=self.send_loop)
         self.received = []
         self.success = True
 
     def send_loop(self):
-        for i in range(0, 10):
+        for i in range(0, SENDER_NUM_MESSAGES):
             self.mav.mav.ping_send(int(time.time() * 1000), i,
                                    self.targetSysId, self.targetCompId)
             sleep(0.5)
@@ -73,14 +76,15 @@ class MavlinkSender(Thread):
 
 
 class MavlinkReceiver(Thread):
-    '''MAVLink message receiver'''
+    '''MavlinkReceiver collects incoming ping messages and returns a reply'''
     def __init__(self, name, port, sysId, compId):
         super().__init__()
         self.name = name
         self.sysId = sysId
         self.compId = compId
         self.mav = mavutil.mavlink_connection('udpin:127.0.0.1:' + str(port),
-                                              source_system=self.sysId)
+                                              source_system=self.sysId,
+                                              source_component=self.compId)
         self.received = []
         self.success = True
 
@@ -120,13 +124,13 @@ if __name__ == "__main__":
                           stderr=sys.stdout.fileno(),
                           stdout=sys.stdout.fileno()) as proc:
 
-        # Two senders: one send to all (target 0). The other sends to target 100
+        # Two senders: one send to all (target 0). The other sends to target 100/1
         sender0 = MavlinkSender("sender0", 10000, 1, 1, 0, 0)
         sender100 = MavlinkSender("sender100", 10000, 2, 1, 100, 1)
 
-        # Two receivers.
-        receiver100 = MavlinkReceiver("receiver100", 10100, 100, 0)
-        receiver101 = MavlinkReceiver("receiver101", 10101, 101, 0)
+        # Two receivers
+        receiver100 = MavlinkReceiver("receiver100", 10100, 100, 1)
+        receiver101 = MavlinkReceiver("receiver101", 10101, 101, 1)
 
         sender100.start()
         # Wait a bit before starting broadcaster pinger
@@ -146,27 +150,30 @@ if __name__ == "__main__":
 
         results = []
 
-        # This sender should receive 20 replies - 10 from each receiver
+        # Sender0 should receive 20 replies - 10 from each receiver
         results.append(
-            sender0.accept(lambda msgs: expect_len(sender0.name, msgs, 20)))
+            sender0.accept(lambda msgs: expect_len(sender0.name, msgs,
+                                                   (SENDER_NUM_MESSAGES * 2))))
 
         # Sender100 OTOH, should receive only 9. It first message
         # should be delivered to no-one, as mavlink-router doesn't know
         # Receiver100 until it responds a message.
         results.append(
-            sender100.accept(lambda msgs: expect_len(sender100.name, msgs, 9)))
+            sender100.accept(lambda msgs: expect_len(sender100.name, msgs, (
+                SENDER_NUM_MESSAGES - 1))))
 
-        # Receiver101 should only get messages sent to all, so, 10
+        # Receiver101 should only get messages sent to all - 10 from sender0
         results.append(
-            receiver101.accept(
-                lambda msgs: expect_len(receiver101.name, msgs, 10)))
+            receiver101.accept(lambda msgs: expect_len(receiver101.name, msgs,
+                                                       SENDER_NUM_MESSAGES)))
 
         # Receiver100 should only get 19 messages, as it first specific
         # message should be lost, as mavlink-router doesn't know it
-        # before it answers first ping
+        # before it answers first broadcast ping
         results.append(
             receiver100.accept(
-                lambda msgs: expect_len(receiver100.name, msgs, 19)))
+                lambda msgs: expect_len(receiver100.name, msgs, (
+                    SENDER_NUM_MESSAGES + SENDER_NUM_MESSAGES - 1))))
 
         if functools.reduce((lambda p, q: p and q), results):
             print("Routing test OK")
