@@ -32,8 +32,8 @@ if len(sys.argv) != 4:
         "to specified interface")
     quit()
 
-mav = mavutil.mavlink_connection(
-    'udpout:' + sys.argv[1], source_system=int(sys.argv[2]))
+mav = mavutil.mavlink_connection('udpout:' + sys.argv[1],
+                                 source_system=int(sys.argv[2]))
 
 
 def pingloop():

@@ -33,7 +33,6 @@ def log(s):
 
 class MavlinkSender(Thread):
     '''MAVLink message sender'''
-
     def __init__(self, name, port, sysId, compId, targetSysId, targetCompId):
         super(MavlinkSender, self).__init__()
         self.name = name
@@ -41,17 +40,16 @@ class MavlinkSender(Thread):
         self.compId = compId
         self.targetSysId = targetSysId
         self.targetCompId = targetCompId
-        self.mav = mavutil.mavlink_connection(
-            'udpout:127.0.0.1:' + str(port), source_system=self.sysId)
+        self.mav = mavutil.mavlink_connection('udpout:127.0.0.1:' + str(port),
+                                              source_system=self.sysId)
         self.sender_thread = Thread(target=self.send_loop)
         self.received = []
         self.success = True
 
     def send_loop(self):
         for i in range(0, 10):
-            self.mav.mav.ping_send(
-                int(time.time() * 1000), i, self.targetSysId,
-                self.targetCompId)
+            self.mav.mav.ping_send(int(time.time() * 1000), i,
+                                   self.targetSysId, self.targetCompId)
             sleep(0.5)
 
     def run(self):
@@ -81,14 +79,13 @@ class MavlinkSender(Thread):
 
 class MavlinkReceiver(Thread):
     '''MAVLink message receiver'''
-
     def __init__(self, name, port, sysId, compId):
         super(MavlinkReceiver, self).__init__()
         self.name = name
         self.sysId = sysId
         self.compId = compId
-        self.mav = mavutil.mavlink_connection(
-            'udpin:127.0.0.1:' + str(port), source_system=self.sysId)
+        self.mav = mavutil.mavlink_connection('udpin:127.0.0.1:' + str(port),
+                                              source_system=self.sysId)
         self.received = []
         self.success = True
 
@@ -103,9 +100,9 @@ class MavlinkReceiver(Thread):
                            msg.target_system, msg.target_component, self.sysId,
                            self.compId))
                     self.success = False
-                self.mav.mav.ping_send(
-                    int(time.time() * 1000), msg.seq,
-                    msg.get_srcSystem(), msg.get_srcComponent())
+                self.mav.mav.ping_send(int(time.time() * 1000), msg.seq,
+                                       msg.get_srcSystem(),
+                                       msg.get_srcComponent())
             else:
                 break
 
@@ -122,13 +119,12 @@ def expectLen(name, msgs, expected):
 
 if __name__ == "__main__":
     # Setup mavlink-router
-    proc = subprocess.Popen(
-        [
-            "./mavlink-routerd", "-e", "127.0.0.1:10100", "-e",
-            "127.0.0.1:10101", "127.0.0.1:10000", "-c", "/nonexistent"
-        ],
-        stderr=sys.stdout.fileno(),
-        stdout=sys.stdout.fileno())
+    proc = subprocess.Popen([
+        "./mavlink-routerd", "-e", "127.0.0.1:10100", "-e", "127.0.0.1:10101",
+        "127.0.0.1:10000", "-c", "/nonexistent"
+    ],
+                            stderr=sys.stdout.fileno(),
+                            stdout=sys.stdout.fileno())
 
     # Two senders: one send to all (target 0). The other sends to target 100
     sender0 = MavlinkSender("sender0", 10000, 1, 1, 0, 0)

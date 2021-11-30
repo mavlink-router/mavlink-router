@@ -29,8 +29,7 @@ mav.wait_heartbeat()
 
 while True:
     mav.mav.heartbeat_send(mavutil.mavlink.MAV_TYPE_QUADROTOR,
-                           mavutil.mavlink.MAV_AUTOPILOT_INVALID,
-                           0, 0, 0)
+                           mavutil.mavlink.MAV_AUTOPILOT_INVALID, 0, 0, 0)
     print(".", end="")
     sys.stdout.flush()
     time.sleep(1)

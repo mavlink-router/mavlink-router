@@ -29,8 +29,8 @@ if len(sys.argv) != 3:
     quit()
 
 srcSystem = int(sys.argv[2])
-mav = mavutil.mavlink_connection(
-    'udpin:' + sys.argv[1], source_system=srcSystem)
+mav = mavutil.mavlink_connection('udpin:' + sys.argv[1],
+                                 source_system=srcSystem)
 
 while (True):
     msg = mav.recv_match(blocking=True)
@@ -41,6 +41,5 @@ while (True):
         print("\tMessage sent to me")
     else:
         print("\tMessage sent to other")
-    mav.mav.ping_send(
-        int(time.time() * 1000), msg.seq,
-        msg.get_srcSystem(), msg.get_srcComponent())
+    mav.mav.ping_send(int(time.time() * 1000), msg.seq, msg.get_srcSystem(),
+                      msg.get_srcComponent())
