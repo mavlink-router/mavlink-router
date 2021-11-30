@@ -23,6 +23,8 @@ import sys
 import time
 from pymavlink import mavutil
 
+TARGET_COMP_ID = 1
+
 if len(sys.argv) != 4:
     print("Usage: %s <ip:udp_port> <system-id> <target-system-id>" %
           (sys.argv[0]))
@@ -38,7 +40,8 @@ mav = mavutil.mavlink_connection('udpout:' + sys.argv[1],
 def pingloop():
     i = 0
     while True:
-        mav.mav.ping_send(int(time.time() * 1000), i, int(sys.argv[3]), 1)
+        mav.mav.ping_send(int(time.time() * 1000), i, int(sys.argv[3]),
+                          TARGET_COMP_ID)
         i = i + 1
         sleep(1)
 
