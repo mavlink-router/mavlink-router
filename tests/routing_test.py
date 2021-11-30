@@ -19,6 +19,7 @@
 from threading import Thread
 from time import sleep
 
+import argparse
 import functools
 import subprocess
 import sys
@@ -116,10 +117,18 @@ def expect_len(name, msgs, expected):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description='MAVLink Router Message Routing System Test')
+    parser.add_argument("-b",
+                        "--binary",
+                        default="./build/src/mavlink-routerd",
+                        help="path to mavlink-routerd")
+    args = parser.parse_args()
+
     # Setup mavlink-router
     with subprocess.Popen([
-            "./build/src/mavlink-routerd", "-e", "127.0.0.1:10100", "-e",
-            "127.0.0.1:10101", "127.0.0.1:10000", "-c", "/nonexistent"
+            args.binary, "-e", "127.0.0.1:10100", "-e", "127.0.0.1:10101",
+            "127.0.0.1:10000", "-c", "/nonexistent"
     ],
                           stderr=sys.stdout.fileno(),
                           stdout=sys.stdout.fileno()) as proc:
