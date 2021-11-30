@@ -372,8 +372,8 @@ bool Endpoint::has_sys_comp_id(unsigned sys_comp_id)
     return false;
 }
 
-bool Endpoint::accept_msg(int target_sysid, int target_compid, uint8_t src_sysid,
-                          uint8_t src_compid, uint32_t msg_id)
+Endpoint::AcceptState Endpoint::accept_msg(int target_sysid, int target_compid, uint8_t src_sysid,
+                                           uint8_t src_compid, uint32_t msg_id)
 {
     if (Log::get_max_level() >= Log::Level::DEBUG) {
         log_debug("Endpoint [%d] got message %u to %d/%d from %u/%u", fd, msg_id, target_sysid,
@@ -386,30 +386,34 @@ bool Endpoint::accept_msg(int target_sysid, int target_compid, uint8_t src_sysid
 
     // This endpoint sent the message, we don't want to send it back over the
     // same channel to avoid loops: reject
-    if (has_sys_comp_id(src_sysid, src_compid))
-        return false;
+    if (has_sys_comp_id(src_sysid, src_compid)) {
+        return Endpoint::AcceptState::Rejected;
+    }
 
     // If filter is defined and message is not in the set: discard it
     if (msg_id != UINT32_MAX && _allowed_msg_ids.size() > 0
         && !vector_contains(_allowed_msg_ids, msg_id)) {
-        return false;
+        return Endpoint::AcceptState::Filtered;
     }
 
     // Message is broadcast on sysid or sysid is non-existent: accept msg
-    if (target_sysid == 0 || target_sysid == -1)
-        return true;
+    if (target_sysid == 0 || target_sysid == -1) {
+        return Endpoint::AcceptState::Accepted;
+    }
 
     // This endpoint has the target of message (sys and comp id): accept
-    if (target_compid > 0 && has_sys_comp_id(target_sysid, target_compid))
-        return true;
+    if (target_compid > 0 && has_sys_comp_id(target_sysid, target_compid)) {
+        return Endpoint::AcceptState::Accepted;
+    }
 
     // This endpoint has the target of message (sysid, but compid is broadcast or non-existent):
     // accept
-    if ((target_compid == 0 || target_compid == -1) && has_sys_id(target_sysid))
-        return true;
+    if ((target_compid == 0 || target_compid == -1) && has_sys_id(target_sysid)) {
+        return Endpoint::AcceptState::Accepted;
+    }
 
     // Reject everything else
-    return false;
+    return Endpoint::AcceptState::Rejected;
 }
 
 bool Endpoint::_check_crc(const mavlink_msg_entry_t *msg_entry)

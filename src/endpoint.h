@@ -75,6 +75,15 @@ public:
         ReadUnkownMsg,
     };
 
+    /**
+     * Return values for @accept_msg()
+     */
+    enum class AcceptState {
+        Accepted = 1,
+        Filtered,
+        Rejected,
+    };
+
     Endpoint(const char *name);
     virtual ~Endpoint();
 
@@ -97,8 +106,8 @@ public:
         return has_sys_comp_id(sys_comp_id);
     }
 
-    bool accept_msg(int target_sysid, int target_compid, uint8_t src_sysid, uint8_t src_compid,
-                    uint32_t msg_id);
+    AcceptState accept_msg(int target_sysid, int target_compid, uint8_t src_sysid,
+                           uint8_t src_compid, uint32_t msg_id);
 
     void filter_add_allowed_msg_id(uint32_t msg_id) { _allowed_msg_ids.push_back(msg_id); }
 
