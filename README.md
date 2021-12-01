@@ -177,6 +177,12 @@ Make sure to check coding style with the provided script in `tools/checkpatch`
 and `tools/checkpython`, check for memory leaks with valgrind and test on real
 hardware.
 
+To test the software, run the unit tests using `ninja -C build test` (the
+googletest library must be installed using your package manager first).
+
+To check the compiled binary, the `tests/routing_test.py` script runs the
+actual mavlink-routerd binary and checks some basic routing rules.
+
 
 ## Samples
 
