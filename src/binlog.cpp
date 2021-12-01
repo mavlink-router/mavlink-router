@@ -86,16 +86,14 @@ int BinLog::write_msg(const struct buffer *buffer)
     mavlink_remote_log_data_block_t *binlog_data;
 
     if (mavlink2) {
-        struct mavlink_router_mavlink2_header *msg
-            = (struct mavlink_router_mavlink2_header *)buffer->data;
+        auto *msg = (struct mavlink_router_mavlink2_header *)buffer->data;
         msg_id = msg->msgid;
         payload = buffer->data + sizeof(struct mavlink_router_mavlink2_header);
         payload_len = msg->payload_len;
         source_system_id = msg->sysid;
         source_component_id = msg->compid;
     } else {
-        struct mavlink_router_mavlink1_header *msg
-            = (struct mavlink_router_mavlink1_header *)buffer->data;
+        auto *msg = (struct mavlink_router_mavlink1_header *)buffer->data;
         msg_id = msg->msgid;
         payload = buffer->data + sizeof(struct mavlink_router_mavlink1_header);
         payload_len = msg->payload_len;

@@ -147,9 +147,9 @@ static int setup_signal_handlers()
     sa.sa_flags = SA_NOCLDSTOP;
     sa.sa_handler = exit_signal_handler;
 
-    if (sigaction(SIGTERM, &sa, NULL) != 0 ||
-        sigaction(SIGINT, &sa, NULL) != 0)
+    if (sigaction(SIGTERM, &sa, nullptr) != 0 || sigaction(SIGINT, &sa, nullptr) != 0) {
         return -1;
+    }
 
     return 0;
 }
@@ -436,7 +436,7 @@ static void timeout_callback()
         set_mode_send(PX4_MODE_OFFBOARD);
         break;
     case ARM_DISARM: {
-        if (armed == t->param1) {
+        if (static_cast<int>(armed) == t->param1) {
             task_list_index++;
             break;
         }
@@ -642,7 +642,7 @@ static int setup_timeout()
     ts.it_value.tv_sec = ts.it_interval.tv_sec;
     ts.it_value.tv_nsec = ts.it_interval.tv_nsec;
 
-    timerfd_settime(timeout_fd, 0, &ts, NULL);
+    timerfd_settime(timeout_fd, 0, &ts, nullptr);
 
     return 0;
 }
@@ -662,10 +662,9 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (setup_connection(ip, port) < 0 ||
-        setup_timeout() < 0 ||
-        setup_signal_handlers() < 0)
+    if (setup_connection(ip, port) < 0 || setup_timeout() < 0 || setup_signal_handlers() < 0) {
         goto fail;
+    }
 
     free(ip);
 
@@ -679,10 +678,12 @@ int main(int argc, char *argv[])
 fail:
     free(ip);
 
-    if (tcp_fd >= 0)
+    if (tcp_fd >= 0) {
         close(tcp_fd);
-    if (timeout_fd >=0)
+    }
+    if (timeout_fd >= 0) {
         close(timeout_fd);
+    }
 
     return EXIT_FAILURE;
 }

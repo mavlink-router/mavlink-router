@@ -51,28 +51,19 @@
 static bool is_ipv6(const char *ip)
 {
     /* Square brackets always exist on IPv6 addresses b/c of input validation */
-    if (strchr(ip, '[') != nullptr) {
-        return true;
-    }
-    return false;
+    return strchr(ip, '[') != nullptr;
 }
 
 static bool ipv6_is_linklocal(const char *ip)
 {
     /* link-local addresses start with fe80 */
-    if (strncmp(ip, "fe80", 4) == 0) {
-        return true;
-    }
-    return false;
+    return strncmp(ip, "fe80", 4) == 0;
 }
 
 static bool ipv6_is_multicast(const char *ip)
 {
     /* link-local addresses start with ff0x */
-    if (strncmp(ip, "ff0", 3) == 0) {
-        return true;
-    }
-    return false;
+    return strncmp(ip, "ff0", 3) == 0;
 }
 
 static unsigned int ipv6_get_scope_id(const char *ip)
@@ -86,10 +77,10 @@ static unsigned int ipv6_get_scope_id(const char *ip)
     for (ifaddrs *addr = addrs; addr; addr = addr->ifa_next) {
         if (addr->ifa_addr && addr->ifa_addr->sa_family == AF_INET6) {
             getnameinfo(addr->ifa_addr, sizeof(struct sockaddr_in6), ipAddress, sizeof(ipAddress),
-                        NULL, 0, NI_NUMERICHOST);
+                        nullptr, 0, NI_NUMERICHOST);
 
             /* cut the interface name from the end of a link-local address */
-            auto search = strrchr(ipAddress, '%');
+            auto *search = strrchr(ipAddress, '%');
             if (search != nullptr) {
                 *search = '\0';
             }
@@ -139,9 +130,10 @@ int Endpoint::handle_read()
     };
 
     while ((r = read_msg(&buf, &target_sysid, &target_compid, &src_sysid, &src_compid, &msg_id))
-           > 0)
+           > 0) {
         Mainloop::get_instance().route_msg(&buf, target_sysid, target_compid, src_sysid, src_compid,
                                            msg_id);
+    }
 
     return r;
 }
@@ -181,8 +173,9 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
 
     if (should_read_more) {
         ssize_t r = _read_msg(rx_buf.data + rx_buf.len, RX_BUF_MAX_SIZE - rx_buf.len);
-        if (r <= 0)
+        if (r <= 0) {
             return r;
+        }
 
         log_debug("%s [%d] got %zd bytes", _name, fd, r);
         rx_buf.len += r;
@@ -202,10 +195,11 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
         unsigned int stx_pos = 0;
 
         for (unsigned int i = 1; i < (unsigned int)rx_buf.len; i++) {
-            if (rx_buf.data[i] == MAVLINK_STX)
+            if (rx_buf.data[i] == MAVLINK_STX) {
                 mavlink2 = true;
-            else if (rx_buf.data[i] == MAVLINK_STX_MAVLINK1)
+            } else if (rx_buf.data[i] == MAVLINK_STX_MAVLINK1) {
                 mavlink1 = true;
+            }
 
             if (mavlink1 || mavlink2) {
                 stx_pos = i;
@@ -231,11 +225,11 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
     size_t expected_size;
 
     if (mavlink2) {
-        struct mavlink_router_mavlink2_header *hdr
-            = (struct mavlink_router_mavlink2_header *)rx_buf.data;
+        auto *hdr = (struct mavlink_router_mavlink2_header *)rx_buf.data;
 
-        if (rx_buf.len < sizeof(*hdr))
+        if (rx_buf.len < sizeof(*hdr)) {
             return 0;
+        }
 
         *msg_id = hdr->msgid;
         payload = rx_buf.data + sizeof(*hdr);
@@ -247,14 +241,15 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
         expected_size = sizeof(*hdr);
         expected_size += hdr->payload_len;
         expected_size += checksum_len;
-        if (hdr->incompat_flags & MAVLINK_IFLAG_SIGNED)
+        if (hdr->incompat_flags & MAVLINK_IFLAG_SIGNED) {
             expected_size += MAVLINK_SIGNATURE_BLOCK_LEN;
+        }
     } else {
-        struct mavlink_router_mavlink1_header *hdr
-            = (struct mavlink_router_mavlink1_header *)rx_buf.data;
+        auto *hdr = (struct mavlink_router_mavlink1_header *)rx_buf.data;
 
-        if (rx_buf.len < sizeof(*hdr))
+        if (rx_buf.len < sizeof(*hdr)) {
             return 0;
+        }
 
         *msg_id = hdr->msgid;
         payload = rx_buf.data + sizeof(*hdr);
@@ -269,8 +264,9 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
     }
 
     /* check if we have a valid mavlink packet */
-    if (rx_buf.len < expected_size)
+    if (rx_buf.len < expected_size) {
         return 0;
+    }
 
     /* We always want to transmit one packet at a time; record the number
      * of bytes read in addition to the expected size and leave them for
@@ -327,10 +323,11 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
         if (_stat.read.total > 1) {
             uint8_t diff;
 
-            if (seq > _stat.read.expected_seq)
+            if (seq > _stat.read.expected_seq) {
                 diff = (seq - _stat.read.expected_seq);
-            else
+            } else {
                 diff = (UINT8_MAX - _stat.read.expected_seq) + seq;
+            }
 
             _stat.read.drop_seq_total += diff;
             _stat.read.total += diff;
@@ -347,26 +344,29 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
 
 void Endpoint::_add_sys_comp_id(uint16_t sys_comp_id)
 {
-    if (has_sys_comp_id(sys_comp_id))
+    if (has_sys_comp_id(sys_comp_id)) {
         return;
+    }
 
     _sys_comp_ids.push_back(sys_comp_id);
 }
 
 bool Endpoint::has_sys_id(unsigned sysid)
 {
-    for (auto it = _sys_comp_ids.begin(); it != _sys_comp_ids.end(); it++) {
-        if (((*it >> 8) | (sysid & 0xff)) == sysid)
+    for (auto &id : _sys_comp_ids) {
+        if (((id >> 8) | (sysid & 0xff)) == sysid) {
             return true;
+        }
     }
     return false;
 }
 
 bool Endpoint::has_sys_comp_id(unsigned sys_comp_id)
 {
-    for (auto it = _sys_comp_ids.begin(); it != _sys_comp_ids.end(); it++) {
-        if (sys_comp_id == *it)
+    for (auto &id : _sys_comp_ids) {
+        if (sys_comp_id == id) {
             return true;
+        }
     }
 
     return false;
@@ -379,8 +379,8 @@ Endpoint::AcceptState Endpoint::accept_msg(int target_sysid, int target_compid, 
         log_debug("Endpoint [%d] got message %u to %d/%d from %u/%u", fd, msg_id, target_sysid,
                   target_compid, src_sysid, src_compid);
         log_debug("\tKnown components:");
-        for (auto it = _sys_comp_ids.begin(); it != _sys_comp_ids.end(); it++) {
-            log_debug("\t\t%u/%u", (*it >> 8), *it & 0xff);
+        for (auto &id : _sys_comp_ids) {
+            log_debug("\t\t%u/%u", (id >> 8), id & 0xff);
         }
     }
 
@@ -391,7 +391,7 @@ Endpoint::AcceptState Endpoint::accept_msg(int target_sysid, int target_compid, 
     }
 
     // If filter is defined and message is not in the set: discard it
-    if (msg_id != UINT32_MAX && _allowed_msg_ids.size() > 0
+    if (msg_id != UINT32_MAX && !_allowed_msg_ids.empty()
         && !vector_contains(_allowed_msg_ids, msg_id)) {
         return Endpoint::AcceptState::Filtered;
     }
@@ -416,21 +416,19 @@ Endpoint::AcceptState Endpoint::accept_msg(int target_sysid, int target_compid, 
     return Endpoint::AcceptState::Rejected;
 }
 
-bool Endpoint::_check_crc(const mavlink_msg_entry_t *msg_entry)
+bool Endpoint::_check_crc(const mavlink_msg_entry_t *msg_entry) const
 {
     const bool mavlink2 = rx_buf.data[0] == MAVLINK_STX;
     uint16_t crc_msg, crc_calc;
     uint8_t payload_len, header_len, *payload;
 
     if (mavlink2) {
-        struct mavlink_router_mavlink2_header *hdr
-            = (struct mavlink_router_mavlink2_header *)rx_buf.data;
+        auto *hdr = (struct mavlink_router_mavlink2_header *)rx_buf.data;
         payload = rx_buf.data + sizeof(*hdr);
         header_len = sizeof(*hdr);
         payload_len = hdr->payload_len;
     } else {
-        struct mavlink_router_mavlink1_header *hdr
-            = (struct mavlink_router_mavlink1_header *)rx_buf.data;
+        auto *hdr = (struct mavlink_router_mavlink1_header *)rx_buf.data;
         payload = rx_buf.data + sizeof(*hdr);
         header_len = sizeof(*hdr);
         payload_len = hdr->payload_len;
@@ -439,11 +437,7 @@ bool Endpoint::_check_crc(const mavlink_msg_entry_t *msg_entry)
     crc_msg = payload[payload_len] | (payload[payload_len + 1] << 8);
     crc_calc = crc_calculate(&rx_buf.data[1], header_len + payload_len - 1);
     crc_accumulate(msg_entry->crc_extra, &crc_calc);
-    if (crc_calc != crc_msg) {
-        return false;
-    }
-
-    return true;
+    return crc_calc == crc_msg;
 }
 
 void Endpoint::print_statistics()
@@ -468,16 +462,17 @@ void Endpoint::print_statistics()
 uint8_t Endpoint::get_trimmed_zeros(const mavlink_msg_entry_t *msg_entry,
                                     const struct buffer *buffer)
 {
-    struct mavlink_router_mavlink2_header *msg
-        = (struct mavlink_router_mavlink2_header *)buffer->data;
+    auto *msg = (struct mavlink_router_mavlink2_header *)buffer->data;
 
     /* Only MAVLink 2 trim zeros */
-    if (buffer->data[0] != MAVLINK_STX)
+    if (buffer->data[0] != MAVLINK_STX) {
         return 0;
+    }
 
     /* Should never happen but if happens it will cause stack overflow */
-    if (msg->payload_len > msg_entry->max_msg_len)
+    if (msg->payload_len > msg_entry->max_msg_len) {
         return 0;
+    }
 
     return msg_entry->max_msg_len - msg->payload_len;
 }
@@ -547,10 +542,11 @@ int UartEndpoint::set_flow_control(bool enabled)
         return -1;
     }
 
-    if (enabled)
+    if (enabled) {
         tc.c_cflag |= CRTSCTS;
-    else
+    } else {
         tc.c_cflag &= ~CRTSCTS;
+    }
 
     if (ioctl(fd, TCSETS2, &tc) == -1) {
         log_error("Could not set terminal attributes (%m)");
@@ -630,8 +626,9 @@ int UartEndpoint::open(const char *path)
 
         result = ioctl(fd, TIOCSSERIAL, &serial_ctl);
         if (result < 0) {
-            if (errno != ENODEV && errno != ENOTTY)
+            if (errno != ENODEV && errno != ENOTTY) {
                 log_warning("Error while trying to write serial port latency: %m");
+            }
         }
     }
 
@@ -679,10 +676,12 @@ int UartEndpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_c
 ssize_t UartEndpoint::_read_msg(uint8_t *buf, size_t len)
 {
     ssize_t r = ::read(fd, buf, len);
-    if ((r == -1 && errno == EAGAIN) || r == 0)
+    if ((r == -1 && errno == EAGAIN) || r == 0) {
         return 0;
-    if (r == -1)
+    }
+    if (r == -1) {
         return -errno;
+    }
 
     return r;
 }
@@ -700,8 +699,9 @@ int UartEndpoint::write_msg(const struct buffer *pbuf)
     }
 
     ssize_t r = ::write(fd, pbuf->data, pbuf->len);
-    if (r == -1 && errno == EAGAIN)
+    if (r == -1 && errno == EAGAIN) {
         return -EAGAIN;
+    }
 
     _stat.write.total++;
     _stat.write.bytes += pbuf->len;
@@ -719,8 +719,9 @@ int UartEndpoint::write_msg(const struct buffer *pbuf)
 
 int UartEndpoint::add_speeds(std::vector<unsigned long> bauds)
 {
-    if (!bauds.size())
+    if (bauds.empty()) {
         return -EINVAL;
+    }
 
     _baudrates = bauds;
 
@@ -828,13 +829,15 @@ int UdpEndpoint::open(const char *ip, unsigned long port, bool server)
     this->ipv6 = is_ipv6(ip);
 
     // setup the special ipv6/ipv4 part
-    if (this->ipv6)
+    if (this->ipv6) {
         open_ipv6(ip, port, server);
-    else
+    } else {
         open_ipv4(ip, port, server);
+    }
 
-    if (fd < 0)
+    if (fd < 0) {
         return -1;
+    }
 
     // common setup
     if (!server) {
@@ -876,10 +879,12 @@ ssize_t UdpEndpoint::_read_msg(uint8_t *buf, size_t len)
     }
 
     r = ::recvfrom(fd, buf, len, 0, sock, &addrlen);
-    if (r == -1 && errno == EAGAIN)
+    if (r == -1 && errno == EAGAIN) {
         return 0;
-    if (r == -1)
+    }
+    if (r == -1) {
         return -errno;
+    }
 
     return r;
 }
@@ -917,8 +922,9 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
 
     ssize_t r = ::sendto(fd, pbuf->data, pbuf->len, 0, sock, addrlen);
     if (r == -1) {
-        if (errno != EAGAIN && errno != ECONNREFUSED && errno != ENETUNREACH)
+        if (errno != EAGAIN && errno != ECONNREFUSED && errno != ENETUNREACH) {
             log_error("Error sending udp packet (%m)");
+        }
         return -errno;
     };
 
@@ -963,8 +969,9 @@ int TcpEndpoint::accept(int listener_fd)
     }
 
     fd = accept4(listener_fd, sock, &addrlen, SOCK_NONBLOCK);
-    if (fd == -1)
+    if (fd == -1) {
         return -1;
+    }
 
     log_info("TCP connection [%d] accepted", fd);
 
@@ -1055,8 +1062,9 @@ int TcpEndpoint::open(const char *ip, unsigned long port)
         addrlen = sizeof(sockaddr);
     }
 
-    if (fd < 0)
+    if (fd < 0) {
         return -1;
+    }
 
     // common setup
     if (connect(fd, sock, addrlen) < 0) {
@@ -1094,10 +1102,12 @@ ssize_t TcpEndpoint::_read_msg(uint8_t *buf, size_t len)
     }
 
     r = ::recvfrom(fd, buf, len, 0, sock, &addrlen);
-    if (r == -1 && errno == EAGAIN)
+    if (r == -1 && errno == EAGAIN) {
         return 0;
-    if (r == -1)
+    }
+    if (r == -1) {
         return -errno;
+    }
 
     // a read of zero on a stream socket means that other side shut down
     if (r == 0 && len != 0) {
@@ -1133,10 +1143,12 @@ int TcpEndpoint::write_msg(const struct buffer *pbuf)
 
     ssize_t r = ::sendto(fd, pbuf->data, pbuf->len, 0, sock, addrlen);
     if (r == -1) {
-        if (errno != EAGAIN && errno != ECONNREFUSED)
+        if (errno != EAGAIN && errno != ECONNREFUSED) {
             log_error("Error sending tcp packet (%m)");
-        if (errno == EPIPE)
+        }
+        if (errno == EPIPE) {
             _valid = false;
+        }
         return -errno;
     };
 

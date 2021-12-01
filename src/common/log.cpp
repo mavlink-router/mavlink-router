@@ -37,8 +37,9 @@ bool Log::_show_colors;
 
 const char *Log::_get_color(Level level)
 {
-    if (!_show_colors)
+    if (!_show_colors) {
         return nullptr;
+    }
 
     switch (level) {
     case Level::ERROR:
@@ -63,8 +64,9 @@ int Log::open()
     /* for now, only logging is supported only to stderr */
     _target_fd = STDERR_FILENO;
 
-    if (isatty(_target_fd))
+    if (isatty(_target_fd)) {
         _show_colors = true;
+    }
 
     return 0;
 }
@@ -90,16 +92,18 @@ void Log::logv(Level level, const char *format, va_list ap)
     char buffer[LINE_MAX];
     int save_errno;
 
-    if (_max_level < level)
+    if (_max_level < level) {
         return;
+    }
 
     /* so %m works as expected */
     save_errno = errno;
 
     color = _get_color(level);
 
-    if (color)
+    if (color) {
         IOVEC_SET_STRING(iovec[n++], color);
+    }
 
     errno = save_errno;
 
@@ -110,8 +114,9 @@ void Log::logv(Level level, const char *format, va_list ap)
 
     IOVEC_SET_STRING(iovec[n++], buffer);
 
-    if (color)
+    if (color) {
         IOVEC_SET_STRING(iovec[n++], COLOR_RESET);
+    }
 
     IOVEC_SET_STRING(iovec[n++], "\n");
 

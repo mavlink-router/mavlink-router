@@ -35,15 +35,13 @@ int AutoLog::write_msg(const struct buffer *buffer)
     uint8_t source_component_id;
 
     if (mavlink2) {
-        struct mavlink_router_mavlink2_header *hdr
-            = (struct mavlink_router_mavlink2_header *)buffer->data;
+        auto *hdr = (struct mavlink_router_mavlink2_header *)buffer->data;
         msg_id = hdr->msgid;
         payload = buffer->data + sizeof(*hdr);
         source_system_id = hdr->sysid;
         source_component_id = hdr->compid;
     } else {
-        struct mavlink_router_mavlink1_header *hdr
-            = (struct mavlink_router_mavlink1_header *)buffer->data;
+        auto *hdr = (struct mavlink_router_mavlink1_header *)buffer->data;
         msg_id = hdr->msgid;
         payload = buffer->data + sizeof(*hdr);
         source_system_id = hdr->sysid;
@@ -79,8 +77,9 @@ int AutoLog::write_msg(const struct buffer *buffer)
 
 void AutoLog::stop()
 {
-    if (_logger)
+    if (_logger) {
         _logger->stop();
+    }
 }
 
 bool AutoLog::start()

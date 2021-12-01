@@ -93,17 +93,20 @@ void LogEndpoint::mark_unfinished_logs()
     uint32_t u;
 
     while ((ent = readdir(dir)) != nullptr) {
-        if (sscanf(ent->d_name, "%u-", &u) != 1)
+        if (sscanf(ent->d_name, "%u-", &u) != 1) {
             continue;
+        }
 
         char log_file[PATH_MAX];
         struct stat file_stat;
         if (snprintf(log_file, sizeof(log_file), "%s/%s", _logs_dir, ent->d_name)
-            >= (int)sizeof(log_file))
+            >= (int)sizeof(log_file)) {
             continue;
+        }
 
-        if (stat(log_file, &file_stat))
+        if (stat(log_file, &file_stat)) {
             continue;
+        }
 
         if (S_ISREG(file_stat.st_mode) && (file_stat.st_mode & S_IWUSR)) {
             log_info("File %s not read-only yet, marking as RO", ent->d_name);
@@ -243,7 +246,7 @@ DIR *LogEndpoint::_open_or_create_dir(const char *name)
         r = mkdir_p(name, strlen(name), 0755);
         if (r < 0) {
             errno = -r;
-            return NULL;
+            return nullptr;
         }
         dir = opendir(name);
     }
@@ -253,7 +256,7 @@ DIR *LogEndpoint::_open_or_create_dir(const char *name)
 
 int LogEndpoint::_get_file(const char *extension)
 {
-    time_t t = time(NULL);
+    time_t t = time(nullptr);
     struct tm *timeinfo = localtime(&t);
     uint32_t i;
     int j, r;
@@ -421,15 +424,16 @@ bool LogEndpoint::_start_alive_timeout()
 }
 
 void LogEndpoint::_handle_auto_start_stop(uint32_t msg_id, uint8_t source_system_id,
-                                          uint8_t source_component_id, uint8_t *payload)
+                                          uint8_t source_component_id, const uint8_t *payload)
 {
     if (_target_system_id == -1) { // wait until initialized
         return;
     }
     if (_mode == LogMode::always) {
         if (_file == -1) {
-            if (!start())
+            if (!start()) {
                 _mode = LogMode::disabled;
+            }
         }
     } else if (_mode == LogMode::while_armed) {
         if (msg_id == MAVLINK_MSG_ID_HEARTBEAT && source_system_id == _target_system_id
@@ -439,8 +443,9 @@ void LogEndpoint::_handle_auto_start_stop(uint32_t msg_id, uint8_t source_system
             const bool is_armed = heartbeat->base_mode & MAV_MODE_FLAG_SAFETY_ARMED;
 
             if (_file == -1 && is_armed) {
-                if (!start())
+                if (!start()) {
                     _mode = LogMode::disabled;
+                }
             } else if (_file != -1 && !is_armed) {
                 stop();
             }

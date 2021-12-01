@@ -80,7 +80,7 @@ int ConfFile::parse(const char *filename)
         goto error;
     }
 
-    addr = mmap(0, (size_t)fstat.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    addr = mmap(nullptr, (size_t)fstat.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
     if (addr == MAP_FAILED) {
         ret = -errno;
         goto error;
@@ -116,11 +116,14 @@ int ConfFile::_parse_file(const char *addr, size_t len, const char *filename)
 
         // Make sure all casts to int are safe. No need to support options or sections
         // larger than INT_MAX
-        if (line_len > INT_MAX)
+        if (line_len > INT_MAX) {
             return -EINVAL;
+        }
+
         _trim(&addr, &line_len);
-        if (!line_len)
+        if (!line_len) {
             goto next;
+        }
 
         switch (addr[0]) {
         case ';':
@@ -128,8 +131,9 @@ int ConfFile::_parse_file(const char *addr, size_t len, const char *filename)
             goto next;
         case '[':
             s = _add_section(addr, line_len, line, filename);
-            if (!s)
+            if (!s) {
                 return -EINVAL;
+            }
             break;
         default:
             if (!s) {
@@ -140,8 +144,9 @@ int ConfFile::_parse_file(const char *addr, size_t len, const char *filename)
             }
 
             ret = _add_config(s, addr, line_len, filename, line);
-            if (ret < 0)
+            if (ret < 0) {
                 return ret;
+            }
             break;
         }
 
@@ -197,8 +202,9 @@ struct section *ConfFile::_add_section(const char *addr, size_t len, int line, c
     }
 
     s = _find_section(addr + 1, len - 2);
-    if (s)
+    if (s) {
         return s;
+    }
 
     if (len - 2 > MAX_SECTION_NAME) {
         log_error("Max supported section name is %d", MAX_SECTION_NAME);
@@ -259,11 +265,13 @@ void ConfFile::_trim(const char **str, size_t *len)
     const char *s = *str;
     const char *end = s + *len;
 
-    while (isspace(*s) && s < end)
+    while (isspace(*s) && s < end) {
         s++;
+    }
 
-    while (end > s && isspace(*(end - 1)))
+    while (end > s && isspace(*(end - 1))) {
         end--;
+    }
 
     *len = end - s;
     *str = s;
@@ -303,8 +311,9 @@ static void print_filenames(struct section *s)
     int files_size = 0;
     struct config *c;
 
-    if (Log::get_max_level() < Log::Level::ERROR)
+    if (Log::get_max_level() < Log::Level::ERROR) {
         return;
+    }
 
     for (c = s->configs; c; c = c->next) {
         bool found = false;
@@ -395,8 +404,9 @@ struct config *ConfFile::_find_config(struct section *s, const char *key, size_t
     struct config *c;
 
     for (c = s->configs; c; c = c->next) {
-        if (c->key_len == key_len && strncasecmp(key, (char *)c->key, key_len) == 0)
+        if (c->key_len == key_len && strncasecmp(key, (char *)c->key, key_len) == 0) {
             return c;
+        }
     }
 
     return nullptr;
@@ -407,8 +417,9 @@ struct section *ConfFile::_find_section(const char *section_name, size_t len)
     struct section *s;
 
     for (s = _sections; s; s = s->next) {
-        if (memcaseeq(section_name, len, s->name, s->len))
+        if (memcaseeq(section_name, len, s->name, s->len)) {
             return s;
+        }
     }
 
     return nullptr;
@@ -422,10 +433,11 @@ int ConfFile::get_sections(const char *pattern, struct section_iter *iter)
     assert(pattern);
     assert(iter);
 
-    if (iter->ptr == nullptr)
+    if (iter->ptr == nullptr) {
         s = _sections;
-    else
+    } else {
         s = ((section *)iter->ptr)->next;
+    }
 
     for (; s; s = s->next) {
         memcpy(section_name, s->name, s->len);
@@ -452,12 +464,14 @@ int ConfFile::parse_str_dup(const char *val, size_t val_len, void *storage, size
     assert(storage);
     assert(val_len);
 
-    if (storage_len < sizeof(char *))
+    if (storage_len < sizeof(char *)) {
         return -ENOBUFS;
+    }
 
     *ptr = strndup(val, val_len);
-    if (!*ptr)
+    if (!*ptr) {
         return -errno;
+    }
     return 0;
 }
 
@@ -468,8 +482,9 @@ int ConfFile::parse_str_buf(const char *val, size_t val_len, void *storage, size
     assert(storage_len);
     assert(val_len);
 
-    if (storage_len - 1 < val_len)
+    if (storage_len - 1 < val_len) {
         return -ENOBUFS;
+    }
 
     memcpy(storage, val, val_len);
     ((char *)storage)[val_len] = '\0';
@@ -486,17 +501,19 @@ int ConfFile::parse_bool(const char *val, size_t val_len, void *storage, size_t 
     assert(storage);
     assert(val_len);
 
-    if (storage_len < sizeof(bool))
+    if (storage_len < sizeof(bool)) {
         return -ENOBUFS;
+    }
 
-    if (memcaseeq("true", 4, val, val_len))
+    if (memcaseeq("true", 4, val, val_len)) {
         *b = true;
-    else if (memcaseeq("false", 5, val, val_len))
+    } else if (memcaseeq("false", 5, val, val_len)) {
         *b = false;
-    else {
+    } else {
         ret = parse_i(val, val_len, &ival, sizeof(ival));
-        if (ret < 0)
+        if (ret < 0) {
             return ret;
+        }
         *b = !!ival;
     }
 

@@ -92,8 +92,9 @@ void ULog::stop()
     _buffer_len = 0;
     /* Write the last partial message to avoid corrupt the end of the file */
     while (_buffer_partial_len) {
-        if (!_logging_flush())
+        if (!_logging_flush()) {
             break;
+        }
     }
 
     LogEndpoint::stop();
@@ -110,16 +111,14 @@ int ULog::write_msg(const struct buffer *buffer)
     uint8_t source_component_id;
 
     if (mavlink2) {
-        struct mavlink_router_mavlink2_header *msg
-            = (struct mavlink_router_mavlink2_header *)buffer->data;
+        auto *msg = (struct mavlink_router_mavlink2_header *)buffer->data;
         msg_id = msg->msgid;
         payload = buffer->data + sizeof(struct mavlink_router_mavlink2_header);
         payload_len = msg->payload_len;
         source_system_id = msg->sysid;
         source_component_id = msg->compid;
     } else {
-        struct mavlink_router_mavlink1_header *msg
-            = (struct mavlink_router_mavlink1_header *)buffer->data;
+        auto *msg = (struct mavlink_router_mavlink1_header *)buffer->data;
         msg_id = msg->msgid;
         payload = buffer->data + sizeof(struct mavlink_router_mavlink1_header);
         payload_len = msg->payload_len;
@@ -163,11 +162,13 @@ int ULog::write_msg(const struct buffer *buffer)
         mavlink_command_ack_t cmd;
 
         memcpy(&cmd, payload, payload_len);
-        if (trimmed_zeros)
+        if (trimmed_zeros) {
             memset(((uint8_t *)&cmd) + payload_len, 0, trimmed_zeros);
+        }
 
-        if (!_timeout.logging_start || cmd.command != MAV_CMD_LOGGING_START)
+        if (!_timeout.logging_start || cmd.command != MAV_CMD_LOGGING_START) {
             return buffer->len;
+        }
 
         if (cmd.result == MAV_RESULT_ACCEPTED) {
             _remove_logging_start_timeout();
@@ -175,12 +176,13 @@ int ULog::write_msg(const struct buffer *buffer)
                 log_warning("Could not start liveness timeout - mavlink router log won't be able "
                             "to detect if flight stack stopped");
             }
-        } else
+        } else {
             log_error("MAV_CMD_LOGGING_START result(%u) is different than accepted", cmd.result);
+        }
         break;
     }
     case MAVLINK_MSG_ID_LOGGING_DATA_ACKED: {
-        mavlink_logging_data_acked_t *ulog_data_acked = (mavlink_logging_data_acked_t *)payload;
+        auto *ulog_data_acked = (mavlink_logging_data_acked_t *)payload;
         mavlink_message_t msg;
         mavlink_logging_ack_t ack;
 
@@ -199,7 +201,7 @@ int ULog::write_msg(const struct buffer *buffer)
             memset(((uint8_t *)&ulog_data) + payload_len, 0, trimmed_zeros);
             _logging_data_process(&ulog_data);
         } else {
-            mavlink_logging_data_t *ulog_data = (mavlink_logging_data_t *)payload;
+            auto *ulog_data = (mavlink_logging_data_t *)payload;
             _logging_data_process(ulog_data);
         }
         break;
@@ -246,8 +248,9 @@ void ULog::_logging_data_process(mavlink_logging_data_t *msg)
 {
     bool drops = false;
 
-    if (!_logging_seq(msg->sequence, &drops))
+    if (!_logging_seq(msg->sequence, &drops)) {
         return;
+    }
 
     /* Waiting for ULog header? */
     if (_waiting_header) {
@@ -316,8 +319,9 @@ void ULog::_logging_data_process(mavlink_logging_data_t *msg)
         begin = msg->first_message_offset;
     }
 
-    if (!msg->length)
+    if (!msg->length) {
         return;
+    }
 
     msg->length = msg->length - begin;
     memcpy(&_buffer[_buffer_index + _buffer_len], &msg->data[begin], msg->length);
@@ -329,8 +333,9 @@ bool ULog::_logging_flush()
 {
     while (_buffer_partial_len) {
         const ssize_t r = write(_file, _buffer_partial, _buffer_partial_len);
-        if (r == 0 || (r == -1 && errno == EAGAIN))
+        if (r == 0 || (r == -1 && errno == EAGAIN)) {
             return true;
+        }
         if (r < 0) {
             log_error("Unable to write to ULog file: (%m)");
             return false;
@@ -341,7 +346,7 @@ bool ULog::_logging_flush()
     }
 
     while (_buffer_len >= sizeof(struct ulog_msg_header) && !_buffer_partial_len) {
-        struct ulog_msg_header *header = (struct ulog_msg_header *)&_buffer[_buffer_index];
+        auto *header = (struct ulog_msg_header *)&_buffer[_buffer_index];
         const uint16_t full_msg_size = header->msg_size + sizeof(struct ulog_msg_header);
 
         if (full_msg_size > _buffer_len) {
@@ -354,8 +359,9 @@ bool ULog::_logging_flush()
             _buffer_index += full_msg_size;
             continue;
         }
-        if (r == 0 || (r == -1 && errno == EAGAIN))
+        if (r == 0 || (r == -1 && errno == EAGAIN)) {
             break;
+        }
         if (r < 0) {
             log_error("Unable to write to ULog file: (%m)");
             return false;

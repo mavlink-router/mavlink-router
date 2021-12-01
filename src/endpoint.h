@@ -85,7 +85,7 @@ public:
     };
 
     Endpoint(const char *name);
-    virtual ~Endpoint();
+    ~Endpoint() override;
 
     int handle_read() override;
     bool handle_canwrite() override;
@@ -115,10 +115,10 @@ public:
     struct buffer tx_buf;
 
 protected:
-    virtual int read_msg(struct buffer *pbuf, int *target_system, int *target_compid,
+    virtual int read_msg(struct buffer *pbuf, int *target_sysid, int *target_compid,
                          uint8_t *src_sysid, uint8_t *src_compid, uint32_t *msg_id);
     virtual ssize_t _read_msg(uint8_t *buf, size_t len) = 0;
-    bool _check_crc(const mavlink_msg_entry_t *msg_entry);
+    bool _check_crc(const mavlink_msg_entry_t *msg_entry) const;
     void _add_sys_comp_id(uint16_t sys_comp_id);
 
     const char *_name;
@@ -154,17 +154,17 @@ public:
         : Endpoint{"UART"}
     {
     }
-    virtual ~UartEndpoint();
+    ~UartEndpoint() override;
     int write_msg(const struct buffer *pbuf) override;
     int flush_pending_msgs() override { return -ENOSYS; }
 
     int open(const char *path);
     int set_speed(speed_t baudrate);
     int set_flow_control(bool enabled);
-    int add_speeds(std::vector<unsigned long> baudrates);
+    int add_speeds(std::vector<unsigned long> bauds);
 
 protected:
-    int read_msg(struct buffer *pbuf, int *target_system, int *target_compid, uint8_t *src_sysid,
+    int read_msg(struct buffer *pbuf, int *target_sysid, int *target_compid, uint8_t *src_sysid,
                  uint8_t *src_compid, uint32_t *msg_id) override;
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
 
@@ -179,7 +179,7 @@ private:
 class UdpEndpoint : public Endpoint {
 public:
     UdpEndpoint();
-    virtual ~UdpEndpoint() { }
+    ~UdpEndpoint() override = default;
 
     int write_msg(const struct buffer *pbuf) override;
     int flush_pending_msgs() override { return -ENOSYS; }
@@ -201,7 +201,7 @@ protected:
 class TcpEndpoint : public Endpoint {
 public:
     TcpEndpoint();
-    ~TcpEndpoint();
+    ~TcpEndpoint() override;
 
     int accept(int listener_fd);
     int open(const char *ip, unsigned long port);
@@ -217,7 +217,7 @@ public:
 
     inline const char *get_ip() { return _ip; }
 
-    inline unsigned long get_port() { return _port; }
+    inline unsigned long get_port() const { return _port; }
 
     bool is_valid() override { return _valid; };
     bool is_critical() override { return false; };
