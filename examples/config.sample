@@ -69,6 +69,11 @@
 #       defining if flow control should be enabled
 #       Default: false
 #
+#   AllowMsgIdOut
+#       Comma separated list of message IDs to transmit to this endpoint
+#       No default value. All message IDs will be accepted, when not
+#       specified.
+#
 #
 # Section [UdpEndpoint]: This section must have a name
 #
@@ -96,6 +101,11 @@
 #       will bind to this port and wait for a first packet to be received to
 #       know to where it needs to send packets.
 #
+#   AllowMsgIdOut
+#       Comma separated list of message IDs to transmit to this endpoint
+#       No default value. All message IDs will be accepted, when not
+#       specified.
+#
 # Section [TcpEndpoint]: This section must have a name
 #
 # Keys:
@@ -113,6 +123,11 @@
 #       to reconnect to IP in case of disconnection. A value of 0 disables
 #       reconnection.
 #       Default value: 5
+#
+#   AllowMsgIdOut
+#       Comma separated list of message IDs to transmit to this endpoint
+#       No default value. All message IDs will be accepted, when not
+#       specified.
 #
 # Following, an example of configuration file:
 [General]

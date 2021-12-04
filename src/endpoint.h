@@ -75,6 +75,15 @@ public:
         ReadUnkownMsg,
     };
 
+    /**
+     * Return values for @accept_msg()
+     */
+    enum class AcceptState {
+        Accepted = 1,
+        Filtered,
+        Rejected,
+    };
+
     Endpoint(const char *name);
     virtual ~Endpoint();
 
@@ -97,10 +106,10 @@ public:
         return has_sys_comp_id(sys_comp_id);
     }
 
-    bool accept_msg(int target_sysid, int target_compid, uint8_t src_sysid, uint8_t src_compid,
-                    uint32_t msg_id);
+    AcceptState accept_msg(int target_sysid, int target_compid, uint8_t src_sysid,
+                           uint8_t src_compid, uint32_t msg_id);
 
-    void add_message_to_filter(uint32_t msg_id) { _message_filter.push_back(msg_id); }
+    void filter_add_allowed_msg_id(uint32_t msg_id) { _allowed_msg_ids.push_back(msg_id); }
 
     struct buffer rx_buf;
     struct buffer tx_buf;
@@ -136,7 +145,7 @@ protected:
     std::vector<uint16_t> _sys_comp_ids;
 
 private:
-    std::vector<uint32_t> _message_filter;
+    std::vector<uint32_t> _allowed_msg_ids;
 };
 
 class UartEndpoint : public Endpoint {

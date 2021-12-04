@@ -17,16 +17,14 @@
  */
 #pragma once
 
+#include <algorithm>
 #include <fcntl.h>
 #include <inttypes.h>
 #include <stdbool.h>
 #include <time.h>
+#include <vector>
 
 #include "macro.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 typedef uint64_t usec_t;
 typedef uint64_t nsec_t;
@@ -52,9 +50,11 @@ usec_t now_usec(void);
 usec_t ts_usec(const struct timespec *ts);
 
 int mkdir_p(const char *path, int len, mode_t mode);
-#ifdef __cplusplus
+
+template <typename type> bool vector_contains(std::vector<type> vect, type elem)
+{
+    return std::find(vect.begin(), vect.end(), elem) != vect.end();
 }
-#endif
 
 #ifndef strndupa
 #    define strndupa(s, n)                           \

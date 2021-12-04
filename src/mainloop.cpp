@@ -154,17 +154,32 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid
     bool unknown = true;
 
     for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
-        if ((*e)->accept_msg(target_sysid, target_compid, sender_sysid, sender_compid, msg_id)) {
+        auto acceptState
+            = (*e)->accept_msg(target_sysid, target_compid, sender_sysid, sender_compid, msg_id);
+        switch (acceptState) {
+        case Endpoint::AcceptState::Accepted:
             log_debug("Endpoint [%d] accepted message %u to %d/%d from %u/%u", (*e)->fd, msg_id,
                       target_sysid, target_compid, sender_sysid, sender_compid);
             write_msg(*e, buf);
             unknown = false;
+            break;
+        case Endpoint::AcceptState::Filtered:
+            log_debug("Endpoint [%d] filtered out message %u to %d/%d from %u/%u", (*e)->fd, msg_id,
+                      target_sysid, target_compid, sender_sysid, sender_compid);
+            unknown = false;
+            break;
+        case Endpoint::AcceptState::Rejected:
+            // fall through
+        default:
+            break; // do nothing (will count as unknown)
         }
     }
 
     for (struct endpoint_entry *e = g_tcp_endpoints; e; e = e->next) {
-        if (e->endpoint->accept_msg(target_sysid, target_compid, sender_sysid, sender_compid,
-                                    msg_id)) {
+        auto acceptState = e->endpoint->accept_msg(target_sysid, target_compid, sender_sysid,
+                                                   sender_compid, msg_id);
+        switch (acceptState) {
+        case Endpoint::AcceptState::Accepted: {
             log_debug("Endpoint [%d] accepted message %u to %d/%d from %u/%u", e->endpoint->fd,
                       msg_id, target_sysid, target_compid, sender_sysid, sender_compid);
             int r = write_msg(e->endpoint, buf);
@@ -172,6 +187,16 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid
                 should_process_tcp_hangups = true;
             }
             unknown = false;
+        } break;
+        case Endpoint::AcceptState::Filtered:
+            log_debug("Endpoint [%d] filtered out message %u to %d/%d from %u/%u", e->endpoint->fd,
+                      msg_id, target_sysid, target_compid, sender_sysid, sender_compid);
+            unknown = false;
+            break;
+        case Endpoint::AcceptState::Rejected:
+            // fall through
+        default:
+            break; // do nothing (will count as unknown)
         }
     }
 
@@ -416,6 +441,14 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
                     return false;
             }
 
+            if (conf->msgIdFilter) {
+                char *token = strtok(conf->msgIdFilter, ",");
+                while (token != NULL) {
+                    uart->filter_add_allowed_msg_id(atoi(token));
+                    token = strtok(NULL, ",");
+                }
+            }
+
             g_endpoints[i] = uart.release();
             mainloop.add_fd(g_endpoints[i]->fd, g_endpoints[i], EPOLLIN);
             i++;
@@ -428,10 +461,10 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
                 return false;
             }
 
-            if (conf->filter) {
-                char *token = strtok(conf->filter, ",");
+            if (conf->msgIdFilter) {
+                char *token = strtok(conf->msgIdFilter, ",");
                 while (token != NULL) {
-                    udp->add_message_to_filter(atoi(token));
+                    udp->filter_add_allowed_msg_id(atoi(token));
                     token = strtok(NULL, ",");
                 }
             }
@@ -450,6 +483,14 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
                     _add_tcp_retry(tcp.release());
                 }
                 continue;
+            }
+
+            if (conf->msgIdFilter) {
+                char *token = strtok(conf->msgIdFilter, ",");
+                while (token != NULL) {
+                    tcp->filter_add_allowed_msg_id(atoi(token));
+                    token = strtok(NULL, ",");
+                }
             }
 
             if (_add_tcp_endpoint(tcp.get()) < 0) {
