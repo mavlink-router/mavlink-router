@@ -745,7 +745,7 @@ int UdpEndpoint::open_ipv6(const char *ip, unsigned long port, bool server)
 {
     fd = socket(AF_INET6, SOCK_DGRAM, 0);
     if (fd < 0) {
-        log_error("Could not create socket (%m)");
+        log_error("Could not create IPv6 socket (%m)");
         return -errno;
     }
 
@@ -798,7 +798,7 @@ int UdpEndpoint::open_ipv4(const char *ip, unsigned long port, bool server)
 {
     fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (fd < 0) {
-        log_error("Could not create socket (%m)");
+        log_error("Could not create IPv4 socket (%m)");
         return -errno;
     }
 
@@ -808,7 +808,7 @@ int UdpEndpoint::open_ipv4(const char *ip, unsigned long port, bool server)
 
     if (server) {
         if (bind(fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) < 0) {
-            log_error("Error binding socket (%m)");
+            log_error("Error binding IPv4 socket (%m)");
             goto fail;
         }
         sockaddr.sin_port = 0;
@@ -988,7 +988,7 @@ int TcpEndpoint::open_ipv6(const char *ip, unsigned long port)
 {
     fd = socket(AF_INET6, SOCK_STREAM, 0);
     if (fd == -1) {
-        log_error("Could not create socket (%m)");
+        log_error("Could not create IPv6 socket (%m)");
         return -1;
     }
 
@@ -1025,7 +1025,7 @@ int TcpEndpoint::open_ipv4(const char *ip, unsigned long port)
 {
     fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd == -1) {
-        log_error("Could not create socket (%m)");
+        log_error("Could not create IPv4 socket (%m)");
         return -1;
     }
 
@@ -1068,7 +1068,7 @@ int TcpEndpoint::open(const char *ip, unsigned long port)
 
     // common setup
     if (connect(fd, sock, addrlen) < 0) {
-        log_error("Error connecting to IPv6 socket (%m)");
+        log_error("Error connecting to socket (%m)");
         goto fail;
     }
 
