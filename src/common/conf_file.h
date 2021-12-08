@@ -17,6 +17,8 @@
  */
 #pragma once
 
+#include <string>
+
 /**
  * Load and parse multiple conf files, offering methods to extract the configuration options to user
  * structs.
@@ -66,7 +68,7 @@ public:
      * @param filename The conf filename
      * @return errno on IO or parsing errors or @c 0 if successful
      */
-    int parse(const char *filename);
+    int parse(const std::string &filename);
 
     /**
      * Release all opened files and internal structures from this ConfFile.
@@ -119,8 +121,8 @@ public:
     // Helpers
     static int parse_bool(const char *val, size_t val_len, void *storage, size_t storage_len);
     static int parse_str_dup(const char *val, size_t val_len, void *storage, size_t storage_len);
-    static int parse_log_mode(const char *val, size_t val_len, void *storage, size_t storage_len);
     static int parse_str_buf(const char *val, size_t val_len, void *storage, size_t storage_len);
+    static int parse_stdstring(const char *val, size_t val_len, void *storage, size_t storage_len);
 
 #define DECLARE_PARSE_INT(_type) \
     static int parse_##_type(const char *val, size_t val_len, void *storage, size_t storage_len)
@@ -135,14 +137,14 @@ private:
 
     int _parse_file(const char *addr, size_t len, const char *filename);
     struct section *_find_section(const char *section_name, size_t len);
-    struct config *_find_config(struct section *s, const char *key_name, size_t key_len);
+    static struct config *_find_config(struct section *s, const char *key_name, size_t key_len);
 
     struct section *_add_section(const char *addr, size_t len, int line, const char *filename);
-    int _add_config(struct section *s, const char *entry, size_t entry_len, const char *filename,
-                    int line);
-    void _trim(const char **str, size_t *len);
-    int _extract_options_from_section(struct section *s, const OptionsTable table[],
-                                      size_t table_len, void *data);
+    static int _add_config(struct section *s, const char *entry, size_t entry_len,
+                           const char *filename, int line);
+    static void _trim(const char **str, size_t *len);
+    static int _extract_options_from_section(struct section *s, const OptionsTable table[],
+                                             size_t table_len, void *data);
 };
 
 /*

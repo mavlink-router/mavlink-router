@@ -135,7 +135,7 @@ int Mainloop::remove_fd(int fd) const
     return 0;
 }
 
-int Mainloop::write_msg(Endpoint *e, const struct buffer *buf) const
+int Mainloop::write_msg(const std::shared_ptr<Endpoint> &e, const struct buffer *buf) const
 {
     int r = e->write_msg(buf);
 
@@ -144,7 +144,7 @@ int Mainloop::write_msg(Endpoint *e, const struct buffer *buf) const
      * possible to write again
      */
     if (r == -EAGAIN) {
-        mod_fd(e->fd, e, EPOLLIN | EPOLLOUT);
+        mod_fd(e->fd, e.get(), EPOLLIN | EPOLLOUT);
     }
 
     return r;
@@ -155,18 +155,18 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid
 {
     bool unknown = true;
 
-    for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
+    for (const auto &e : this->g_endpoints) {
         auto acceptState
-            = (*e)->accept_msg(target_sysid, target_compid, sender_sysid, sender_compid, msg_id);
+            = e->accept_msg(target_sysid, target_compid, sender_sysid, sender_compid, msg_id);
         switch (acceptState) {
         case Endpoint::AcceptState::Accepted:
-            log_debug("Endpoint [%d] accepted message %u to %d/%d from %u/%u", (*e)->fd, msg_id,
+            log_debug("Endpoint [%d] accepted message %u to %d/%d from %u/%u", e->fd, msg_id,
                       target_sysid, target_compid, sender_sysid, sender_compid);
-            write_msg(*e, buf);
+            write_msg(e, buf);
             unknown = false;
             break;
         case Endpoint::AcceptState::Filtered:
-            log_debug("Endpoint [%d] filtered out message %u to %d/%d from %u/%u", (*e)->fd, msg_id,
+            log_debug("Endpoint [%d] filtered out message %u to %d/%d from %u/%u", e->fd, msg_id,
                       target_sysid, target_compid, sender_sysid, sender_compid);
             unknown = false;
             break;
@@ -177,22 +177,22 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid
         }
     }
 
-    for (struct endpoint_entry *e = g_tcp_endpoints; e != nullptr; e = e->next) {
-        auto acceptState = e->endpoint->accept_msg(target_sysid, target_compid, sender_sysid,
-                                                   sender_compid, msg_id);
+    for (const auto &e : this->g_tcp_endpoints) {
+        auto acceptState
+            = e->accept_msg(target_sysid, target_compid, sender_sysid, sender_compid, msg_id);
         switch (acceptState) {
         case Endpoint::AcceptState::Accepted: {
-            log_debug("Endpoint [%d] accepted message %u to %d/%d from %u/%u", e->endpoint->fd,
-                      msg_id, target_sysid, target_compid, sender_sysid, sender_compid);
-            int r = write_msg(e->endpoint, buf);
+            log_debug("Endpoint [%d] accepted message %u to %d/%d from %u/%u", e->fd, msg_id,
+                      target_sysid, target_compid, sender_sysid, sender_compid);
+            int r = write_msg(e, buf);
             if (r == -EPIPE) {
                 should_process_tcp_hangups = true;
             }
             unknown = false;
         } break;
         case Endpoint::AcceptState::Filtered:
-            log_debug("Endpoint [%d] filtered out message %u to %d/%d from %u/%u", e->endpoint->fd,
-                      msg_id, target_sysid, target_compid, sender_sysid, sender_compid);
+            log_debug("Endpoint [%d] filtered out message %u to %d/%d from %u/%u", e->fd, msg_id,
+                      target_sysid, target_compid, sender_sysid, sender_compid);
             unknown = false;
             break;
         case Endpoint::AcceptState::Rejected:
@@ -210,86 +210,46 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid
 
 void Mainloop::process_tcp_hangups()
 {
-    // First, remove entries from the beginning of list, ensuring `g_tcp_endpoints` still
-    // points to list beginning
-    struct endpoint_entry **first = &g_tcp_endpoints;
-    while ((*first != nullptr) && !(*first)->endpoint->is_valid()) {
-        struct endpoint_entry *next = (*first)->next;
-        remove_fd((*first)->endpoint->fd);
-        if ((*first)->endpoint->retry_timeout > 0) {
-            _add_tcp_retry((*first)->endpoint);
-        } else {
-            delete (*first)->endpoint;
-        }
-        free(*first);
-        *first = next;
-    }
-
-    // Remove other entries
-    if (*first != nullptr) {
-        struct endpoint_entry *prev = *first;
-        struct endpoint_entry *current = prev->next;
-        while (current != nullptr) {
-            if (!current->endpoint->is_valid()) {
-                prev->next = current->next;
-                remove_fd(current->endpoint->fd);
-                if (current->endpoint->retry_timeout > 0) {
-                    _add_tcp_retry(current->endpoint);
-                } else {
-                    delete current->endpoint;
-                }
-                free(current);
-                current = prev->next;
+    // Remove endpoints, which are invalid and have no retry timeout
+    for (auto it = g_tcp_endpoints.begin(); it != g_tcp_endpoints.end();) {
+        if (!it->get()->is_valid()) {
+            if (it->get()->retry_timeout > 0) {
+                _add_tcp_retry(it->get());
+                ++it;
             } else {
-                prev = current;
-                current = current->next;
+                it = g_tcp_endpoints.erase(it);
             }
+        } else {
+            ++it;
         }
     }
 
     should_process_tcp_hangups = false;
 }
 
-int Mainloop::_add_tcp_endpoint(TcpEndpoint *tcp)
+void Mainloop::_add_tcp_endpoint(TcpEndpoint *tcp)
 {
-    struct endpoint_entry *tcp_entry;
+    g_tcp_endpoints.emplace_back(tcp);
 
-    tcp_entry = (struct endpoint_entry *)calloc(1, sizeof(struct endpoint_entry));
-    if (tcp_entry == nullptr) {
-        return -ENOMEM;
-    }
-
-    tcp_entry->next = g_tcp_endpoints;
-    tcp_entry->endpoint = tcp;
-    g_tcp_endpoints = tcp_entry;
-
-    add_fd(tcp->fd, tcp, EPOLLIN);
-
-    return 0;
+    auto endpoint = g_tcp_endpoints.back();
+    this->add_fd(endpoint->fd, endpoint.get(), EPOLLIN);
 }
 
 void Mainloop::handle_tcp_connection()
 {
     auto *tcp = new TcpEndpoint{};
-    int fd;
-    int errno_copy;
+    tcp->retry_timeout = 0; // disable retry on dynamic endpoints by the TCP server
 
-    fd = tcp->accept(g_tcp_fd);
+    int fd = tcp->accept(g_tcp_fd);
     if (fd == -1) {
         goto accept_error;
     }
 
-    if (_add_tcp_endpoint(tcp) < 0) {
-        goto add_error;
-    }
+    _add_tcp_endpoint(tcp);
 
     log_debug("Accepted TCP connection on [%d]", fd);
     return;
 
-add_error:
-    errno_copy = errno;
-    close(fd);
-    errno = errno_copy;
 accept_error:
     log_error("Could not accept TCP connection (%m)");
     delete tcp;
@@ -382,26 +342,24 @@ bool Mainloop::_log_aggregate_timeout(void *data)
         _errors_aggregate.msg_to_unknown = 0;
     }
 
-    if (g_endpoints != nullptr) {
-        for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
-            (*e)->log_aggregate(LOG_AGGREGATE_INTERVAL_SEC);
-        }
+    for (const auto &e : g_endpoints) {
+        e->log_aggregate(LOG_AGGREGATE_INTERVAL_SEC);
     }
 
-    for (auto *t = g_tcp_endpoints; t != nullptr; t = t->next) {
-        t->endpoint->log_aggregate(LOG_AGGREGATE_INTERVAL_SEC);
+    for (const auto &e : g_tcp_endpoints) {
+        e->log_aggregate(LOG_AGGREGATE_INTERVAL_SEC);
     }
     return true;
 }
 
 void Mainloop::print_statistics()
 {
-    for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
-        (*e)->print_statistics();
+    for (const auto &e : g_endpoints) {
+        e->print_statistics();
     }
 
-    for (auto *t = g_tcp_endpoints; t != nullptr; t = t->next) {
-        t->endpoint->print_statistics();
+    for (const auto &e : g_tcp_endpoints) {
+        e->print_statistics();
     }
 }
 
@@ -412,167 +370,115 @@ static bool _print_statistics_timeout_cb(void *data)
     return true;
 }
 
-bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
+bool Mainloop::add_endpoints(const Configuration &config)
 {
-    unsigned n_endpoints = 0, i = 0;
-    struct endpoint_config *conf;
-
-    for (conf = opt->endpoints; conf != nullptr; conf = conf->next) {
-        if (conf->type != Tcp) {
-            // TCP endpoints are efemeral, that's why they don't
-            // live on `g_endpoints` array, but on `g_tcp_endpoints` list
-            n_endpoints++;
-        }
-    }
-
-    if (opt->logs_dir != nullptr) {
-        n_endpoints++;
-    }
-
-    g_endpoints = (Endpoint **)calloc(n_endpoints + 1, sizeof(Endpoint *));
-    assert_or_return(g_endpoints, false);
-
-    for (conf = opt->endpoints; conf != nullptr; conf = conf->next) {
-        switch (conf->type) {
-        case Uart: {
-            std::unique_ptr<UartEndpoint> uart{new UartEndpoint{}};
-            if (uart->open(conf->device) < 0) {
-                return false;
-            }
-
-            if (conf->bauds->size() == 1) {
-                if (uart->set_speed((*(conf->bauds))[0]) < 0) {
-                    return false;
-                }
-            } else {
-                if (uart->add_speeds(*conf->bauds) < 0) {
-                    return false;
-                }
-            }
-
-            if (conf->flowcontrol) {
-                if (uart->set_flow_control(true) < 0) {
-                    return false;
-                }
-            }
-
-            if (conf->msgIdFilter != nullptr) {
-                char *token = strtok(conf->msgIdFilter, ",");
-                while (token != nullptr) {
-                    uart->filter_add_allowed_msg_id(atoi(token));
-                    token = strtok(nullptr, ",");
-                }
-            }
-
-            g_endpoints[i] = uart.release();
-            mainloop.add_fd(g_endpoints[i]->fd, g_endpoints[i], EPOLLIN);
-            i++;
-            break;
-        }
-        case Udp: {
-            std::unique_ptr<UdpEndpoint> udp{new UdpEndpoint{}};
-            if (udp->open(conf->address, conf->port, conf->server) < 0) {
-                log_error("Could not open %s:%ld", conf->address, conf->port);
-                return false;
-            }
-
-            if (conf->msgIdFilter != nullptr) {
-                char *token = strtok(conf->msgIdFilter, ",");
-                while (token != nullptr) {
-                    udp->filter_add_allowed_msg_id(atoi(token));
-                    token = strtok(nullptr, ",");
-                }
-            }
-
-            g_endpoints[i] = udp.release();
-            mainloop.add_fd(g_endpoints[i]->fd, g_endpoints[i], EPOLLIN);
-            i++;
-            break;
-        }
-        case Tcp: {
-            std::unique_ptr<TcpEndpoint> tcp{new TcpEndpoint{}};
-            tcp->retry_timeout = conf->retry_timeout;
-            if (tcp->open(conf->address, conf->port) < 0) {
-                log_error("Could not open %s:%ld.", conf->address, conf->port);
-                if (tcp->retry_timeout > 0) {
-                    _add_tcp_retry(tcp.release());
-                }
-                continue;
-            }
-
-            if (conf->msgIdFilter != nullptr) {
-                char *token = strtok(conf->msgIdFilter, ",");
-                while (token != nullptr) {
-                    tcp->filter_add_allowed_msg_id(atoi(token));
-                    token = strtok(nullptr, ",");
-                }
-            }
-
-            if (_add_tcp_endpoint(tcp.get()) < 0) {
-                log_error("Could not open %s:%ld", conf->address, conf->port);
-                return false;
-            }
-            tcp.release();
-            break;
-        }
-        default:
-            log_error("Unknow endpoint type!");
+    // Create UART and UDP endpoints
+    for (const auto &conf : config.uart_configs) {
+        auto uart = std::make_shared<UartEndpoint>();
+        if (uart->open(conf.device.c_str()) < 0) {
             return false;
         }
-    }
 
-    if (opt->tcp_port != 0u) {
-        g_tcp_fd = tcp_open(opt->tcp_port);
-    }
-
-    if (opt->logs_dir != nullptr) {
-        if (opt->mavlink_dialect == Ardupilotmega) {
-            _log_endpoint
-                = new BinLog(opt->logs_dir, opt->log_mode, opt->min_free_space, opt->max_log_files);
-        } else if (opt->mavlink_dialect == Common) {
-            _log_endpoint
-                = new ULog(opt->logs_dir, opt->log_mode, opt->min_free_space, opt->max_log_files);
+        if (conf.baudrates.size() == 1) {
+            if (uart->set_speed(conf.baudrates[0]) < 0) {
+                return false;
+            }
         } else {
-            _log_endpoint = new AutoLog(opt->logs_dir, opt->log_mode, opt->min_free_space,
-                                        opt->max_log_files);
+            if (uart->add_speeds(conf.baudrates) < 0) {
+                return false;
+            }
         }
-        _log_endpoint->mark_unfinished_logs();
-        g_endpoints[i] = _log_endpoint;
+
+        if (conf.flowcontrol) {
+            if (uart->set_flow_control(true) < 0) {
+                return false;
+            }
+        }
+
+        for (auto msg_id : conf.allow_msg_id_out) {
+            uart->filter_add_allowed_msg_id(msg_id);
+        }
+
+        g_endpoints.push_back(uart);
+        auto endpoint = g_endpoints.back();
+        this->add_fd(endpoint->fd, endpoint.get(), EPOLLIN);
     }
 
-    if (opt->report_msg_statistics) {
+    for (const auto &conf : config.udp_configs) {
+        auto udp = std::make_shared<UdpEndpoint>();
+
+        bool is_server_mode = (UdpEndpointConfig::Mode::Server == conf.mode);
+        if (udp->open(conf.address.c_str(), conf.port, is_server_mode) < 0) {
+            log_error("Could not open %s:%ld", conf.address.c_str(), conf.port);
+            return false;
+        }
+
+        for (auto msg_id : conf.allow_msg_id_out) {
+            udp->filter_add_allowed_msg_id(msg_id);
+        }
+
+        g_endpoints.emplace_back(udp);
+        auto endpoint = g_endpoints.back();
+        this->add_fd(endpoint->fd, endpoint.get(), EPOLLIN);
+    }
+
+    // Create TCP endpoints
+    for (const auto &conf : config.tcp_configs) {
+        std::unique_ptr<TcpEndpoint> tcp{new TcpEndpoint{}};
+
+        tcp->retry_timeout = conf.retry_timeout;
+
+        for (auto msg_id : conf.allow_msg_id_out) {
+            tcp->filter_add_allowed_msg_id(msg_id);
+        }
+
+        if (tcp->open(conf.address.c_str(), conf.port) < 0) {
+            log_error("Could not open %s:%ld", conf.address.c_str(), conf.port);
+            if (tcp->retry_timeout > 0) {
+                _add_tcp_retry(tcp.release());
+            }
+            continue;
+        }
+
+        _add_tcp_endpoint(tcp.release());
+    }
+
+    // Create TCP server
+    if (config.tcp_port != 0u) {
+        g_tcp_fd = tcp_open(config.tcp_port);
+    }
+
+    // Create Log endpoint
+    auto conf = config.log_config;
+    if (!conf.logs_dir.empty()) {
+        switch (conf.mavlink_dialect) {
+        case LogOptions::MavDialect::Ardupilotmega:
+            this->_log_endpoint = std::make_shared<BinLog>(conf.logs_dir.c_str(), conf.log_mode,
+                                                           conf.min_free_space, conf.max_log_files);
+            break;
+
+        case LogOptions::MavDialect::Common:
+            this->_log_endpoint = std::make_shared<ULog>(conf.logs_dir.c_str(), conf.log_mode,
+                                                         conf.min_free_space, conf.max_log_files);
+            break;
+
+        case LogOptions::MavDialect::Auto:
+            this->_log_endpoint = std::make_shared<AutoLog>(
+                conf.logs_dir.c_str(), conf.log_mode, conf.min_free_space, conf.max_log_files);
+            break;
+
+            // no default case on purpose
+        }
+        this->_log_endpoint->mark_unfinished_logs();
+        g_endpoints.emplace_back(this->_log_endpoint);
+    }
+
+    // Apply other options
+    if (config.report_msg_statistics) {
         add_timeout(MSEC_PER_SEC, _print_statistics_timeout_cb, this);
     }
 
     return true;
-}
-
-void Mainloop::free_endpoints(struct options *opt)
-{
-    for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
-        delete *e;
-    }
-    free(g_endpoints);
-
-    for (auto *t = g_tcp_endpoints; t != nullptr;) {
-        auto *next = t->next;
-        delete t->endpoint;
-        free(t);
-        t = next;
-    }
-
-    for (auto *e = opt->endpoints; e != nullptr;) {
-        auto *next = e->next;
-        if (e->type == Udp || e->type == Tcp) {
-            free(e->address);
-        } else {
-            free(e->device);
-            delete e->bauds;
-        }
-        free(e->name);
-        free(e);
-        e = next;
-    }
 }
 
 int Mainloop::tcp_open(unsigned long tcp_port)
@@ -702,13 +608,10 @@ bool Mainloop::_retry_timeout_cb(void *data)
     auto *tcp = (TcpEndpoint *)data;
 
     if (tcp->open(tcp->get_ip(), tcp->get_port()) < 0) {
-        return true;
+        return true; // try again
     }
 
-    if (_add_tcp_endpoint(tcp) < 0) {
-        tcp->close();
-        return true;
-    }
+    _add_tcp_endpoint(tcp);
 
-    return false;
+    return false; // connection is fine now, no retry
 }

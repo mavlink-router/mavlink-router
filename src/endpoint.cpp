@@ -652,7 +652,7 @@ bool UartEndpoint::_change_baud_cb(void *data)
 {
     _current_baud_idx = (_current_baud_idx + 1) % _baudrates.size();
 
-    log_info("Retrying UART [%d] on new baudrate: %lu", fd, _baudrates[_current_baud_idx]);
+    log_info("Retrying UART [%d] on new baudrate: %u", fd, _baudrates[_current_baud_idx]);
 
     set_speed(_baudrates[_current_baud_idx]);
 
@@ -665,7 +665,7 @@ int UartEndpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_c
     int ret = Endpoint::read_msg(pbuf, target_sysid, target_compid, src_sysid, src_compid, msg_id);
 
     if (_change_baud_timeout != nullptr && ret == ReadOk) {
-        log_info("Baudrate %lu responded, keeping it", _baudrates[_current_baud_idx]);
+        log_info("Baudrate %u responded, keeping it", _baudrates[_current_baud_idx]);
         Mainloop::get_instance().del_timeout(_change_baud_timeout);
         _change_baud_timeout = nullptr;
     }
@@ -717,7 +717,7 @@ int UartEndpoint::write_msg(const struct buffer *pbuf)
     return r;
 }
 
-int UartEndpoint::add_speeds(std::vector<unsigned long> bauds)
+int UartEndpoint::add_speeds(const std::vector<speed_t> &bauds)
 {
     if (bauds.empty()) {
         return -EINVAL;

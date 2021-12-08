@@ -20,13 +20,38 @@
 #include <common/mavlink.h>
 
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "comm.h"
 #include "pollable.h"
 #include "timeout.h"
 
-class Mainloop;
+struct UartEndpointConfig {
+    std::string name;
+    std::string device;
+    std::vector<speed_t> baudrates;
+    bool flowcontrol{false};
+    std::vector<uint8_t> allow_msg_id_out;
+};
+
+struct UdpEndpointConfig {
+    enum class Mode { Undefined = 0, Server, Client };
+
+    std::string name;
+    std::string address;
+    unsigned long port;
+    Mode mode;
+    std::vector<uint8_t> allow_msg_id_out;
+};
+
+struct TcpEndpointConfig {
+    std::string name;
+    std::string address;
+    unsigned long port;
+    int retry_timeout;
+    std::vector<uint8_t> allow_msg_id_out;
+};
 
 /*
  * mavlink 2.0 packet in its wire format
@@ -96,7 +121,8 @@ public:
 
     void log_aggregate(unsigned int interval_sec);
 
-    uint8_t get_trimmed_zeros(const mavlink_msg_entry_t *msg_entry, const struct buffer *buffer);
+    static uint8_t get_trimmed_zeros(const mavlink_msg_entry_t *msg_entry,
+                                     const struct buffer *buffer);
 
     bool has_sys_id(unsigned sysid);
     bool has_sys_comp_id(unsigned sys_comp_id);
@@ -161,7 +187,7 @@ public:
     int open(const char *path);
     int set_speed(speed_t baudrate);
     int set_flow_control(bool enabled);
-    int add_speeds(std::vector<unsigned long> bauds);
+    int add_speeds(const std::vector<speed_t> &bauds);
 
 protected:
     int read_msg(struct buffer *pbuf, int *target_sysid, int *target_compid, uint8_t *src_sysid,
@@ -171,7 +197,7 @@ protected:
 private:
     size_t _current_baud_idx = 0;
     Timeout *_change_baud_timeout = nullptr;
-    std::vector<unsigned long> _baudrates;
+    std::vector<uint32_t> _baudrates;
 
     bool _change_baud_cb(void *data);
 };
@@ -213,7 +239,7 @@ public:
     struct sockaddr_in sockaddr;
     struct sockaddr_in6 sockaddr6;
     bool ipv6;
-    int retry_timeout = 0;
+    int retry_timeout = 0; // disable retry by default
 
     inline const char *get_ip() { return _ip; }
 

@@ -17,11 +17,30 @@
  */
 #pragma once
 
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "common/log.h"
+
 #include "binlog.h"
 #include "comm.h"
 #include "endpoint.h"
 #include "timeout.h"
 #include "ulog.h"
+
+struct Configuration {
+    std::string conf_file_name; ///< CLI "conf-file" only!
+    std::string conf_dir;       ///< CLI "conf-dir" only!
+    unsigned long tcp_port;     ///< conf "TcpServerPort" or CLI "tcp-port"
+    bool report_msg_statistics; ///< conf "ReportStats" or CLI "report_msg_statistics"
+    Log::Level debug_log_level; ///< conf "DebugLogLevel" or CLI "debug-log-level"
+
+    LogOptions log_config; ///< logging is in General config section, but internally an endpoint
+    std::vector<UartEndpointConfig> uart_configs;
+    std::vector<UdpEndpointConfig> udp_configs;
+    std::vector<TcpEndpointConfig> tcp_configs;
+};
 
 struct endpoint_entry {
     struct endpoint_entry *next;
@@ -37,16 +56,13 @@ public:
     int loop();
     void route_msg(struct buffer *buf, int target_sysid, int target_compid, int sender_sysid,
                    int sender_compid, uint32_t msg_id = UINT32_MAX);
-    void handle_read(Endpoint *e);
-    void handle_canwrite(Endpoint *e);
     void handle_tcp_connection();
-    int write_msg(Endpoint *e, const struct buffer *buf) const;
+    int write_msg(const std::shared_ptr<Endpoint> &e, const struct buffer *buf) const;
     void process_tcp_hangups();
     Timeout *add_timeout(uint32_t timeout_msec, std::function<bool(void *)> cb, const void *data);
     void del_timeout(Timeout *t);
 
-    void free_endpoints(struct options *opt);
-    bool add_endpoints(Mainloop &mainloop, struct options *opt);
+    bool add_endpoints(const Configuration &config);
 
     void print_statistics();
 
@@ -78,10 +94,11 @@ public:
 private:
     static const unsigned int LOG_AGGREGATE_INTERVAL_SEC = 5;
 
-    endpoint_entry *g_tcp_endpoints = nullptr;
-    Endpoint **g_endpoints = nullptr;
-    int g_tcp_fd = -1;
-    LogEndpoint *_log_endpoint = nullptr;
+    // TCP endpoints are separarte b/c process_tcp_hangups() just needs TCP instances
+    std::vector<std::shared_ptr<Endpoint>> g_endpoints{};
+    std::vector<std::shared_ptr<TcpEndpoint>> g_tcp_endpoints{};
+    int g_tcp_fd = -1; ///< for TCP server
+    std::shared_ptr<LogEndpoint> _log_endpoint{nullptr};
 
     Timeout *_timeouts = nullptr;
 
@@ -93,7 +110,7 @@ private:
 
     int tcp_open(unsigned long tcp_port);
     void _del_timeouts();
-    int _add_tcp_endpoint(TcpEndpoint *tcp);
+    void _add_tcp_endpoint(TcpEndpoint *tcp);
     void _add_tcp_retry(TcpEndpoint *tcp);
     bool _retry_timeout_cb(void *data);
     bool _log_aggregate_timeout(void *data);
@@ -104,41 +121,4 @@ private:
 
     static Mainloop _instance;
     static bool _initialized;
-};
-
-enum endpoint_type { Tcp, Uart, Udp, Unknown };
-enum mavlink_dialect { Auto, Common, Ardupilotmega };
-
-struct endpoint_config {
-    struct endpoint_config *next;
-    char *name;
-    enum endpoint_type type;
-    union {
-        struct {
-            char *address;
-            long unsigned port;
-            int retry_timeout;
-            bool server;
-        };
-        struct {
-            char *device;
-            std::vector<unsigned long> *bauds;
-            bool flowcontrol;
-        };
-    };
-    char *msgIdFilter;
-};
-
-struct options {
-    struct endpoint_config *endpoints;
-    const char *conf_file_name;
-    const char *conf_dir;
-    unsigned long tcp_port;
-    bool report_msg_statistics;
-    char *logs_dir;
-    LogMode log_mode;
-    int debug_log_level;
-    enum mavlink_dialect mavlink_dialect;
-    unsigned long min_free_space;
-    unsigned long max_log_files;
 };

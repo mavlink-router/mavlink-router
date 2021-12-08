@@ -20,6 +20,7 @@
 #include <aio.h>
 #include <assert.h>
 #include <dirent.h>
+#include <string>
 
 #include "endpoint.h"
 #include "timeout.h"
@@ -31,6 +32,16 @@ enum class LogMode {
     while_armed, ///< Start logging when the vehicle is armed until it's disarmed
 
     disabled ///< Do not try to start logging (only used internally)
+};
+
+struct LogOptions {
+    enum class MavDialect { Auto, Common, Ardupilotmega };
+
+    std::string logs_dir;                         // conf "Log" or CLI "log"
+    LogMode log_mode{LogMode::always};            // conf "LogMode"
+    MavDialect mavlink_dialect{MavDialect::Auto}; // conf "MavlinkDialect"
+    unsigned long min_free_space;                 // conf "MinFreeSpace"
+    unsigned long max_log_files;                  // conf "MaxLogFiles"
 };
 
 class LogEndpoint : public Endpoint {
@@ -80,8 +91,8 @@ protected:
 
 private:
     int _get_file(const char *extension);
-    uint32_t _get_prefix(DIR *dir);
-    DIR *_open_or_create_dir(const char *name);
+    static uint32_t _get_prefix(DIR *dir);
+    static DIR *_open_or_create_dir(const char *name);
 
     /**
      * Delete old logs until a certain amount of free space and total number of log files are met.
