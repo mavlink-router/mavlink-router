@@ -21,11 +21,17 @@
 
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "comm.h"
 #include "pollable.h"
 #include "timeout.h"
+
+#define ENDPOINT_TYPE_UART "UART"
+#define ENDPOINT_TYPE_UDP  "UDP"
+#define ENDPOINT_TYPE_TCP  "TCP"
+#define ENDPOINT_TYPE_LOG  "Log"
 
 struct UartEndpointConfig {
     std::string name;
@@ -109,7 +115,7 @@ public:
         Rejected,
     };
 
-    Endpoint(const char *name);
+    Endpoint(std::string type, std::string name);
     ~Endpoint() override;
 
     int handle_read() override;
@@ -147,7 +153,8 @@ protected:
     bool _check_crc(const mavlink_msg_entry_t *msg_entry) const;
     void _add_sys_comp_id(uint16_t sys_comp_id);
 
-    const char *_name;
+    const std::string _type; ///< UART, UDP, TCP, Log
+    std::string _name;       ///< Endpoint name from config file
     size_t _last_packet_len = 0;
 
     // Statistics
@@ -176,8 +183,8 @@ private:
 
 class UartEndpoint : public Endpoint {
 public:
-    UartEndpoint()
-        : Endpoint{"UART"}
+    UartEndpoint(std::string name)
+        : Endpoint{ENDPOINT_TYPE_UART, std::move(name)}
     {
     }
     ~UartEndpoint() override;
@@ -204,7 +211,7 @@ private:
 
 class UdpEndpoint : public Endpoint {
 public:
-    UdpEndpoint();
+    UdpEndpoint(std::string name);
     ~UdpEndpoint() override = default;
 
     int write_msg(const struct buffer *pbuf) override;
@@ -226,11 +233,11 @@ protected:
 
 class TcpEndpoint : public Endpoint {
 public:
-    TcpEndpoint();
+    TcpEndpoint(std::string name);
     ~TcpEndpoint() override;
 
     int accept(int listener_fd);
-    int open(const char *ip, unsigned long port);
+    int open(const std::string &ip, unsigned long port);
     void close();
 
     int write_msg(const struct buffer *pbuf) override;
@@ -241,7 +248,7 @@ public:
     bool ipv6;
     int retry_timeout = 0; // disable retry by default
 
-    inline const char *get_ip() { return _ip; }
+    inline std::string get_ip() { return _ip; }
 
     inline unsigned long get_port() const { return _port; }
 
@@ -255,7 +262,7 @@ protected:
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
 
 private:
-    char *_ip = nullptr;
+    std::string _ip{};
     unsigned long _port = 0;
     bool _valid = true;
 };

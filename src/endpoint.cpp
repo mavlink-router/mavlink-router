@@ -18,6 +18,7 @@
 #include "endpoint.h"
 
 #include <algorithm>
+#include <utility>
 
 #include <arpa/inet.h>
 #include <assert.h>
@@ -97,8 +98,9 @@ static unsigned int ipv6_get_scope_id(const char *ip)
     return scope;
 }
 
-Endpoint::Endpoint(const char *name)
-    : _name{name}
+Endpoint::Endpoint(std::string type, std::string name)
+    : _type{std::move(type)}
+    , _name{std::move(name)}
 {
     rx_buf.data = (uint8_t *)malloc(RX_BUF_MAX_SIZE);
     rx_buf.len = 0;
@@ -146,7 +148,7 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
     uint8_t *payload, seq, payload_len;
 
     if (fd < 0) {
-        log_error("Trying to read invalid fd");
+        log_error("%s %s: Trying to read invalid fd", _type.c_str(), _name.c_str());
         return -EINVAL;
     }
 
@@ -177,7 +179,7 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
             return r;
         }
 
-        log_debug("%s [%d] got %zd bytes", _name, fd, r);
+        log_debug("%s [%d]%s: got %zd bytes", _type.c_str(), fd, _name.c_str(), r);
         rx_buf.len += r;
     }
 
@@ -297,7 +299,7 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
     *target_compid = -1;
 
     if (msg_entry == nullptr) {
-        log_debug("No message entry for %u", *msg_id);
+        log_debug("%s [%d]%s: No message entry for %u", _type.c_str(), fd, _name.c_str(), *msg_id);
     } else {
         if (msg_entry->flags & MAV_MSG_ENTRY_FLAG_HAVE_TARGET_SYSTEM) {
             // if target_system is 0, it may have been trimmed out on mavlink2
@@ -376,8 +378,8 @@ Endpoint::AcceptState Endpoint::accept_msg(int target_sysid, int target_compid, 
                                            uint8_t src_compid, uint32_t msg_id)
 {
     if (Log::get_max_level() >= Log::Level::DEBUG) {
-        log_debug("Endpoint [%d] got message %u to %d/%d from %u/%u", fd, msg_id, target_sysid,
-                  target_compid, src_sysid, src_compid);
+        log_debug("Endpoint [%d]%s: got message %u to %d/%d from %u/%u", fd, _name.c_str(), msg_id,
+                  target_sysid, target_compid, src_sysid, src_compid);
         log_debug("\tKnown components:");
         for (auto &id : _sys_comp_ids) {
             log_debug("\t\t%u/%u", (id >> 8), id & 0xff);
@@ -444,7 +446,7 @@ void Endpoint::print_statistics()
 {
     const uint32_t read_total = _stat.read.total == 0 ? 1 : _stat.read.total;
 
-    printf("Endpoint %s [%d] {", _name, fd);
+    printf("%s Endpoint [%d]%s {", _type.c_str(), fd, _name.c_str());
     printf("\n\tReceived messages {");
     printf("\n\t\tCRC error: %u %u%% %luKBytes", _stat.read.crc_error,
            (_stat.read.crc_error * 100) / read_total, _stat.read.crc_error_bytes / 1000);
@@ -480,8 +482,8 @@ uint8_t Endpoint::get_trimmed_zeros(const mavlink_msg_entry_t *msg_entry,
 void Endpoint::log_aggregate(unsigned int interval_sec)
 {
     if (_incomplete_msgs > 0) {
-        log_warning("Endpoint %s [%d]: %u incomplete messages in the last %d seconds", _name, fd,
-                    _incomplete_msgs, interval_sec);
+        log_warning("%s Endpoint [%d]%s: %u incomplete messages in the last %d seconds",
+                    _type.c_str(), fd, _name.c_str(), _incomplete_msgs, interval_sec);
         _incomplete_msgs = 0;
     }
 }
@@ -503,7 +505,7 @@ int UartEndpoint::set_speed(speed_t baudrate)
 
     bzero(&tc, sizeof(tc));
     if (ioctl(fd, TCGETS2, &tc) == -1) {
-        log_error("Could not get termios2 (%m)");
+        log_error("UART [%d]%s: Could not get termios2 (%m)", fd, _name.c_str());
         return -1;
     }
 
@@ -518,10 +520,10 @@ int UartEndpoint::set_speed(speed_t baudrate)
         return -1;
     }
 
-    log_info("UART [%d] speed = %u", fd, baudrate);
+    log_info("UART [%d]%s: speed = %u", fd, _name.c_str(), baudrate);
 
     if (ioctl(fd, TCFLSH, TCIOFLUSH) == -1) {
-        log_error("Could not flush terminal (%m)");
+        log_error("UART [%d]%s: Could not flush terminal (%m)", fd, _name.c_str());
         return -1;
     }
 
@@ -538,7 +540,7 @@ int UartEndpoint::set_flow_control(bool enabled)
 
     bzero(&tc, sizeof(tc));
     if (ioctl(fd, TCGETS2, &tc) == -1) {
-        log_error("Could not get termios2 (%m)");
+        log_error("UART [%d]%s: Could not get termios2 (%m)", fd, _name.c_str());
         return -1;
     }
 
@@ -549,11 +551,11 @@ int UartEndpoint::set_flow_control(bool enabled)
     }
 
     if (ioctl(fd, TCSETS2, &tc) == -1) {
-        log_error("Could not set terminal attributes (%m)");
+        log_error("UART [%d]%s: Could not set terminal attributes (%m)", fd, _name.c_str());
         return -1;
     }
 
-    log_info("UART [%d] flowcontrol = %s", fd, enabled ? "enabled" : "disabled");
+    log_info("UART [%d]%s: flowcontrol = %s", fd, _name.c_str(), enabled ? "enabled" : "disabled");
 
     return 0;
 }
@@ -569,14 +571,14 @@ int UartEndpoint::open(const char *path)
     }
 
     if (reset_uart(fd) < 0) {
-        log_error("Could not reset uart");
+        log_error("Could not reset uart on %s", path);
         goto fail;
     }
 
     bzero(&tc, sizeof(tc));
 
     if (ioctl(fd, TCGETS2, &tc) == -1) {
-        log_error("Could not get termios2 (%m)");
+        log_error("Could not get termios2 on %s (%m)", path);
         goto fail;
     }
 
@@ -603,7 +605,7 @@ int UartEndpoint::open(const char *path)
     tc.c_cc[VTIME] = 0;
 
     if (ioctl(fd, TCSETS2, &tc) == -1) {
-        log_error("Could not set terminal attributes (%m)");
+        log_error("Could not set terminal attributes on %s (%m)", path);
         goto fail;
     }
 
@@ -618,7 +620,7 @@ int UartEndpoint::open(const char *path)
 
         int result = ioctl(fd, TIOCGSERIAL, &serial_ctl);
         if (result < 0) {
-            log_warning("Error while trying to read serial port configuration: %m");
+            log_warning("Error while trying to read serial port configuration on %s: %m", path);
             goto set_latency_failed;
         }
 
@@ -627,18 +629,18 @@ int UartEndpoint::open(const char *path)
         result = ioctl(fd, TIOCSSERIAL, &serial_ctl);
         if (result < 0) {
             if (errno != ENODEV && errno != ENOTTY) {
-                log_warning("Error while trying to write serial port latency: %m");
+                log_warning("Error while trying to write serial port latency on %s: %m", path);
             }
         }
     }
 
 set_latency_failed:
     if (ioctl(fd, TCFLSH, TCIOFLUSH) == -1) {
-        log_error("Could not flush terminal (%m)");
+        log_error("Could not flush terminal on %s (%m)", path);
         goto fail;
     }
 
-    log_info("Open UART [%d] %s *", fd, path);
+    log_info("Opened UART [%d]%s: %s", fd, _name.c_str(), path);
 
     return fd;
 
@@ -652,7 +654,8 @@ bool UartEndpoint::_change_baud_cb(void *data)
 {
     _current_baud_idx = (_current_baud_idx + 1) % _baudrates.size();
 
-    log_info("Retrying UART [%d] on new baudrate: %u", fd, _baudrates[_current_baud_idx]);
+    log_info("Retrying UART [%d]%s on new baudrate: %u", fd, _name.c_str(),
+             _baudrates[_current_baud_idx]);
 
     set_speed(_baudrates[_current_baud_idx]);
 
@@ -665,7 +668,8 @@ int UartEndpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_c
     int ret = Endpoint::read_msg(pbuf, target_sysid, target_compid, src_sysid, src_compid, msg_id);
 
     if (_change_baud_timeout != nullptr && ret == ReadOk) {
-        log_info("Baudrate %u responded, keeping it", _baudrates[_current_baud_idx]);
+        log_info("%s [%d]%s: Baudrate %u responded, keeping it", _type.c_str(), fd, _name.c_str(),
+                 _baudrates[_current_baud_idx]);
         Mainloop::get_instance().del_timeout(_change_baud_timeout);
         _change_baud_timeout = nullptr;
     }
@@ -689,7 +693,7 @@ ssize_t UartEndpoint::_read_msg(uint8_t *buf, size_t len)
 int UartEndpoint::write_msg(const struct buffer *pbuf)
 {
     if (fd < 0) {
-        log_error("Trying to write invalid fd");
+        log_error("UART %s: Trying to write invalid fd", _name.c_str());
         return -EINVAL;
     }
 
@@ -709,10 +713,11 @@ int UartEndpoint::write_msg(const struct buffer *pbuf)
     /* Incomplete packet, we warn and discard the rest */
     if (r != (ssize_t)pbuf->len) {
         _incomplete_msgs++;
-        log_debug("Discarding packet, incomplete write %zd but len=%u", r, pbuf->len);
+        log_debug("UART %s: Discarding packet, incomplete write %zd but len=%u", _name.c_str(), r,
+                  pbuf->len);
     }
 
-    log_debug("UART [%d] wrote %zd bytes", fd, r);
+    log_debug("UART [%d]%s: Wrote %zd bytes", fd, _name.c_str(), r);
 
     return r;
 }
@@ -734,8 +739,8 @@ int UartEndpoint::add_speeds(const std::vector<speed_t> &bauds)
     return 0;
 }
 
-UdpEndpoint::UdpEndpoint()
-    : Endpoint{"UDP"}
+UdpEndpoint::UdpEndpoint(std::string name)
+    : Endpoint{ENDPOINT_TYPE_UDP, std::move(name)}
 {
     bzero(&sockaddr, sizeof(sockaddr));
     bzero(&sockaddr6, sizeof(sockaddr6));
@@ -745,7 +750,7 @@ int UdpEndpoint::open_ipv6(const char *ip, unsigned long port, bool server)
 {
     fd = socket(AF_INET6, SOCK_DGRAM, 0);
     if (fd < 0) {
-        log_error("Could not create IPv6 socket (%m)");
+        log_error("Could not create IPv6 socket for %s:%lu (%m)", ip, port);
         return -errno;
     }
 
@@ -763,7 +768,7 @@ int UdpEndpoint::open_ipv6(const char *ip, unsigned long port, bool server)
         struct ipv6_mreq group;
         inet_pton(AF_INET6, ip_str, &group.ipv6mr_multiaddr);
         if (setsockopt(fd, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, &group, sizeof(group)) < 0) {
-            log_error("Error setting IPv6 multicast socket options (%m)");
+            log_error("Error setting IPv6 multicast socket options for %s:%lu (%m)", ip, port);
             goto fail;
         }
     } else {
@@ -777,7 +782,7 @@ int UdpEndpoint::open_ipv6(const char *ip, unsigned long port, bool server)
 
     if (server) {
         if (bind(fd, (struct sockaddr *)&sockaddr6, sizeof(sockaddr6)) < 0) {
-            log_error("Error binding IPv6 socket (%m)");
+            log_error("Error binding IPv6 socket for %s:%lu (%m)", ip, port);
             goto fail;
         }
         sockaddr6.sin6_port = 0;
@@ -797,7 +802,7 @@ int UdpEndpoint::open_ipv4(const char *ip, unsigned long port, bool server)
 {
     fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (fd < 0) {
-        log_error("Could not create IPv4 socket (%m)");
+        log_error("Could not create IPv4 socket for %s:%lu (%m)", ip, port);
         return -errno;
     }
 
@@ -807,7 +812,7 @@ int UdpEndpoint::open_ipv4(const char *ip, unsigned long port, bool server)
 
     if (server) {
         if (bind(fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) < 0) {
-            log_error("Error binding IPv4 socket (%m)");
+            log_error("Error binding IPv4 socket for %s:%lu (%m)", ip, port);
             goto fail;
         }
         sockaddr.sin_port = 0;
@@ -841,17 +846,21 @@ int UdpEndpoint::open(const char *ip, unsigned long port, bool server)
     // common setup
     if (!server) {
         if (setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &broadcast_val, sizeof(broadcast_val))) {
-            log_error("Error enabling broadcast in socket (%m)");
+            log_error("Error enabling broadcast in socket for %s:%lu (%m)", ip, port);
             goto fail;
         }
     }
 
     if (fcntl(fd, F_SETFL, O_NONBLOCK | FASYNC) < 0) {
-        log_error("Error setting socket fd as non-blocking (%m)");
+        log_error("Error setting socket fd as non-blocking for %s:%lu (%m)", ip, port);
         goto fail;
     }
 
-    log_info("Open UDP [%d] %s:%lu %c", fd, ip, port, server ? '*' : ' ');
+    if (server) {
+        log_info("Opened UDP Server [%d]%s: %s:%lu", fd, _name.c_str(), ip, port);
+    } else {
+        log_info("Opened UDP Client [%d]%s: %s:%lu", fd, _name.c_str(), ip, port);
+    }
 
     return fd;
 
@@ -894,7 +903,7 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
     socklen_t addrlen;
 
     if (fd < 0) {
-        log_error("Trying to write invalid fd");
+        log_error("UDP %s: Trying to write invalid fd", _name.c_str());
         return -EINVAL;
     }
 
@@ -915,14 +924,14 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
     }
 
     if (!sock_connected) {
-        log_debug("No one ever connected to %d. No one to write for", fd);
+        log_debug("UDP %s: No one ever connected to us. No one to write for", _name.c_str());
         return 0;
     }
 
     ssize_t r = ::sendto(fd, pbuf->data, pbuf->len, 0, sock, addrlen);
     if (r == -1) {
         if (errno != EAGAIN && errno != ECONNREFUSED && errno != ENETUNREACH) {
-            log_error("Error sending udp packet (%m)");
+            log_error("UDP %s: Error sending udp packet (%m)", _name.c_str());
         }
         return -errno;
     };
@@ -933,16 +942,17 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
     /* Incomplete packet, we warn and discard the rest */
     if (r != (ssize_t)pbuf->len) {
         _incomplete_msgs++;
-        log_debug("Discarding packet, incomplete write %zd but len=%u", r, pbuf->len);
+        log_debug("UDP %s: Discarding packet, incomplete write %zd but len=%u", _name.c_str(), r,
+                  pbuf->len);
     }
 
-    log_debug("UDP [%d] wrote %zd bytes", fd, r);
+    log_debug("UDP [%d]%s: Wrote %zd bytes", fd, _name.c_str(), r);
 
     return r;
 }
 
-TcpEndpoint::TcpEndpoint()
-    : Endpoint{"TCP"}
+TcpEndpoint::TcpEndpoint(std::string name)
+    : Endpoint{ENDPOINT_TYPE_TCP, std::move(name)}
 {
     bzero(&sockaddr, sizeof(sockaddr));
     bzero(&sockaddr6, sizeof(sockaddr6));
@@ -951,7 +961,6 @@ TcpEndpoint::TcpEndpoint()
 TcpEndpoint::~TcpEndpoint()
 {
     close();
-    free(_ip);
 }
 
 int TcpEndpoint::accept(int listener_fd)
@@ -972,11 +981,11 @@ int TcpEndpoint::accept(int listener_fd)
         return -1;
     }
 
-    log_info("TCP connection [%d] accepted", fd);
+    log_info("TCP [%d]%s: Connection accepted", fd, _name.c_str());
 
     int tcp_nodelay_state = 1;
     if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&tcp_nodelay_state, sizeof(int)) < 0) {
-        log_error("Setting TCP_NODELAY failed [%d]", fd);
+        log_error("Error setting TCP_NODELAY on [%d]%s", fd, _name.c_str());
         return -1;
     }
 
@@ -987,7 +996,7 @@ int TcpEndpoint::open_ipv6(const char *ip, unsigned long port)
 {
     fd = socket(AF_INET6, SOCK_STREAM, 0);
     if (fd == -1) {
-        log_error("Could not create IPv6 socket (%m)");
+        log_error("Could not create IPv6 socket for %s:%lu (%m)", ip, port);
         return -1;
     }
 
@@ -997,7 +1006,7 @@ int TcpEndpoint::open_ipv6(const char *ip, unsigned long port)
 
     /* multicast address is not allowed for TCP sockets */
     if (ipv6_is_multicast(ip_str)) {
-        log_error("TCP socket does not support multicast address");
+        log_error("TCP endpoints do not support multicast address");
         goto fail;
     }
 
@@ -1024,7 +1033,7 @@ int TcpEndpoint::open_ipv4(const char *ip, unsigned long port)
 {
     fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd == -1) {
-        log_error("Could not create IPv4 socket (%m)");
+        log_error("Could not create IPv4 socket for %s:%lu (%m)", ip, port);
         return -1;
     }
 
@@ -1035,28 +1044,23 @@ int TcpEndpoint::open_ipv4(const char *ip, unsigned long port)
     return fd;
 }
 
-int TcpEndpoint::open(const char *ip, unsigned long port)
+int TcpEndpoint::open(const std::string &ip, unsigned long port)
 {
-    struct sockaddr *sock;
-    socklen_t addrlen;
+    // save IP and port for retry callback
+    _ip = ip;
+    _port = port;
 
-    if (!_ip || strcmp(ip, _ip)) {
-        free(_ip);
-        _ip = strdup(ip);
-        _port = port;
-    }
-
-    assert_or_return(_ip, -ENOMEM);
-
-    this->ipv6 = is_ipv6(ip);
+    this->ipv6 = is_ipv6(ip.c_str());
 
     // setup the special ipv6/ipv4 part
+    struct sockaddr *sock;
+    socklen_t addrlen;
     if (this->ipv6) {
-        open_ipv6(ip, port);
+        open_ipv6(ip.c_str(), port);
         sock = (struct sockaddr *)&this->sockaddr6;
         addrlen = sizeof(sockaddr6);
     } else {
-        open_ipv4(ip, port);
+        open_ipv4(ip.c_str(), port);
         sock = (struct sockaddr *)&this->sockaddr;
         addrlen = sizeof(sockaddr);
     }
@@ -1067,16 +1071,16 @@ int TcpEndpoint::open(const char *ip, unsigned long port)
 
     // common setup
     if (connect(fd, sock, addrlen) < 0) {
-        log_error("Error connecting to socket (%m)");
+        log_error("Error connecting to %s:%lu (%m)", ip.c_str(), port);
         goto fail;
     }
 
     if (fcntl(fd, F_SETFL, O_NONBLOCK | FASYNC) < 0) {
-        log_error("Error setting socket fd as non-blocking (%m)");
+        log_error("Error setting socket fd as non-blocking for %s:%lu (%m)", ip.c_str(), port);
         goto fail;
     }
 
-    log_info("Open TCP [%d] %s:%lu", fd, ip, port);
+    log_info("Opened TCP Client [%d]%s: %s:%lu", fd, _name.c_str(), ip.c_str(), port);
 
     _valid = true;
     return fd;
@@ -1123,7 +1127,7 @@ int TcpEndpoint::write_msg(const struct buffer *pbuf)
     socklen_t addrlen;
 
     if (fd < 0) {
-        log_error("Trying to write invalid fd");
+        log_error("TCP %s: Trying to write invalid fd", _name.c_str());
         return -EINVAL;
     }
 
@@ -1143,7 +1147,7 @@ int TcpEndpoint::write_msg(const struct buffer *pbuf)
     ssize_t r = ::sendto(fd, pbuf->data, pbuf->len, 0, sock, addrlen);
     if (r == -1) {
         if (errno != EAGAIN && errno != ECONNREFUSED) {
-            log_error("Error sending tcp packet (%m)");
+            log_error("TCP %s: Error sending tcp packet (%m)", _name.c_str());
         }
         if (errno == EPIPE) {
             _valid = false;
@@ -1157,10 +1161,11 @@ int TcpEndpoint::write_msg(const struct buffer *pbuf)
     /* Incomplete packet, we warn and discard the rest */
     if (r != (ssize_t)pbuf->len) {
         _incomplete_msgs++;
-        log_debug("Discarding packet, incomplete write %zd but len=%u", r, pbuf->len);
+        log_debug("TCP %s: Discarding packet, incomplete write %zd but len=%u", _name.c_str(), r,
+                  pbuf->len);
     }
 
-    log_debug("TCP [%d] wrote %zd bytes", fd, r);
+    log_debug("TCP [%d]%s: Wrote %zd bytes", fd, _name.c_str(), r);
 
     return r;
 }
@@ -1170,7 +1175,7 @@ void TcpEndpoint::close()
     if (fd > -1) {
         ::close(fd);
 
-        log_info("TCP Connection [%d] closed", fd);
+        log_info("TCP [%d]%s: Connection closed", fd, _name.c_str());
     }
 
     fd = -1;

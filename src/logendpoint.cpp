@@ -33,6 +33,7 @@
 #include <memory>
 #include <string>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 #include <common/log.h>
@@ -43,9 +44,9 @@
 #define ALIVE_TIMEOUT 5
 #define MAX_RETRIES   10
 
-LogEndpoint::LogEndpoint(const char *name, const char *logs_dir, LogMode mode,
+LogEndpoint::LogEndpoint(std::string name, const char *logs_dir, LogMode mode,
                          unsigned long min_free_space, unsigned long max_files)
-    : Endpoint{name}
+    : Endpoint{ENDPOINT_TYPE_LOG, std::move(name)}
     , _logs_dir{logs_dir}
     , _min_free_space(min_free_space)
     , _max_files(max_files)

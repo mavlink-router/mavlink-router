@@ -46,7 +46,7 @@ struct LogOptions {
 
 class LogEndpoint : public Endpoint {
 public:
-    LogEndpoint(const char *name, const char *logs_dir, LogMode mode, unsigned long min_free_space,
+    LogEndpoint(std::string name, const char *logs_dir, LogMode mode, unsigned long min_free_space,
                 unsigned long max_files);
 
     virtual bool start();

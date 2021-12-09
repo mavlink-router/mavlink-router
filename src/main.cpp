@@ -208,7 +208,7 @@ static int parse_argv(int argc, char *argv[], Configuration &config)
             char *ip;
             unsigned long port;
             UdpEndpointConfig opt_udp{};
-            opt_udp.name = "";
+            opt_udp.name = "CLI";
 
             if (split_on_last_colon(optarg, &ip, &port) < 0) {
                 log_error("Invalid port in argument: %s", optarg);
@@ -269,7 +269,7 @@ static int parse_argv(int argc, char *argv[], Configuration &config)
             unsigned long port;
 
             TcpEndpointConfig opt_tcp{};
-            opt_tcp.name = "";
+            opt_tcp.name = "CLI";
 
             if (split_on_last_colon(optarg, &ip, &port) < 0) {
                 log_error("Invalid port in argument: %s", optarg);
@@ -324,7 +324,7 @@ static int parse_argv(int argc, char *argv[], Configuration &config)
 
         if (stat(base, &st) == -1 || !S_ISCHR(st.st_mode)) {
             UdpEndpointConfig opt_udp{};
-            opt_udp.name = "";
+            opt_udp.name = "CLI";
 
             opt_udp.port = number;
             if (ULONG_MAX == opt_udp.port) {
@@ -345,7 +345,7 @@ static int parse_argv(int argc, char *argv[], Configuration &config)
             config.udp_configs.push_back(opt_udp);
         } else {
             UartEndpointConfig opt_uart{};
-            opt_uart.name = "";
+            opt_uart.name = "CLI";
             opt_uart.device = std::string(base);
 
             const char *bauds = number != ULONG_MAX ? base + strlen(base) + 1 : nullptr;

@@ -237,7 +237,9 @@ void Mainloop::_add_tcp_endpoint(TcpEndpoint *tcp)
 
 void Mainloop::handle_tcp_connection()
 {
-    auto *tcp = new TcpEndpoint{};
+    log_debug("TCP Server: New client");
+
+    auto *tcp = new TcpEndpoint{"dynamic"};
     tcp->retry_timeout = 0; // disable retry on dynamic endpoints by the TCP server
 
     int fd = tcp->accept(g_tcp_fd);
@@ -247,11 +249,10 @@ void Mainloop::handle_tcp_connection()
 
     _add_tcp_endpoint(tcp);
 
-    log_debug("Accepted TCP connection on [%d]", fd);
     return;
 
 accept_error:
-    log_error("Could not accept TCP connection (%m)");
+    log_error("TCP Server: Could not accept TCP connection (%m)");
     delete tcp;
 }
 
@@ -374,7 +375,7 @@ bool Mainloop::add_endpoints(const Configuration &config)
 {
     // Create UART and UDP endpoints
     for (const auto &conf : config.uart_configs) {
-        auto uart = std::make_shared<UartEndpoint>();
+        auto uart = std::make_shared<UartEndpoint>(conf.name);
         if (uart->open(conf.device.c_str()) < 0) {
             return false;
         }
@@ -405,7 +406,7 @@ bool Mainloop::add_endpoints(const Configuration &config)
     }
 
     for (const auto &conf : config.udp_configs) {
-        auto udp = std::make_shared<UdpEndpoint>();
+        auto udp = std::make_shared<UdpEndpoint>(conf.name);
 
         bool is_server_mode = (UdpEndpointConfig::Mode::Server == conf.mode);
         if (udp->open(conf.address.c_str(), conf.port, is_server_mode) < 0) {
@@ -424,7 +425,7 @@ bool Mainloop::add_endpoints(const Configuration &config)
 
     // Create TCP endpoints
     for (const auto &conf : config.tcp_configs) {
-        std::unique_ptr<TcpEndpoint> tcp{new TcpEndpoint{}};
+        std::unique_ptr<TcpEndpoint> tcp{new TcpEndpoint{conf.name}};
 
         tcp->retry_timeout = conf.retry_timeout;
 
@@ -432,8 +433,8 @@ bool Mainloop::add_endpoints(const Configuration &config)
             tcp->filter_add_allowed_msg_id(msg_id);
         }
 
-        if (tcp->open(conf.address.c_str(), conf.port) < 0) {
-            log_error("Could not open %s:%ld", conf.address.c_str(), conf.port);
+        if (tcp->open(conf.address, conf.port) < 0) {
+            log_warning("Could not open %s:%ld, re-trying", conf.address.c_str(), conf.port);
             if (tcp->retry_timeout > 0) {
                 _add_tcp_retry(tcp.release());
             }
@@ -489,7 +490,7 @@ int Mainloop::tcp_open(unsigned long tcp_port)
 
     fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
     if (fd == -1) {
-        log_error("Could not create tcp socket (%m)");
+        log_error("TCP Server: Could not create tcp socket (%m)");
         return -1;
     }
 
@@ -500,20 +501,20 @@ int Mainloop::tcp_open(unsigned long tcp_port)
     sockaddr.sin_addr.s_addr = INADDR_ANY;
 
     if (bind(fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) < 0) {
-        log_error("Could not bind to tcp socket (%m)");
+        log_error("TCP Server: Could not bind to tcp socket (%m)");
         close(fd);
         return -1;
     }
 
     if (listen(fd, SOMAXCONN) < 0) {
-        log_error("Could not listen on tcp socket (%m)");
+        log_error("TCP Server: Could not listen on tcp socket (%m)");
         close(fd);
         return -1;
     }
 
     add_fd(fd, &g_tcp_fd, EPOLLIN);
 
-    log_info("Open TCP [%d] 0.0.0.0:%lu *", fd, tcp_port);
+    log_info("Opened TCP Server [%d] 0.0.0.0:%lu", fd, tcp_port);
 
     return fd;
 }
@@ -599,7 +600,7 @@ void Mainloop::_add_tcp_retry(TcpEndpoint *tcp)
     if (t == nullptr) {
         log_warning("Could not create retry timeout for TCP endpoint %s:%lu\n"
                     "No attempts to reconnect will be made",
-                    tcp->get_ip(), tcp->get_port());
+                    tcp->get_ip().c_str(), tcp->get_port());
     }
 }
 
