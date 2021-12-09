@@ -17,6 +17,7 @@
  */
 #pragma once
 
+#include <common/conf_file.h>
 #include <common/mavlink.h>
 
 #include <memory>
@@ -27,6 +28,8 @@
 #include "comm.h"
 #include "pollable.h"
 #include "timeout.h"
+
+#define DEFAULT_BAUDRATE 115200U
 
 #define ENDPOINT_TYPE_UART "UART"
 #define ENDPOINT_TYPE_UDP  "UDP"
@@ -198,6 +201,11 @@ public:
     int set_flow_control(bool enabled);
     int add_speeds(const std::vector<speed_t> &bauds);
 
+    static const ConfFile::OptionsTable option_table[4];
+    static const char *section_pattern;
+    static int parse_baudrates(const char *val, size_t val_len, void *storage, size_t storage_len);
+    static bool validate_config(const UartEndpointConfig &config);
+
 protected:
     int read_msg(struct buffer *pbuf, int *target_sysid, int *target_compid, uint8_t *src_sysid,
                  uint8_t *src_compid, uint32_t *msg_id) override;
@@ -226,6 +234,11 @@ public:
     struct sockaddr_in6 sockaddr6;
 
     bool ipv6;
+
+    static const ConfFile::OptionsTable option_table[5];
+    static const char *section_pattern;
+    static int parse_udp_mode(const char *val, size_t val_len, void *storage, size_t storage_len);
+    static bool validate_config(const UdpEndpointConfig &config);
 
 protected:
     int open_ipv4(const char *ip, unsigned long port, UdpEndpointConfig::Mode mode);
@@ -257,6 +270,10 @@ public:
 
     bool is_valid() override { return _valid; };
     bool is_critical() override { return false; };
+
+    static const ConfFile::OptionsTable option_table[4];
+    static const char *section_pattern;
+    static bool validate_config(const TcpEndpointConfig &config);
 
 protected:
     int open_ipv4(const char *ip, unsigned long port);

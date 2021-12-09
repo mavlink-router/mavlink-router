@@ -17,6 +17,8 @@
  */
 #pragma once
 
+#include <common/conf_file.h>
+
 #include <aio.h>
 #include <assert.h>
 #include <dirent.h>
@@ -58,6 +60,11 @@ public:
      * lost power.
      */
     void mark_unfinished_logs();
+
+    static const ConfFile::OptionsTable option_table[5];
+    static int parse_mavlink_dialect(const char *val, size_t val_len, void *storage,
+                                     size_t storage_len);
+    static int parse_log_mode(const char *val, size_t val_len, void *storage, size_t storage_len);
 
 protected:
     const char *_logs_dir;

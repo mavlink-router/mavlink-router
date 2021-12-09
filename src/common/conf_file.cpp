@@ -507,6 +507,28 @@ int ConfFile::parse_stdstring(const char *val, size_t val_len, void *storage, si
     return 0;
 }
 
+int ConfFile::parse_uint8_vector(const char *val, size_t val_len, void *storage, size_t storage_len)
+{
+    assert(val);
+    assert(storage);
+    assert(val_len);
+
+    if (storage_len < sizeof(bool)) {
+        return -ENOBUFS;
+    }
+
+    char *filter_string = strndupa(val, val_len);
+    auto *target = (std::vector<uint8_t> *)storage;
+
+    char *token = strtok(filter_string, ",");
+    while (token != nullptr) {
+        target->push_back(atoi(token));
+        token = strtok(nullptr, ",");
+    }
+
+    return 0;
+}
+
 int ConfFile::parse_bool(const char *val, size_t val_len, void *storage, size_t storage_len)
 {
     bool *b = (bool *)storage;

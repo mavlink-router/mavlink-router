@@ -18,6 +18,8 @@
 #include "endpoint.h"
 
 #include <algorithm>
+#include <climits>
+#include <regex>
 #include <utility>
 
 #include <arpa/inet.h>
@@ -49,6 +51,42 @@
 
 #define UART_BAUD_RETRY_SEC 5
 
+const char *UartEndpoint::section_pattern = "uartendpoint *";
+const ConfFile::OptionsTable UartEndpoint::option_table[] = {
+    {"baud", false, UartEndpoint::parse_baudrates,
+     OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, baudrates)},
+    {"device", true, ConfFile::parse_stdstring,
+     OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, device)},
+    {"FlowControl", false, ConfFile::parse_bool,
+     OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, flowcontrol)},
+    {"AllowMsgIdOut", false, ConfFile::parse_uint8_vector,
+     OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, allow_msg_id_out)},
+};
+
+const char *UdpEndpoint::section_pattern = "udpendpoint *";
+const ConfFile::OptionsTable UdpEndpoint::option_table[] = {
+    {"address", true, ConfFile::parse_stdstring,
+     OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, address)},
+    {"mode", true, UdpEndpoint::parse_udp_mode,
+     OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, mode)},
+    {"port", false, ConfFile::parse_ul, OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, port)},
+    {"filter", false, ConfFile::parse_uint8_vector,
+     OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_msg_id_out)}, // legacy AllowMsgIdOut
+    {"AllowMsgIdOut", false, ConfFile::parse_uint8_vector,
+     OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_msg_id_out)},
+};
+
+const char *TcpEndpoint::section_pattern = "tcpendpoint *";
+const ConfFile::OptionsTable TcpEndpoint::option_table[] = {
+    {"address", true, ConfFile::parse_stdstring,
+     OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, address)},
+    {"port", true, ConfFile::parse_ul, OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, port)},
+    {"RetryTimeout", false, ConfFile::parse_i,
+     OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, retry_timeout)},
+    {"AllowMsgIdOut", false, ConfFile::parse_uint8_vector,
+     OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_msg_id_out)},
+};
+
 static bool is_ipv6(const char *ip)
 {
     /* Square brackets always exist on IPv6 addresses b/c of input validation */
@@ -65,6 +103,24 @@ static bool ipv6_is_multicast(const char *ip)
 {
     /* link-local addresses start with ff0x */
     return strncmp(ip, "ff0", 3) == 0;
+}
+
+static bool validate_ipv6(const std::string &ip)
+{
+    // simplyfied pattern
+    std::regex ipv6_regex("\\[(([a-f\\d]{0,4}:)+[a-f\\d]{0,4})\\]");
+    return std::regex_match(ip, ipv6_regex);
+}
+
+static bool validate_ipv4(const std::string &ip)
+{
+    std::regex ipv4_regex("(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})");
+    return regex_match(ip, ipv4_regex);
+}
+
+static bool validate_ip(const std::string &ip)
+{
+    return validate_ipv4(ip) || validate_ipv6(ip);
 }
 
 static unsigned int ipv6_get_scope_id(const char *ip)
@@ -739,6 +795,45 @@ int UartEndpoint::add_speeds(const std::vector<speed_t> &bauds)
     return 0;
 }
 
+int UartEndpoint::parse_baudrates(const char *val, size_t val_len, void *storage,
+                                  size_t storage_len)
+{
+    assert(val);
+    assert(storage);
+    assert(val_len);
+
+    if (storage_len < sizeof(bool)) {
+        return -ENOBUFS;
+    }
+
+    char *filter_string = strndupa(val, val_len);
+    auto *target = (std::vector<speed_t> *)storage;
+
+    char *token = strtok(filter_string, ",");
+    while (token != nullptr) {
+        target->push_back(atoi(token));
+        token = strtok(nullptr, ",");
+    }
+    target->push_back(DEFAULT_BAUDRATE);
+
+    return 0;
+}
+
+bool UartEndpoint::validate_config(const UartEndpointConfig &config)
+{
+    if (config.baudrates.empty()) {
+        log_error("UartEndpoint %s: Baudrate list must not be empty", config.name.c_str());
+        return false;
+    }
+
+    if (config.device.empty()) {
+        log_error("UartEndpoint %s: Device must be specified", config.name.c_str());
+        return false;
+    }
+
+    return true;
+}
+
 UdpEndpoint::UdpEndpoint(std::string name)
     : Endpoint{ENDPOINT_TYPE_UDP, std::move(name)}
 {
@@ -949,6 +1044,62 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
     log_debug("UDP [%d]%s: Wrote %zd bytes", fd, _name.c_str(), r);
 
     return r;
+}
+
+int UdpEndpoint::parse_udp_mode(const char *val, size_t val_len, void *storage, size_t storage_len)
+{
+    assert(val);
+    assert(storage);
+    assert(val_len);
+
+    if (storage_len < sizeof(bool)) {
+        return -ENOBUFS;
+    }
+    if (val_len > INT_MAX) {
+        return -EINVAL;
+    }
+
+    auto *udp_mode = (UdpEndpointConfig::Mode *)storage;
+    if (memcaseeq(val, val_len, "normal", sizeof("normal") - 1)) {
+        *udp_mode = UdpEndpointConfig::Mode::Client;
+    } else if (memcaseeq(val, val_len, "eavesdropping", sizeof("eavesdropping") - 1)) {
+        log_warning("Eavesdropping mode is deprecated and rather act like udpin/server");
+        *udp_mode = UdpEndpointConfig::Mode::Server;
+    } else if (memcaseeq(val, val_len, "server", sizeof("server") - 1)) {
+        *udp_mode = UdpEndpointConfig::Mode::Server;
+    } else {
+        log_error("Unknown 'mode' key: %.*s", (int)val_len, val);
+        return -EINVAL;
+    }
+
+    return 0;
+}
+
+bool UdpEndpoint::validate_config(const UdpEndpointConfig &config)
+{
+    if (config.address.empty()) {
+        log_error("UdpEndpoint %s: IP address must be specified", config.name.c_str());
+        return false;
+    }
+
+    if (!validate_ip(config.address)) {
+        log_error("UdpEndpoint %s: Invalid IP address %s", config.name.c_str(),
+                  config.address.c_str());
+        return false;
+    }
+
+    if (config.mode == UdpEndpointConfig::Mode::Server && config.port == ULONG_MAX) {
+        log_error("UdpEndpoint %s: Port is required in Server mode", config.name.c_str());
+        return false;
+    }
+
+    if (config.port == 0 || config.port == ULONG_MAX) {
+        log_error("UdpEndpoint %s: Invalid or unset UDP port %lu", config.name.c_str(),
+                  config.port);
+        return false;
+    }
+
+    return true;
 }
 
 TcpEndpoint::TcpEndpoint(std::string name)
@@ -1179,4 +1330,26 @@ void TcpEndpoint::close()
     }
 
     fd = -1;
+}
+
+bool TcpEndpoint::validate_config(const TcpEndpointConfig &config)
+{
+    if (config.address.empty()) {
+        log_error("TcpEndpoint %s: IP address must be specified", config.name.c_str());
+        return false;
+    }
+
+    if (!validate_ip(config.address)) {
+        log_error("TcpEndpoint %s: Invalid IP address %s", config.name.c_str(),
+                  config.address.c_str());
+        return false;
+    }
+
+    if (config.port == 0 || config.port == ULONG_MAX) {
+        log_error("TcpEndpoint %s: Invalid or unset TCP port %lu", config.name.c_str(),
+                  config.port);
+        return false;
+    }
+
+    return true;
 }

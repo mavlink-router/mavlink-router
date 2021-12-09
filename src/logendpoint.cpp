@@ -44,6 +44,18 @@
 #define ALIVE_TIMEOUT 5
 #define MAX_RETRIES   10
 
+const ConfFile::OptionsTable LogEndpoint::option_table[] = {
+    {"Log", false, ConfFile::parse_str_dup, OPTIONS_TABLE_STRUCT_FIELD(LogOptions, logs_dir)},
+    {"LogMode", false, LogEndpoint::parse_log_mode,
+     OPTIONS_TABLE_STRUCT_FIELD(LogOptions, log_mode)},
+    {"MavlinkDialect", false, LogEndpoint::parse_mavlink_dialect,
+     OPTIONS_TABLE_STRUCT_FIELD(LogOptions, mavlink_dialect)},
+    {"MinFreeSpace", false, ConfFile::parse_ul,
+     OPTIONS_TABLE_STRUCT_FIELD(LogOptions, min_free_space)},
+    {"MaxLogFiles", false, ConfFile::parse_ul,
+     OPTIONS_TABLE_STRUCT_FIELD(LogOptions, max_log_files)},
+};
+
 LogEndpoint::LogEndpoint(std::string name, const char *logs_dir, LogMode mode,
                          unsigned long min_free_space, unsigned long max_files)
     : Endpoint{ENDPOINT_TYPE_LOG, std::move(name)}
@@ -453,3 +465,63 @@ void LogEndpoint::_handle_auto_start_stop(uint32_t msg_id, uint8_t source_system
         }
     }
 }
+
+int LogEndpoint::parse_mavlink_dialect(const char *val, size_t val_len, void *storage,
+                                       size_t storage_len)
+{
+    assert(val);
+    assert(storage);
+    assert(val_len);
+
+    auto *dialect = (LogOptions::MavDialect *)storage;
+
+    if (storage_len < sizeof(LogOptions::mavlink_dialect)) {
+        return -ENOBUFS;
+    }
+    if (val_len > INT_MAX) {
+        return -EINVAL;
+    }
+
+    if (memcaseeq(val, val_len, "auto", sizeof("auto") - 1)) {
+        *dialect = LogOptions::MavDialect::Auto;
+    } else if (memcaseeq(val, val_len, "common", sizeof("common") - 1)) {
+        *dialect = LogOptions::MavDialect::Common;
+    } else if (memcaseeq(val, val_len, "ardupilotmega", sizeof("ardupilotmega") - 1)) {
+        *dialect = LogOptions::MavDialect::Ardupilotmega;
+    } else {
+        log_error("Invalid argument for MavlinkDialect = %.*s", (int)val_len, val);
+        return -EINVAL;
+    }
+
+    return 0;
+}
+
+#define MAX_LOG_MODE_SIZE 20
+int LogEndpoint::parse_log_mode(const char *val, size_t val_len, void *storage, size_t storage_len)
+{
+    assert(val);
+    assert(storage);
+    assert(val_len);
+
+    if (storage_len < sizeof(LogOptions::log_mode)) {
+        return -ENOBUFS;
+    }
+    if (val_len > MAX_LOG_MODE_SIZE) {
+        return -EINVAL;
+    }
+
+    const char *log_mode_str = strndupa(val, val_len);
+    LogMode log_mode;
+    if (strcaseeq(log_mode_str, "always")) {
+        log_mode = LogMode::always;
+    } else if (strcaseeq(log_mode_str, "while-armed")) {
+        log_mode = LogMode::while_armed;
+    } else {
+        log_error("Invalid argument for LogMode = %s", log_mode_str);
+        return -EINVAL;
+    }
+    *((LogMode *)storage) = log_mode;
+
+    return 0;
+}
+#undef MAX_LOG_MODE_SIZE
