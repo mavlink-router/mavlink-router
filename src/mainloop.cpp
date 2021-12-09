@@ -380,8 +380,7 @@ bool Mainloop::add_endpoints(const Configuration &config)
     for (const auto &conf : config.udp_configs) {
         auto udp = std::make_shared<UdpEndpoint>(conf.name);
 
-        bool is_server_mode = (UdpEndpointConfig::Mode::Server == conf.mode);
-        if (udp->open(conf.address.c_str(), conf.port, is_server_mode) < 0) {
+        if (udp->open(conf.address.c_str(), conf.port, conf.mode) < 0) {
             log_error("Could not open %s:%ld", conf.address.c_str(), conf.port);
             return false;
         }

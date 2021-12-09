@@ -219,7 +219,8 @@ public:
     int write_msg(const struct buffer *pbuf) override;
     int flush_pending_msgs() override { return -ENOSYS; }
 
-    int open(const char *ip, unsigned long port, bool server = false);
+    int open(const char *ip, unsigned long port,
+             UdpEndpointConfig::Mode mode = UdpEndpointConfig::Mode::Client);
 
     struct sockaddr_in sockaddr;
     struct sockaddr_in6 sockaddr6;
@@ -227,8 +228,8 @@ public:
     bool ipv6;
 
 protected:
-    int open_ipv4(const char *ip, unsigned long port, bool server);
-    int open_ipv6(const char *ip, unsigned long port, bool server);
+    int open_ipv4(const char *ip, unsigned long port, UdpEndpointConfig::Mode mode);
+    int open_ipv6(const char *ip, unsigned long port, UdpEndpointConfig::Mode mode);
 
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
 };

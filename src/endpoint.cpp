@@ -746,7 +746,7 @@ UdpEndpoint::UdpEndpoint(std::string name)
     bzero(&sockaddr6, sizeof(sockaddr6));
 }
 
-int UdpEndpoint::open_ipv6(const char *ip, unsigned long port, bool server)
+int UdpEndpoint::open_ipv6(const char *ip, unsigned long port, UdpEndpointConfig::Mode mode)
 {
     fd = socket(AF_INET6, SOCK_DGRAM, 0);
     if (fd < 0) {
@@ -762,7 +762,7 @@ int UdpEndpoint::open_ipv6(const char *ip, unsigned long port, bool server)
     sockaddr6.sin6_port = htons(port);
 
     /* multicast address needs to listen to all, but "filter" incoming packets */
-    if (server && ipv6_is_multicast(ip_str)) {
+    if (mode == UdpEndpointConfig::Mode::Server && ipv6_is_multicast(ip_str)) {
         sockaddr6.sin6_addr = in6addr_any;
 
         struct ipv6_mreq group;
@@ -780,7 +780,7 @@ int UdpEndpoint::open_ipv6(const char *ip, unsigned long port, bool server)
         sockaddr6.sin6_scope_id = ipv6_get_scope_id(ip_str);
     }
 
-    if (server) {
+    if (mode == UdpEndpointConfig::Mode::Server) {
         if (bind(fd, (struct sockaddr *)&sockaddr6, sizeof(sockaddr6)) < 0) {
             log_error("Error binding IPv6 socket for %s:%lu (%m)", ip, port);
             goto fail;
@@ -798,7 +798,7 @@ fail:
     return -EINVAL;
 }
 
-int UdpEndpoint::open_ipv4(const char *ip, unsigned long port, bool server)
+int UdpEndpoint::open_ipv4(const char *ip, unsigned long port, UdpEndpointConfig::Mode mode)
 {
     fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (fd < 0) {
@@ -810,7 +810,7 @@ int UdpEndpoint::open_ipv4(const char *ip, unsigned long port, bool server)
     sockaddr.sin_addr.s_addr = inet_addr(ip);
     sockaddr.sin_port = htons(port);
 
-    if (server) {
+    if (mode == UdpEndpointConfig::Mode::Server) {
         if (bind(fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) < 0) {
             log_error("Error binding IPv4 socket for %s:%lu (%m)", ip, port);
             goto fail;
@@ -826,7 +826,7 @@ fail:
     return -EINVAL;
 }
 
-int UdpEndpoint::open(const char *ip, unsigned long port, bool server)
+int UdpEndpoint::open(const char *ip, unsigned long port, UdpEndpointConfig::Mode mode)
 {
     const int broadcast_val = 1;
 
@@ -834,9 +834,9 @@ int UdpEndpoint::open(const char *ip, unsigned long port, bool server)
 
     // setup the special ipv6/ipv4 part
     if (this->ipv6) {
-        open_ipv6(ip, port, server);
+        open_ipv6(ip, port, mode);
     } else {
-        open_ipv4(ip, port, server);
+        open_ipv4(ip, port, mode);
     }
 
     if (fd < 0) {
@@ -844,7 +844,7 @@ int UdpEndpoint::open(const char *ip, unsigned long port, bool server)
     }
 
     // common setup
-    if (!server) {
+    if (mode == UdpEndpointConfig::Mode::Client) {
         if (setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &broadcast_val, sizeof(broadcast_val))) {
             log_error("Error enabling broadcast in socket for %s:%lu (%m)", ip, port);
             goto fail;
@@ -856,7 +856,7 @@ int UdpEndpoint::open(const char *ip, unsigned long port, bool server)
         goto fail;
     }
 
-    if (server) {
+    if (mode == UdpEndpointConfig::Mode::Server) {
         log_info("Opened UDP Server [%d]%s: %s:%lu", fd, _name.c_str(), ip, port);
     } else {
         log_info("Opened UDP Client [%d]%s: %s:%lu", fd, _name.c_str(), ip, port);
