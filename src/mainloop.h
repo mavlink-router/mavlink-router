@@ -94,9 +94,7 @@ public:
 private:
     static const unsigned int LOG_AGGREGATE_INTERVAL_SEC = 5;
 
-    // TCP endpoints are separarte b/c process_tcp_hangups() just needs TCP instances
     std::vector<std::shared_ptr<Endpoint>> g_endpoints{};
-    std::vector<std::shared_ptr<TcpEndpoint>> g_tcp_endpoints{};
     int g_tcp_fd = -1; ///< for TCP server
     std::shared_ptr<LogEndpoint> _log_endpoint{nullptr};
 

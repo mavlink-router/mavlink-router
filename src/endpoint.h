@@ -130,18 +130,20 @@ public:
     static uint8_t get_trimmed_zeros(const mavlink_msg_entry_t *msg_entry,
                                      const struct buffer *buffer);
 
-    bool has_sys_id(unsigned sysid);
-    bool has_sys_comp_id(unsigned sys_comp_id);
-    bool has_sys_comp_id(unsigned sysid, unsigned compid)
+    bool has_sys_id(unsigned sysid) const;
+    bool has_sys_comp_id(unsigned sys_comp_id) const;
+    bool has_sys_comp_id(unsigned sysid, unsigned compid) const
     {
         uint16_t sys_comp_id = ((sysid & 0xff) << 8) | (compid & 0xff);
         return has_sys_comp_id(sys_comp_id);
     }
 
     AcceptState accept_msg(int target_sysid, int target_compid, uint8_t src_sysid,
-                           uint8_t src_compid, uint32_t msg_id);
+                           uint8_t src_compid, uint32_t msg_id) const;
 
     void filter_add_allowed_msg_id(uint32_t msg_id) { _allowed_msg_ids.push_back(msg_id); }
+
+    std::string get_type() const { return this->_type; }
 
     struct buffer rx_buf;
     struct buffer tx_buf;

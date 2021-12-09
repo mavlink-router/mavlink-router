@@ -162,34 +162,11 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid
         case Endpoint::AcceptState::Accepted:
             log_debug("Endpoint [%d] accepted message %u to %d/%d from %u/%u", e->fd, msg_id,
                       target_sysid, target_compid, sender_sysid, sender_compid);
-            write_msg(e, buf);
-            unknown = false;
-            break;
-        case Endpoint::AcceptState::Filtered:
-            log_debug("Endpoint [%d] filtered out message %u to %d/%d from %u/%u", e->fd, msg_id,
-                      target_sysid, target_compid, sender_sysid, sender_compid);
-            unknown = false;
-            break;
-        case Endpoint::AcceptState::Rejected:
-            // fall through
-        default:
-            break; // do nothing (will count as unknown)
-        }
-    }
-
-    for (const auto &e : this->g_tcp_endpoints) {
-        auto acceptState
-            = e->accept_msg(target_sysid, target_compid, sender_sysid, sender_compid, msg_id);
-        switch (acceptState) {
-        case Endpoint::AcceptState::Accepted: {
-            log_debug("Endpoint [%d] accepted message %u to %d/%d from %u/%u", e->fd, msg_id,
-                      target_sysid, target_compid, sender_sysid, sender_compid);
-            int r = write_msg(e, buf);
-            if (r == -EPIPE) {
+            if (write_msg(e, buf) == -EPIPE) { // only TCP endpoints should return -EPIPE
                 should_process_tcp_hangups = true;
             }
             unknown = false;
-        } break;
+            break;
         case Endpoint::AcceptState::Filtered:
             log_debug("Endpoint [%d] filtered out message %u to %d/%d from %u/%u", e->fd, msg_id,
                       target_sysid, target_compid, sender_sysid, sender_compid);
@@ -211,13 +188,16 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid
 void Mainloop::process_tcp_hangups()
 {
     // Remove endpoints, which are invalid and have no retry timeout
-    for (auto it = g_tcp_endpoints.begin(); it != g_tcp_endpoints.end();) {
-        if (!it->get()->is_valid()) {
-            if (it->get()->retry_timeout > 0) {
-                _add_tcp_retry(it->get());
-                ++it;
-            } else {
-                it = g_tcp_endpoints.erase(it);
+    for (auto it = g_endpoints.begin(); it != g_endpoints.end();) {
+        if (it->get()->get_type() == ENDPOINT_TYPE_TCP) {
+            auto *tcp_endpoint = static_cast<TcpEndpoint *>(it->get());
+            if (!tcp_endpoint->is_valid()) {
+                if (tcp_endpoint->retry_timeout > 0) {
+                    _add_tcp_retry(tcp_endpoint);
+                    ++it;
+                } else {
+                    it = g_endpoints.erase(it);
+                }
             }
         } else {
             ++it;
@@ -229,9 +209,9 @@ void Mainloop::process_tcp_hangups()
 
 void Mainloop::_add_tcp_endpoint(TcpEndpoint *tcp)
 {
-    g_tcp_endpoints.emplace_back(tcp);
+    g_endpoints.emplace_back(tcp);
 
-    auto endpoint = g_tcp_endpoints.back();
+    auto endpoint = g_endpoints.back();
     this->add_fd(endpoint->fd, endpoint.get(), EPOLLIN);
 }
 
@@ -346,20 +326,12 @@ bool Mainloop::_log_aggregate_timeout(void *data)
     for (const auto &e : g_endpoints) {
         e->log_aggregate(LOG_AGGREGATE_INTERVAL_SEC);
     }
-
-    for (const auto &e : g_tcp_endpoints) {
-        e->log_aggregate(LOG_AGGREGATE_INTERVAL_SEC);
-    }
     return true;
 }
 
 void Mainloop::print_statistics()
 {
     for (const auto &e : g_endpoints) {
-        e->print_statistics();
-    }
-
-    for (const auto &e : g_tcp_endpoints) {
         e->print_statistics();
     }
 }

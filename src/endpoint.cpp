@@ -353,9 +353,9 @@ void Endpoint::_add_sys_comp_id(uint16_t sys_comp_id)
     _sys_comp_ids.push_back(sys_comp_id);
 }
 
-bool Endpoint::has_sys_id(unsigned sysid)
+bool Endpoint::has_sys_id(unsigned sysid) const
 {
-    for (auto &id : _sys_comp_ids) {
+    for (const auto &id : _sys_comp_ids) {
         if (((id >> 8) | (sysid & 0xff)) == sysid) {
             return true;
         }
@@ -363,9 +363,9 @@ bool Endpoint::has_sys_id(unsigned sysid)
     return false;
 }
 
-bool Endpoint::has_sys_comp_id(unsigned sys_comp_id)
+bool Endpoint::has_sys_comp_id(unsigned sys_comp_id) const
 {
-    for (auto &id : _sys_comp_ids) {
+    for (const auto &id : _sys_comp_ids) {
         if (sys_comp_id == id) {
             return true;
         }
@@ -375,13 +375,13 @@ bool Endpoint::has_sys_comp_id(unsigned sys_comp_id)
 }
 
 Endpoint::AcceptState Endpoint::accept_msg(int target_sysid, int target_compid, uint8_t src_sysid,
-                                           uint8_t src_compid, uint32_t msg_id)
+                                           uint8_t src_compid, uint32_t msg_id) const
 {
     if (Log::get_max_level() >= Log::Level::DEBUG) {
         log_debug("Endpoint [%d]%s: got message %u to %d/%d from %u/%u", fd, _name.c_str(), msg_id,
                   target_sysid, target_compid, src_sysid, src_compid);
         log_debug("\tKnown components:");
-        for (auto &id : _sys_comp_ids) {
+        for (const auto &id : _sys_comp_ids) {
             log_debug("\t\t%u/%u", (id >> 8), id & 0xff);
         }
     }
