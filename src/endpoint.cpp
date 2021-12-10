@@ -87,13 +87,13 @@ static bool is_ipv6(const char *ip)
 
 static bool ipv6_is_linklocal(const char *ip)
 {
-    /* link-local addresses start with fe80 */
-    return strncmp(ip, "fe80", 4) == 0;
+    /* link-local addresses start with fe80, ULA addresses are in fc::/7 range */
+    return (strncmp(ip, "fe80", 4) == 0 || strncmp(ip, "fc", 2) == 0 || strncmp(ip, "fd", 2) == 0);
 }
 
 static bool ipv6_is_multicast(const char *ip)
 {
-    /* link-local addresses start with ff0x */
+    /* multicast addresses start with ff0x (most of the time) */
     return strncmp(ip, "ff0", 3) == 0;
 }
 
