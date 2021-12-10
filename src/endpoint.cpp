@@ -1221,15 +1221,15 @@ bool UdpEndpoint::validate_config(const UdpEndpointConfig &config)
         return false;
     }
 
-    if (config.mode == UdpEndpointConfig::Mode::Server && config.port == ULONG_MAX) {
-        log_error("UdpEndpoint %s: Port is required in Server mode", config.name.c_str());
-        return false;
-    }
-
     if (config.port == 0 || config.port == ULONG_MAX) {
         log_error("UdpEndpoint %s: Invalid or unset UDP port %lu",
                   config.name.c_str(),
                   config.port);
+        return false;
+    }
+
+    if (config.mode != UdpEndpointConfig::Mode::Client
+        && config.mode != UdpEndpointConfig::Mode::Server) {
         return false;
     }
 
