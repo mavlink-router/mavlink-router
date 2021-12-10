@@ -48,8 +48,7 @@ struct LogOptions {
 
 class LogEndpoint : public Endpoint {
 public:
-    LogEndpoint(std::string name, const char *logs_dir, LogMode mode, unsigned long min_free_space,
-                unsigned long max_files);
+    LogEndpoint(std::string name, LogOptions conf);
 
     virtual bool start();
     virtual void stop();
@@ -67,12 +66,9 @@ public:
     static int parse_log_mode(const char *val, size_t val_len, void *storage, size_t storage_len);
 
 protected:
-    const char *_logs_dir;
+    LogOptions _config;
     int _target_system_id = -1;
     int _file = -1;
-    unsigned long _min_free_space;
-    unsigned long _max_files;
-    LogMode _mode;
 
     struct {
         Timeout *logging_start = nullptr;

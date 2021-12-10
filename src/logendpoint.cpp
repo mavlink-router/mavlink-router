@@ -56,15 +56,11 @@ const ConfFile::OptionsTable LogEndpoint::option_table[] = {
      OPTIONS_TABLE_STRUCT_FIELD(LogOptions, max_log_files)},
 };
 
-LogEndpoint::LogEndpoint(std::string name, const char *logs_dir, LogMode mode,
-                         unsigned long min_free_space, unsigned long max_files)
+LogEndpoint::LogEndpoint(std::string name, LogOptions conf)
     : Endpoint{ENDPOINT_TYPE_LOG, std::move(name)}
-    , _logs_dir{logs_dir}
-    , _min_free_space(min_free_space)
-    , _max_files(max_files)
-    , _mode(mode)
+    , _config{conf}
 {
-    assert(_logs_dir);
+    assert(!_config.logs_dir.empty());
     _add_sys_comp_id(LOG_ENDPOINT_SYSTEM_ID << 8);
     _fsync_cb.aio_fildes = -1;
 
@@ -95,7 +91,7 @@ void LogEndpoint::_send_msg(const mavlink_message_t *msg, int target_sysid)
 
 void LogEndpoint::mark_unfinished_logs()
 {
-    DIR *dir = opendir(_logs_dir);
+    DIR *dir = opendir(_config.logs_dir.c_str());
 
     // Assume the directory does not exist if opendir failed
     if (!dir) {
@@ -112,7 +108,7 @@ void LogEndpoint::mark_unfinished_logs()
 
         char log_file[PATH_MAX];
         struct stat file_stat;
-        if (snprintf(log_file, sizeof(log_file), "%s/%s", _logs_dir, ent->d_name)
+        if (snprintf(log_file, sizeof(log_file), "%s/%s", _config.logs_dir.c_str(), ent->d_name)
             >= (int)sizeof(log_file)) {
             continue;
         }
@@ -134,21 +130,21 @@ void LogEndpoint::_delete_old_logs()
 
     struct statvfs buf;
     uint64_t free_space;
-    if (statvfs(_logs_dir, &buf) == 0) {
+    if (statvfs(_config.logs_dir.c_str(), &buf) == 0) {
         free_space = (uint64_t)buf.f_bsize * buf.f_bavail;
     } else {
         free_space = UINT64_MAX;
         log_error("[Log Deletion] Error when measuring free disk space: %m");
     }
     log_debug("[Log Deletion]  Total free space: %lumb. Min free space: %lumb",
-              free_space / (1ul << 20), _min_free_space / (1ul << 20));
+              free_space / (1ul << 20), _config.min_free_space / (1ul << 20));
 
     // This check is not necessary, it just saves on some file IO.
-    if (free_space > _min_free_space && _max_files == 0) {
+    if (free_space > _config.min_free_space && _config.max_log_files == 0) {
         return;
     }
 
-    DIR *dir = opendir(_logs_dir);
+    DIR *dir = opendir(_config.logs_dir.c_str());
 
     // Assume the directory does not exist if opendir failed
     if (!dir) {
@@ -188,11 +184,12 @@ void LogEndpoint::_delete_old_logs()
         }
     }
 
-    // If the configured value for _min_free_space is 0, then we don't have to do anything special.
-    int64_t bytes_to_delete = _min_free_space - free_space;
-    // If the configured value for _max_files is 0, then set this to -1 to indicate that we've
+    // If the configured value for min_free_space is 0, then we don't have to do anything special.
+    int64_t bytes_to_delete = _config.min_free_space - free_space;
+    // If the configured value for max_log_files is 0, then set this to -1 to indicate that we've
     // already deleted enough files.
-    ssize_t files_to_delete = _max_files > 0 ? (ssize_t)file_map.size() - _max_files : -1;
+    ssize_t files_to_delete
+        = _config.max_log_files > 0 ? (ssize_t)file_map.size() - _config.max_log_files : -1;
 
     log_debug("[Log Deletion] Files to delete: %zd", files_to_delete);
 
@@ -208,7 +205,8 @@ void LogEndpoint::_delete_old_logs()
         std::string &filename = std::get<0>(pair.second);
         const unsigned long filesize = std::get<1>(pair.second);
         char log_file[PATH_MAX];
-        if (snprintf(log_file, sizeof(log_file), "%s/%s", _logs_dir, filename.c_str())
+        if (snprintf(log_file, sizeof(log_file), "%s/%s", _config.logs_dir.c_str(),
+                     filename.c_str())
             >= (int)sizeof(log_file)) {
             log_error("Directory + filename %s is longer than PATH_MAX of %d", filename.c_str(),
                       PATH_MAX);
@@ -276,7 +274,7 @@ int LogEndpoint::_get_file(const char *extension)
     DIR *dir;
     int dir_fd;
 
-    dir = _open_or_create_dir(_logs_dir);
+    dir = _open_or_create_dir(_config.logs_dir.c_str());
     if (!dir) {
         log_error("Could not open log dir (%m)");
         return -1;
@@ -343,7 +341,7 @@ void LogEndpoint::stop()
 
     // change file permissions to read-only to mark them as finished
     char log_file[PATH_MAX];
-    if (snprintf(log_file, sizeof(log_file), "%s/%s", _logs_dir, _filename)
+    if (snprintf(log_file, sizeof(log_file), "%s/%s", _config.logs_dir.c_str(), _filename)
         < (int)sizeof(log_file)) {
         chmod(log_file, S_IRUSR | S_IRGRP | S_IROTH);
     }
@@ -442,13 +440,13 @@ void LogEndpoint::_handle_auto_start_stop(uint32_t msg_id, uint8_t source_system
     if (_target_system_id == -1) { // wait until initialized
         return;
     }
-    if (_mode == LogMode::always) {
+    if (_config.log_mode == LogMode::always) {
         if (_file == -1) {
             if (!start()) {
-                _mode = LogMode::disabled;
+                _config.log_mode = LogMode::disabled;
             }
         }
-    } else if (_mode == LogMode::while_armed) {
+    } else if (_config.log_mode == LogMode::while_armed) {
         if (msg_id == MAVLINK_MSG_ID_HEARTBEAT && source_system_id == _target_system_id
             && source_component_id == MAV_COMP_ID_AUTOPILOT1) {
 
@@ -457,7 +455,7 @@ void LogEndpoint::_handle_auto_start_stop(uint32_t msg_id, uint8_t source_system
 
             if (_file == -1 && is_armed) {
                 if (!start()) {
-                    _mode = LogMode::disabled;
+                    _config.log_mode = LogMode::disabled;
                 }
             } else if (_file != -1 && !is_armed) {
                 stop();

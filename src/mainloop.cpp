@@ -391,18 +391,15 @@ bool Mainloop::add_endpoints(const Configuration &config)
     if (!conf.logs_dir.empty()) {
         switch (conf.mavlink_dialect) {
         case LogOptions::MavDialect::Ardupilotmega:
-            this->_log_endpoint = std::make_shared<BinLog>(conf.logs_dir.c_str(), conf.log_mode,
-                                                           conf.min_free_space, conf.max_log_files);
+            this->_log_endpoint = std::make_shared<BinLog>(conf);
             break;
 
         case LogOptions::MavDialect::Common:
-            this->_log_endpoint = std::make_shared<ULog>(conf.logs_dir.c_str(), conf.log_mode,
-                                                         conf.min_free_space, conf.max_log_files);
+            this->_log_endpoint = std::make_shared<ULog>(conf);
             break;
 
         case LogOptions::MavDialect::Auto:
-            this->_log_endpoint = std::make_shared<AutoLog>(
-                conf.logs_dir.c_str(), conf.log_mode, conf.min_free_space, conf.max_log_files);
+            this->_log_endpoint = std::make_shared<AutoLog>(conf);
             break;
 
             // no default case on purpose
