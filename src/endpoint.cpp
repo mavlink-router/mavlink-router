@@ -775,8 +775,6 @@ int UdpEndpoint::open_ipv6(const char *ip, unsigned long port, bool server)
         sockaddr6.sin6_scope_id = ipv6_get_scope_id(ip_str);
     }
 
-    free(ip_str);
-
     if (server) {
         if (bind(fd, (struct sockaddr *)&sockaddr6, sizeof(sockaddr6)) < 0) {
             log_error("Error binding IPv6 socket (%m)");
@@ -785,6 +783,7 @@ int UdpEndpoint::open_ipv6(const char *ip, unsigned long port, bool server)
         sockaddr6.sin6_port = 0;
     }
 
+    free(ip_str);
     return fd;
 
 fail:
