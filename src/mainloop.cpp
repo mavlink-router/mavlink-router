@@ -193,7 +193,7 @@ void Mainloop::process_tcp_hangups()
             auto *tcp_endpoint = static_cast<TcpEndpoint *>(it->get());
             if (!tcp_endpoint->is_valid()) {
                 if (tcp_endpoint->retry_timeout > 0) {
-                    _add_tcp_retry(tcp_endpoint);
+                    add_tcp_retry(tcp_endpoint);
                     ++it;
                 } else {
                     it = g_endpoints.erase(it);
@@ -348,28 +348,9 @@ bool Mainloop::add_endpoints(const Configuration &config)
     // Create UART and UDP endpoints
     for (const auto &conf : config.uart_configs) {
         auto uart = std::make_shared<UartEndpoint>(conf.name);
-        if (uart->open(conf.device.c_str()) < 0) {
+
+        if (!uart->setup(conf)) {
             return false;
-        }
-
-        if (conf.baudrates.size() == 1) {
-            if (uart->set_speed(conf.baudrates[0]) < 0) {
-                return false;
-            }
-        } else {
-            if (uart->add_speeds(conf.baudrates) < 0) {
-                return false;
-            }
-        }
-
-        if (conf.flowcontrol) {
-            if (uart->set_flow_control(true) < 0) {
-                return false;
-            }
-        }
-
-        for (auto msg_id : conf.allow_msg_id_out) {
-            uart->filter_add_allowed_msg_id(msg_id);
         }
 
         g_endpoints.push_back(uart);
@@ -380,13 +361,8 @@ bool Mainloop::add_endpoints(const Configuration &config)
     for (const auto &conf : config.udp_configs) {
         auto udp = std::make_shared<UdpEndpoint>(conf.name);
 
-        if (udp->open(conf.address.c_str(), conf.port, conf.mode) < 0) {
-            log_error("Could not open %s:%ld", conf.address.c_str(), conf.port);
+        if (!udp->setup(conf)) {
             return false;
-        }
-
-        for (auto msg_id : conf.allow_msg_id_out) {
-            udp->filter_add_allowed_msg_id(msg_id);
         }
 
         g_endpoints.emplace_back(udp);
@@ -398,17 +374,7 @@ bool Mainloop::add_endpoints(const Configuration &config)
     for (const auto &conf : config.tcp_configs) {
         std::unique_ptr<TcpEndpoint> tcp{new TcpEndpoint{conf.name}};
 
-        tcp->retry_timeout = conf.retry_timeout;
-
-        for (auto msg_id : conf.allow_msg_id_out) {
-            tcp->filter_add_allowed_msg_id(msg_id);
-        }
-
-        if (tcp->open(conf.address, conf.port) < 0) {
-            log_warning("Could not open %s:%ld, re-trying", conf.address.c_str(), conf.port);
-            if (tcp->retry_timeout > 0) {
-                _add_tcp_retry(tcp.release());
-            }
+        if (!tcp->setup(conf)) {
             continue;
         }
 
@@ -557,7 +523,7 @@ void Mainloop::_del_timeouts()
     }
 }
 
-void Mainloop::_add_tcp_retry(TcpEndpoint *tcp)
+void Mainloop::add_tcp_retry(TcpEndpoint *tcp)
 {
     Timeout *t;
     if (tcp->retry_timeout <= 0) {
@@ -579,7 +545,7 @@ bool Mainloop::_retry_timeout_cb(void *data)
 {
     auto *tcp = (TcpEndpoint *)data;
 
-    if (tcp->open(tcp->get_ip(), tcp->get_port()) < 0) {
+    if (!tcp->reopen()) {
         return true; // try again
     }
 

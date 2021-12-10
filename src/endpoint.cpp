@@ -544,11 +544,50 @@ void Endpoint::log_aggregate(unsigned int interval_sec)
     }
 }
 
+UartEndpoint::UartEndpoint(std::string name)
+    : Endpoint{ENDPOINT_TYPE_UART, std::move(name)}
+{
+    // nothing else to do here
+}
+
 UartEndpoint::~UartEndpoint()
 {
     if (fd > 0) {
         reset_uart(fd);
     }
+}
+
+bool UartEndpoint::setup(UartEndpointConfig conf)
+{
+    if (!this->validate_config(conf)) {
+        return false;
+    }
+
+    if (!this->open(conf.device.c_str())) {
+        return false;
+    }
+
+    if (conf.baudrates.size() == 1) {
+        if (this->set_speed(conf.baudrates[0]) < 0) {
+            return false;
+        }
+    } else {
+        if (this->add_speeds(conf.baudrates) < 0) {
+            return false;
+        }
+    }
+
+    if (conf.flowcontrol) {
+        if (this->set_flow_control(true) < 0) {
+            return false;
+        }
+    }
+
+    for (auto msg_id : conf.allow_msg_id_out) {
+        this->filter_add_allowed_msg_id(msg_id);
+    }
+
+    return true;
 }
 
 int UartEndpoint::set_speed(speed_t baudrate)
@@ -616,14 +655,14 @@ int UartEndpoint::set_flow_control(bool enabled)
     return 0;
 }
 
-int UartEndpoint::open(const char *path)
+bool UartEndpoint::open(const char *path)
 {
     struct termios2 tc;
 
     fd = ::open(path, O_RDWR | O_NONBLOCK | O_CLOEXEC | O_NOCTTY);
     if (fd < 0) {
         log_error("Could not open %s (%m)", path);
-        return -1;
+        return false;
     }
 
     if (reset_uart(fd) < 0) {
@@ -698,12 +737,12 @@ set_latency_failed:
 
     log_info("Opened UART [%d]%s: %s", fd, _name.c_str(), path);
 
-    return fd;
+    return true;
 
 fail:
     ::close(fd);
     fd = -1;
-    return -1;
+    return false;
 }
 
 bool UartEndpoint::_change_baud_cb(void *data)
@@ -841,6 +880,24 @@ UdpEndpoint::UdpEndpoint(std::string name)
     bzero(&sockaddr6, sizeof(sockaddr6));
 }
 
+bool UdpEndpoint::setup(UdpEndpointConfig conf)
+{
+    if (!this->validate_config(conf)) {
+        return false;
+    }
+
+    if (!this->open(conf.address.c_str(), conf.port, conf.mode)) {
+        log_error("Could not open %s:%ld", conf.address.c_str(), conf.port);
+        return false;
+    }
+
+    for (auto msg_id : conf.allow_msg_id_out) {
+        this->filter_add_allowed_msg_id(msg_id);
+    }
+
+    return true;
+}
+
 int UdpEndpoint::open_ipv6(const char *ip, unsigned long port, UdpEndpointConfig::Mode mode)
 {
     fd = socket(AF_INET6, SOCK_DGRAM, 0);
@@ -921,7 +978,7 @@ fail:
     return -EINVAL;
 }
 
-int UdpEndpoint::open(const char *ip, unsigned long port, UdpEndpointConfig::Mode mode)
+bool UdpEndpoint::open(const char *ip, unsigned long port, UdpEndpointConfig::Mode mode)
 {
     const int broadcast_val = 1;
 
@@ -935,7 +992,7 @@ int UdpEndpoint::open(const char *ip, unsigned long port, UdpEndpointConfig::Mod
     }
 
     if (fd < 0) {
-        return -1;
+        return false;
     }
 
     // common setup
@@ -957,14 +1014,14 @@ int UdpEndpoint::open(const char *ip, unsigned long port, UdpEndpointConfig::Mod
         log_info("Opened UDP Client [%d]%s: %s:%lu", fd, _name.c_str(), ip, port);
     }
 
-    return fd;
+    return true;
 
 fail:
     if (fd >= 0) {
         ::close(fd);
         fd = -1;
     }
-    return -1;
+    return false;
 }
 
 ssize_t UdpEndpoint::_read_msg(uint8_t *buf, size_t len)
@@ -1114,6 +1171,37 @@ TcpEndpoint::~TcpEndpoint()
     close();
 }
 
+bool TcpEndpoint::setup(TcpEndpointConfig conf)
+{
+    if (!this->validate_config(conf)) {
+        return false;
+    }
+
+    this->_ip = conf.address;
+    this->_port = conf.port;
+    this->retry_timeout = conf.retry_timeout;
+
+    for (auto msg_id : conf.allow_msg_id_out) {
+        this->filter_add_allowed_msg_id(msg_id);
+    }
+
+    if (!this->open(conf.address, conf.port)) {
+        log_warning("Could not open %s:%ld, re-trying every %d sec", conf.address.c_str(),
+                    conf.port, retry_timeout);
+        if (this->retry_timeout > 0) {
+            Mainloop::get_instance().add_tcp_retry(this);
+        }
+        return false;
+    }
+
+    return true;
+}
+
+bool TcpEndpoint::reopen()
+{
+    return this->open(_ip, _port);
+}
+
 int TcpEndpoint::accept(int listener_fd)
 {
     struct sockaddr *sock;
@@ -1195,12 +1283,8 @@ int TcpEndpoint::open_ipv4(const char *ip, unsigned long port)
     return fd;
 }
 
-int TcpEndpoint::open(const std::string &ip, unsigned long port)
+bool TcpEndpoint::open(const std::string &ip, unsigned long port)
 {
-    // save IP and port for retry callback
-    _ip = ip;
-    _port = port;
-
     this->ipv6 = is_ipv6(ip.c_str());
 
     // setup the special ipv6/ipv4 part
@@ -1217,7 +1301,7 @@ int TcpEndpoint::open(const std::string &ip, unsigned long port)
     }
 
     if (fd < 0) {
-        return -1;
+        return false;
     }
 
     // common setup
@@ -1234,11 +1318,11 @@ int TcpEndpoint::open(const std::string &ip, unsigned long port)
     log_info("Opened TCP Client [%d]%s: %s:%lu", fd, _name.c_str(), ip.c_str(), port);
 
     _valid = true;
-    return fd;
+    return true;
 
 fail:
     ::close(fd);
-    return -1;
+    return false;
 }
 
 ssize_t TcpEndpoint::_read_msg(uint8_t *buf, size_t len)

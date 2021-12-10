@@ -188,18 +188,12 @@ private:
 
 class UartEndpoint : public Endpoint {
 public:
-    UartEndpoint(std::string name)
-        : Endpoint{ENDPOINT_TYPE_UART, std::move(name)}
-    {
-    }
+    UartEndpoint(std::string name);
     ~UartEndpoint() override;
     int write_msg(const struct buffer *pbuf) override;
     int flush_pending_msgs() override { return -ENOSYS; }
 
-    int open(const char *path);
-    int set_speed(speed_t baudrate);
-    int set_flow_control(bool enabled);
-    int add_speeds(const std::vector<speed_t> &bauds);
+    bool setup(UartEndpointConfig config); ///< open UART device and apply config
 
     static const ConfFile::OptionsTable option_table[4];
     static const char *section_pattern;
@@ -207,6 +201,11 @@ public:
     static bool validate_config(const UartEndpointConfig &config);
 
 protected:
+    bool open(const char *path);
+    int set_speed(speed_t baudrate);
+    int set_flow_control(bool enabled);
+    int add_speeds(const std::vector<speed_t> &bauds);
+
     int read_msg(struct buffer *pbuf, int *target_sysid, int *target_compid, uint8_t *src_sysid,
                  uint8_t *src_compid, uint32_t *msg_id) override;
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
@@ -227,8 +226,7 @@ public:
     int write_msg(const struct buffer *pbuf) override;
     int flush_pending_msgs() override { return -ENOSYS; }
 
-    int open(const char *ip, unsigned long port,
-             UdpEndpointConfig::Mode mode = UdpEndpointConfig::Mode::Client);
+    bool setup(UdpEndpointConfig config); ///< open socket and apply config
 
     struct sockaddr_in sockaddr;
     struct sockaddr_in6 sockaddr6;
@@ -241,6 +239,8 @@ public:
     static bool validate_config(const UdpEndpointConfig &config);
 
 protected:
+    bool open(const char *ip, unsigned long port,
+              UdpEndpointConfig::Mode mode = UdpEndpointConfig::Mode::Client);
     int open_ipv4(const char *ip, unsigned long port, UdpEndpointConfig::Mode mode);
     int open_ipv6(const char *ip, unsigned long port, UdpEndpointConfig::Mode mode);
 
@@ -252,8 +252,9 @@ public:
     TcpEndpoint(std::string name);
     ~TcpEndpoint() override;
 
-    int accept(int listener_fd);
-    int open(const std::string &ip, unsigned long port);
+    int accept(int listener_fd);        ///< accept incoming connection
+    bool setup(TcpEndpointConfig conf); ///< open connection and apply config
+    bool reopen();                      ///< re-try connecting to the server
     void close();
 
     int write_msg(const struct buffer *pbuf) override;
@@ -265,9 +266,7 @@ public:
     int retry_timeout = 0; // disable retry by default
 
     inline std::string get_ip() { return _ip; }
-
     inline unsigned long get_port() const { return _port; }
-
     bool is_valid() override { return _valid; };
     bool is_critical() override { return false; };
 
@@ -276,6 +275,7 @@ public:
     static bool validate_config(const TcpEndpointConfig &config);
 
 protected:
+    bool open(const std::string &ip, unsigned long port);
     int open_ipv4(const char *ip, unsigned long port);
     int open_ipv6(const char *ip, unsigned long port);
 
