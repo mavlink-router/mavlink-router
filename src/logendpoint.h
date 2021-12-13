@@ -76,7 +76,7 @@ protected:
     bool _fsync();
 
     void _handle_auto_start_stop(uint32_t msg_id, uint8_t source_system_id,
-                                 uint8_t source_component_id, uint8_t *payload);
+                                 uint8_t source_component_id, const uint8_t *payload);
 
 private:
     int _get_file(const char *extension);

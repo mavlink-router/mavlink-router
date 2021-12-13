@@ -26,16 +26,18 @@
 
 usec_t ts_usec(const struct timespec *ts)
 {
-    if (ts->tv_sec == (time_t)-1 && ts->tv_nsec == (long)-1)
+    if (ts->tv_sec == (time_t)-1 && ts->tv_nsec == (long)-1) {
         return USEC_INFINITY;
+    }
 
-    if ((usec_t)ts->tv_sec > (UINT64_MAX - (ts->tv_nsec / NSEC_PER_USEC)) / USEC_PER_SEC)
+    if ((usec_t)ts->tv_sec > (UINT64_MAX - (ts->tv_nsec / NSEC_PER_USEC)) / USEC_PER_SEC) {
         return USEC_INFINITY;
+    }
 
     return (usec_t)ts->tv_sec * USEC_PER_SEC + (usec_t)ts->tv_nsec / NSEC_PER_USEC;
 }
 
-usec_t now_usec(void)
+usec_t now_usec()
 {
     struct timespec ts;
 
@@ -46,7 +48,7 @@ usec_t now_usec(void)
 
 int safe_atoul(const char *s, unsigned long *ret)
 {
-    char *x = NULL;
+    char *x = nullptr;
     unsigned long l;
 
     assert(s);
@@ -55,8 +57,9 @@ int safe_atoul(const char *s, unsigned long *ret)
     errno = 0;
     l = strtoul(s, &x, 0);
 
-    if (!x || x == s || *x || errno)
+    if (!x || x == s || *x || errno) {
         return errno ? -errno : -EINVAL;
+    }
 
     *ret = l;
 
@@ -65,7 +68,7 @@ int safe_atoul(const char *s, unsigned long *ret)
 
 int safe_atoull(const char *s, unsigned long long *ret)
 {
-    char *x = NULL;
+    char *x = nullptr;
     unsigned long long l;
 
     assert(s);
@@ -74,8 +77,9 @@ int safe_atoull(const char *s, unsigned long long *ret)
     errno = 0;
     l = strtoull(s, &x, 0);
 
-    if (!x || x == s || *x || errno)
+    if (!x || x == s || *x || errno) {
         return errno ? -errno : -EINVAL;
+    }
 
     *ret = l;
 
@@ -84,7 +88,7 @@ int safe_atoull(const char *s, unsigned long long *ret)
 
 int safe_atoi(const char *s, int *ret)
 {
-    char *x = NULL;
+    char *x = nullptr;
     long l;
 
     assert(s);
@@ -93,11 +97,13 @@ int safe_atoi(const char *s, int *ret)
     errno = 0;
     l = strtol(s, &x, 0);
 
-    if (!x || x == s || *x || errno)
+    if (!x || x == s || *x || errno) {
         return errno > 0 ? -errno : -EINVAL;
+    }
 
-    if ((long)(int)l != l)
+    if ((long)(int)l != l) {
         return -ERANGE;
+    }
 
     *ret = (int)l;
     return 0;
@@ -107,8 +113,9 @@ static inline int is_dir(const char *path)
 {
     struct stat st;
 
-    if (stat(path, &st) >= 0)
+    if (stat(path, &st) >= 0) {
         return S_ISDIR(st.st_mode);
+    }
 
     return -errno;
 }
@@ -129,32 +136,38 @@ int mkdir_p(const char *path, int len, mode_t mode)
         if (r > 0) {
             end += strlen(end);
 
-            if (end == start + len)
+            if (end == start + len) {
                 return 0;
+            }
 
             /* end != start, since it would be caught on the first
              * iteration */
             *end = '/';
             break;
-        } else if (r == 0)
+        } else if (r == 0) {
             return -ENOTDIR;
+        }
 
-        if (end == start)
+        if (end == start) {
             break;
+        }
 
         *end = '\0';
 
         /* Find the next component, backwards, discarding extra '/'*/
-        while (end > start && *end != '/')
+        while (end > start && *end != '/') {
             end--;
+        }
 
-        while (end > start && *(end - 1) == '/')
+        while (end > start && *(end - 1) == '/') {
             end--;
+        }
     }
 
     for (; end < start + len;) {
-        if (mkdir(start, mode) < 0 && errno != EEXIST)
+        if (mkdir(start, mode) < 0 && errno != EEXIST) {
             return -errno;
+        }
 
         end += strlen(end);
         *end = '/';

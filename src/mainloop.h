@@ -31,16 +31,16 @@ struct endpoint_entry {
 class Mainloop {
 public:
     int open();
-    int add_fd(int fd, void *data, int events);
-    int mod_fd(int fd, void *data, int events);
-    int remove_fd(int fd);
+    int add_fd(int fd, void *data, int events) const;
+    int mod_fd(int fd, void *data, int events) const;
+    int remove_fd(int fd) const;
     int loop();
     void route_msg(struct buffer *buf, int target_sysid, int target_compid, int sender_sysid,
                    int sender_compid, uint32_t msg_id = UINT32_MAX);
     void handle_read(Endpoint *e);
     void handle_canwrite(Endpoint *e);
     void handle_tcp_connection();
-    int write_msg(Endpoint *e, const struct buffer *buf);
+    int write_msg(Endpoint *e, const struct buffer *buf) const;
     void process_tcp_hangups();
     Timeout *add_timeout(uint32_t timeout_msec, std::function<bool(void *)> cb, const void *data);
     void del_timeout(Timeout *t);
@@ -98,7 +98,7 @@ private:
     bool _retry_timeout_cb(void *data);
     bool _log_aggregate_timeout(void *data);
 
-    Mainloop() { }
+    Mainloop() = default;
     Mainloop(const Mainloop &) = delete;
     Mainloop &operator=(const Mainloop &) = delete;
 

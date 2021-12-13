@@ -47,11 +47,11 @@ static void setup_signal_handlers()
 
     sa.sa_flags = SA_NOCLDSTOP;
     sa.sa_handler = exit_signal_handler;
-    sigaction(SIGTERM, &sa, NULL);
-    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGTERM, &sa, nullptr);
+    sigaction(SIGINT, &sa, nullptr);
 
     sa.sa_handler = SIG_IGN;
-    sigaction(SIGPIPE, &sa, NULL);
+    sigaction(SIGPIPE, &sa, nullptr);
 }
 
 Mainloop &Mainloop::init()
@@ -79,8 +79,9 @@ int Mainloop::open()
 {
     _retcode = -1;
 
-    if (epollfd != -1)
+    if (epollfd != -1) {
         return -EBUSY;
+    }
 
     epollfd = epoll_create1(EPOLL_CLOEXEC);
 
@@ -94,7 +95,7 @@ int Mainloop::open()
     return 0;
 }
 
-int Mainloop::mod_fd(int fd, void *data, int events)
+int Mainloop::mod_fd(int fd, void *data, int events) const
 {
     struct epoll_event epev = {};
 
@@ -109,7 +110,7 @@ int Mainloop::mod_fd(int fd, void *data, int events)
     return 0;
 }
 
-int Mainloop::add_fd(int fd, void *data, int events)
+int Mainloop::add_fd(int fd, void *data, int events) const
 {
     struct epoll_event epev = {};
 
@@ -124,9 +125,9 @@ int Mainloop::add_fd(int fd, void *data, int events)
     return 0;
 }
 
-int Mainloop::remove_fd(int fd)
+int Mainloop::remove_fd(int fd) const
 {
-    if (epoll_ctl(epollfd, EPOLL_CTL_DEL, fd, NULL) < 0) {
+    if (epoll_ctl(epollfd, EPOLL_CTL_DEL, fd, nullptr) < 0) {
         log_error("Could not remove fd from epoll (%m)");
         return -1;
     }
@@ -134,7 +135,7 @@ int Mainloop::remove_fd(int fd)
     return 0;
 }
 
-int Mainloop::write_msg(Endpoint *e, const struct buffer *buf)
+int Mainloop::write_msg(Endpoint *e, const struct buffer *buf) const
 {
     int r = e->write_msg(buf);
 
@@ -142,8 +143,9 @@ int Mainloop::write_msg(Endpoint *e, const struct buffer *buf)
      * If endpoint would block, add EPOLLOUT event to get notified when it's
      * possible to write again
      */
-    if (r == -EAGAIN)
+    if (r == -EAGAIN) {
         mod_fd(e->fd, e, EPOLLIN | EPOLLOUT);
+    }
 
     return r;
 }
@@ -175,7 +177,7 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid
         }
     }
 
-    for (struct endpoint_entry *e = g_tcp_endpoints; e; e = e->next) {
+    for (struct endpoint_entry *e = g_tcp_endpoints; e != nullptr; e = e->next) {
         auto acceptState = e->endpoint->accept_msg(target_sysid, target_compid, sender_sysid,
                                                    sender_compid, msg_id);
         switch (acceptState) {
@@ -211,7 +213,7 @@ void Mainloop::process_tcp_hangups()
     // First, remove entries from the beginning of list, ensuring `g_tcp_endpoints` still
     // points to list beginning
     struct endpoint_entry **first = &g_tcp_endpoints;
-    while (*first && !(*first)->endpoint->is_valid()) {
+    while ((*first != nullptr) && !(*first)->endpoint->is_valid()) {
         struct endpoint_entry *next = (*first)->next;
         remove_fd((*first)->endpoint->fd);
         if ((*first)->endpoint->retry_timeout > 0) {
@@ -224,10 +226,10 @@ void Mainloop::process_tcp_hangups()
     }
 
     // Remove other entries
-    if (*first) {
+    if (*first != nullptr) {
         struct endpoint_entry *prev = *first;
         struct endpoint_entry *current = prev->next;
-        while (current) {
+        while (current != nullptr) {
             if (!current->endpoint->is_valid()) {
                 prev->next = current->next;
                 remove_fd(current->endpoint->fd);
@@ -253,8 +255,9 @@ int Mainloop::_add_tcp_endpoint(TcpEndpoint *tcp)
     struct endpoint_entry *tcp_entry;
 
     tcp_entry = (struct endpoint_entry *)calloc(1, sizeof(struct endpoint_entry));
-    if (!tcp_entry)
+    if (tcp_entry == nullptr) {
         return -ENOMEM;
+    }
 
     tcp_entry->next = g_tcp_endpoints;
     tcp_entry->endpoint = tcp;
@@ -267,16 +270,18 @@ int Mainloop::_add_tcp_endpoint(TcpEndpoint *tcp)
 
 void Mainloop::handle_tcp_connection()
 {
-    TcpEndpoint *tcp = new TcpEndpoint{};
+    auto *tcp = new TcpEndpoint{};
     int fd;
     int errno_copy;
 
     fd = tcp->accept(g_tcp_fd);
-    if (fd == -1)
+    if (fd == -1) {
         goto accept_error;
+    }
 
-    if (_add_tcp_endpoint(tcp) < 0)
+    if (_add_tcp_endpoint(tcp) < 0) {
         goto add_error;
+    }
 
     log_debug("Accepted TCP connection on [%d]", fd);
     return;
@@ -296,8 +301,9 @@ int Mainloop::loop()
     struct epoll_event events[max_events];
     int r;
 
-    if (epollfd < 0)
+    if (epollfd < 0) {
         return -EINVAL;
+    }
 
     setup_signal_handlers();
 
@@ -308,8 +314,9 @@ int Mainloop::loop()
         int i;
 
         r = epoll_wait(epollfd, events, max_events, -1);
-        if (r < 0 && errno == EINTR)
+        if (r < 0 && errno == EINTR) {
             continue;
+        }
 
         for (i = 0; i < r; i++) {
             if (events[i].data.ptr == &g_tcp_fd) {
@@ -317,7 +324,7 @@ int Mainloop::loop()
                 continue;
             }
 
-            Pollable *p = static_cast<Pollable *>(events[i].data.ptr);
+            auto *p = static_cast<Pollable *>(events[i].data.ptr);
 
             if (events[i].events & EPOLLIN) {
                 int rd = p->handle_read();
@@ -352,11 +359,12 @@ int Mainloop::loop()
         _del_timeouts();
     }
 
-    if (_log_endpoint)
+    if (_log_endpoint != nullptr) {
         _log_endpoint->stop();
+    }
 
     // free all remaning Timeouts
-    while (_timeouts) {
+    while (_timeouts != nullptr) {
         Timeout *current = _timeouts;
         _timeouts = current->next;
         remove_fd(current->fd);
@@ -374,13 +382,13 @@ bool Mainloop::_log_aggregate_timeout(void *data)
         _errors_aggregate.msg_to_unknown = 0;
     }
 
-    if (g_endpoints) {
+    if (g_endpoints != nullptr) {
         for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
             (*e)->log_aggregate(LOG_AGGREGATE_INTERVAL_SEC);
         }
     }
 
-    for (auto *t = g_tcp_endpoints; t; t = t->next) {
+    for (auto *t = g_tcp_endpoints; t != nullptr; t = t->next) {
         t->endpoint->log_aggregate(LOG_AGGREGATE_INTERVAL_SEC);
     }
     return true;
@@ -388,16 +396,18 @@ bool Mainloop::_log_aggregate_timeout(void *data)
 
 void Mainloop::print_statistics()
 {
-    for (Endpoint **e = g_endpoints; *e != nullptr; e++)
+    for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
         (*e)->print_statistics();
+    }
 
-    for (auto *t = g_tcp_endpoints; t; t = t->next)
+    for (auto *t = g_tcp_endpoints; t != nullptr; t = t->next) {
         t->endpoint->print_statistics();
+    }
 }
 
 static bool _print_statistics_timeout_cb(void *data)
 {
-    Mainloop *mainloop = static_cast<Mainloop *>(data);
+    auto *mainloop = static_cast<Mainloop *>(data);
     mainloop->print_statistics();
     return true;
 }
@@ -407,7 +417,7 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
     unsigned n_endpoints = 0, i = 0;
     struct endpoint_config *conf;
 
-    for (conf = opt->endpoints; conf; conf = conf->next) {
+    for (conf = opt->endpoints; conf != nullptr; conf = conf->next) {
         if (conf->type != Tcp) {
             // TCP endpoints are efemeral, that's why they don't
             // live on `g_endpoints` array, but on `g_tcp_endpoints` list
@@ -415,37 +425,42 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
         }
     }
 
-    if (opt->logs_dir)
+    if (opt->logs_dir != nullptr) {
         n_endpoints++;
+    }
 
     g_endpoints = (Endpoint **)calloc(n_endpoints + 1, sizeof(Endpoint *));
     assert_or_return(g_endpoints, false);
 
-    for (conf = opt->endpoints; conf; conf = conf->next) {
+    for (conf = opt->endpoints; conf != nullptr; conf = conf->next) {
         switch (conf->type) {
         case Uart: {
             std::unique_ptr<UartEndpoint> uart{new UartEndpoint{}};
-            if (uart->open(conf->device) < 0)
+            if (uart->open(conf->device) < 0) {
                 return false;
+            }
 
             if (conf->bauds->size() == 1) {
-                if (uart->set_speed((*(conf->bauds))[0]) < 0)
+                if (uart->set_speed((*(conf->bauds))[0]) < 0) {
                     return false;
+                }
             } else {
-                if (uart->add_speeds(*conf->bauds) < 0)
+                if (uart->add_speeds(*conf->bauds) < 0) {
                     return false;
+                }
             }
 
             if (conf->flowcontrol) {
-                if (uart->set_flow_control(true) < 0)
+                if (uart->set_flow_control(true) < 0) {
                     return false;
+                }
             }
 
-            if (conf->msgIdFilter) {
+            if (conf->msgIdFilter != nullptr) {
                 char *token = strtok(conf->msgIdFilter, ",");
-                while (token != NULL) {
+                while (token != nullptr) {
                     uart->filter_add_allowed_msg_id(atoi(token));
-                    token = strtok(NULL, ",");
+                    token = strtok(nullptr, ",");
                 }
             }
 
@@ -461,11 +476,11 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
                 return false;
             }
 
-            if (conf->msgIdFilter) {
+            if (conf->msgIdFilter != nullptr) {
                 char *token = strtok(conf->msgIdFilter, ",");
-                while (token != NULL) {
+                while (token != nullptr) {
                     udp->filter_add_allowed_msg_id(atoi(token));
-                    token = strtok(NULL, ",");
+                    token = strtok(nullptr, ",");
                 }
             }
 
@@ -485,11 +500,11 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
                 continue;
             }
 
-            if (conf->msgIdFilter) {
+            if (conf->msgIdFilter != nullptr) {
                 char *token = strtok(conf->msgIdFilter, ",");
-                while (token != NULL) {
+                while (token != nullptr) {
                     tcp->filter_add_allowed_msg_id(atoi(token));
-                    token = strtok(NULL, ",");
+                    token = strtok(nullptr, ",");
                 }
             }
 
@@ -506,10 +521,11 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
         }
     }
 
-    if (opt->tcp_port)
+    if (opt->tcp_port != 0u) {
         g_tcp_fd = tcp_open(opt->tcp_port);
+    }
 
-    if (opt->logs_dir) {
+    if (opt->logs_dir != nullptr) {
         if (opt->mavlink_dialect == Ardupilotmega) {
             _log_endpoint
                 = new BinLog(opt->logs_dir, opt->log_mode, opt->min_free_space, opt->max_log_files);
@@ -524,28 +540,29 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
         g_endpoints[i] = _log_endpoint;
     }
 
-    if (opt->report_msg_statistics)
+    if (opt->report_msg_statistics) {
         add_timeout(MSEC_PER_SEC, _print_statistics_timeout_cb, this);
+    }
 
     return true;
 }
 
 void Mainloop::free_endpoints(struct options *opt)
 {
-    for (Endpoint **e = g_endpoints; *e; e++) {
+    for (Endpoint **e = g_endpoints; *e != nullptr; e++) {
         delete *e;
     }
     free(g_endpoints);
 
-    for (auto *t = g_tcp_endpoints; t;) {
-        auto next = t->next;
+    for (auto *t = g_tcp_endpoints; t != nullptr;) {
+        auto *next = t->next;
         delete t->endpoint;
         free(t);
         t = next;
     }
 
-    for (auto e = opt->endpoints; e;) {
-        auto next = e->next;
+    for (auto *e = opt->endpoints; e != nullptr;) {
+        auto *next = e->next;
         if (e->type == Udp || e->type == Tcp) {
             free(e->address);
         } else {
@@ -599,9 +616,9 @@ Timeout *Mainloop::add_timeout(uint32_t timeout_msec, std::function<bool(void *)
                                const void *data)
 {
     struct itimerspec ts;
-    Timeout *t = new Timeout(cb, data);
+    auto *t = new Timeout(cb, data);
 
-    assert_or_return(t, NULL);
+    assert_or_return(t, nullptr);
 
     t->fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
     if (t->fd < 0) {
@@ -613,10 +630,11 @@ Timeout *Mainloop::add_timeout(uint32_t timeout_msec, std::function<bool(void *)
     ts.it_interval.tv_nsec = (timeout_msec % MSEC_PER_SEC) * NSEC_PER_MSEC;
     ts.it_value.tv_sec = ts.it_interval.tv_sec;
     ts.it_value.tv_nsec = ts.it_interval.tv_nsec;
-    timerfd_settime(t->fd, 0, &ts, NULL);
+    timerfd_settime(t->fd, 0, &ts, nullptr);
 
-    if (add_fd(t->fd, t, EPOLLIN) < 0)
+    if (add_fd(t->fd, t, EPOLLIN) < 0) {
         goto error;
+    }
 
     t->next = _timeouts;
     _timeouts = t;
@@ -625,7 +643,7 @@ Timeout *Mainloop::add_timeout(uint32_t timeout_msec, std::function<bool(void *)
 
 error:
     delete t;
-    return NULL;
+    return nullptr;
 }
 
 void Mainloop::del_timeout(Timeout *t)
@@ -636,7 +654,7 @@ void Mainloop::del_timeout(Timeout *t)
 void Mainloop::_del_timeouts()
 {
     // Guarantee one valid Timeout on the beginning of the list
-    while (_timeouts && _timeouts->remove_me) {
+    while ((_timeouts != nullptr) && _timeouts->remove_me) {
         Timeout *next = _timeouts->next;
         remove_fd(_timeouts->fd);
         delete _timeouts;
@@ -644,10 +662,10 @@ void Mainloop::_del_timeouts()
     }
 
     // Remove all other Timeouts
-    if (_timeouts) {
+    if (_timeouts != nullptr) {
         Timeout *prev = _timeouts;
         Timeout *current = _timeouts->next;
-        while (current) {
+        while (current != nullptr) {
             if (current->remove_me) {
                 prev->next = current->next;
                 remove_fd(current->fd);
@@ -681,7 +699,7 @@ void Mainloop::_add_tcp_retry(TcpEndpoint *tcp)
 
 bool Mainloop::_retry_timeout_cb(void *data)
 {
-    TcpEndpoint *tcp = (TcpEndpoint *)data;
+    auto *tcp = (TcpEndpoint *)data;
 
     if (tcp->open(tcp->get_ip(), tcp->get_port()) < 0) {
         return true;

@@ -137,3 +137,21 @@ configure_file(
 
 subdir('src')
 subdir('examples')
+
+# Use clang-tidy to modernize code and check for common code style issues
+clangtidy = find_program('run-clang-tidy', required: false)
+clangtidy_wrapper = files('tools/meson-clang-tidy.sh')
+if clangtidy.found()
+        # common set of auto-fixable issues
+        run_target('clangtidy-autofix',
+                command : [clangtidy_wrapper, '-p', meson.current_build_dir(),
+                        '-header-filter', '@SOURCE_ROOT@/src/.*',
+                        '-fix', '-format',
+                        ])
+        # check, which need manual evaluation on a case by case basis
+        run_target('clangtidy-check',
+                command : [clangtidy_wrapper, '-p', meson.current_build_dir(),
+                        '-header-filter', '@SOURCE_ROOT@/src/.*',
+                        '-checks=bugprone-*,-bugprone-easily-swappable-parameters,cppcoreguidelines-*,-cppcoreguidelines-avoid-goto,-cppcoreguidelines-macro-usage,-cppcoreguidelines-owning-memory,-cppcoreguidelines-pro-bounds-constant-array-index,-cppcoreguidelines-pro-bounds-pointer-arithmetic,-cppcoreguidelines-pro-type-union-access,-cppcoreguidelines-pro-type-vararg,misc-*,-misc-misleading-identifier,-misc-no-recursion,modernize-concat-nested-namespaces,modernize-replace-auto-ptr,modernize-replace-disallow-copy-and-assign-macro,modernize-replace-random-shuffle,modernize-shrink-to-fit,modernize-unary-static-assert,modernize-use-transparent-functors,modernize-use-uncaught-exceptions,performance-*,readability-avoid-const-params-in-decls,readability-container-size-empty,readability-convert-member-functions-to-static,readability-misleading-indentation,readability-misplaced-array-index,readability-named-parameter,readability-non-const-parameter,readability-redundant-access-specifiers,readability-redundant-control-flow,readability-redundant-preprocessor,readability-simplify-subscript-expr,readability-static-accessed-through-instance,readability-static-definition-in-anonymous-namespace,readability-suspicious-call-argument,readability-uppercase-literal-suffix',
+                        ])
+endif

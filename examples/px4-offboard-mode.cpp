@@ -41,10 +41,10 @@
 #include <poll.h>
 #include <signal.h>
 #include <stdint.h>
-#include <stdlib.h>
 #include <stdio.h>
-#include <sys/timerfd.h>
+#include <stdlib.h>
 #include <sys/socket.h>
+#include <sys/timerfd.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -52,10 +52,10 @@
 
 #include "common/util.h"
 
-#define SYSTEM_ID 11
+#define SYSTEM_ID        11
 #define TARGET_SYSTEM_ID 1
 
-#define PX4_MAIN_MODE_CUSTOM 1
+#define PX4_MAIN_MODE_CUSTOM     1
 #define PX4_CUSTOM_MODE_OFFBOARD 6
 
 #define POLL_ERROR_EVENTS (POLLERR | POLLHUP | POLLNVAL)
@@ -69,16 +69,9 @@ static struct sockaddr_in sockaddr;
 
 static int timeout_fd = -1;
 
-enum px4_modes {
-    PX4_MODE_UNKNOWN = 0,
-    PX4_MODE_OFFBOARD,
-    PX4_MODE_LAST
-};
+enum px4_modes { PX4_MODE_UNKNOWN = 0, PX4_MODE_OFFBOARD, PX4_MODE_LAST };
 
-static const char * mode_names[] = {
-    "unknown",
-    "offboard"
-};
+static const char *mode_names[] = {"unknown", "offboard"};
 
 static enum px4_modes current_mode = PX4_MODE_UNKNOWN;
 static bool armed = false;
@@ -86,11 +79,13 @@ static bool in_the_air = false;
 static bool landing = false;
 static float vehicle_x, vehicle_y, vehicle_z;
 
-#define BASIC_INFO_HEARTBEAT_BIT (1 << 0)
+#define BASIC_INFO_HEARTBEAT_BIT          (1 << 0)
 #define BASIC_INFO_LOCAL_POSITION_NED_BIT (1 << 1)
 #define BASIC_INFO_EXTENDED_SYS_STATE_BIT (1 << 2)
-#define BASIC_INFO_HOME_POSITION (1 << 3)
-#define BASIC_INFO_ALL_BITS (BASIC_INFO_HEARTBEAT_BIT | BASIC_INFO_LOCAL_POSITION_NED_BIT | BASIC_INFO_EXTENDED_SYS_STATE_BIT | BASIC_INFO_HOME_POSITION)
+#define BASIC_INFO_HOME_POSITION          (1 << 3)
+#define BASIC_INFO_ALL_BITS                                       \
+    (BASIC_INFO_HEARTBEAT_BIT | BASIC_INFO_LOCAL_POSITION_NED_BIT \
+     | BASIC_INFO_EXTENDED_SYS_STATE_BIT | BASIC_INFO_HOME_POSITION)
 
 static uint8_t have_basic_info_mask = 0;
 
@@ -113,25 +108,24 @@ struct tasks {
 };
 
 static struct tasks list[] = {
-    { .action = CHECK_STATE },
-    { .action = SET_MODE },
-    { .action = ARM_DISARM, .param1 = 1 },
+    {.action = CHECK_STATE},
+    {.action = SET_MODE},
+    {.action = ARM_DISARM, .param1 = 1},
     // Z is inverted in NED https://dev.px4.io/en/ros/external_position_estimation.html#asserting-on-reference-frames
-    { .action = MOVE_Z, .param1 = -5 },
-    { .action = WAIT_MOVE },
-    { .action = MOVE_X, .param1 = 5 },
-    { .action = WAIT_MOVE },
-    { .action = MOVE_Y, .param1 = 5 },
-    { .action = WAIT_MOVE },
-    { .action = MOVE_X, .param1 = -5 },
-    { .action = WAIT_MOVE },
-    { .action = MOVE_Y, .param1 = -5 },
-    { .action = WAIT_MOVE },
-    { .action = LAND },
-    { .action = WAIT_LAND },
-    { .action = ARM_DISARM, .param1 = 0 },
-    { .action = END }
-};
+    {.action = MOVE_Z, .param1 = -5},
+    {.action = WAIT_MOVE},
+    {.action = MOVE_X, .param1 = 5},
+    {.action = WAIT_MOVE},
+    {.action = MOVE_Y, .param1 = 5},
+    {.action = WAIT_MOVE},
+    {.action = MOVE_X, .param1 = -5},
+    {.action = WAIT_MOVE},
+    {.action = MOVE_Y, .param1 = -5},
+    {.action = WAIT_MOVE},
+    {.action = LAND},
+    {.action = WAIT_LAND},
+    {.action = ARM_DISARM, .param1 = 0},
+    {.action = END}};
 
 static uint8_t task_list_index = 0;
 
@@ -142,14 +136,14 @@ static void exit_signal_handler(int signum)
 
 static int setup_signal_handlers()
 {
-    struct sigaction sa = { };
+    struct sigaction sa = {};
 
     sa.sa_flags = SA_NOCLDSTOP;
     sa.sa_handler = exit_signal_handler;
 
-    if (sigaction(SIGTERM, &sa, NULL) != 0 ||
-        sigaction(SIGINT, &sa, NULL) != 0)
+    if (sigaction(SIGTERM, &sa, nullptr) != 0 || sigaction(SIGINT, &sa, nullptr) != 0) {
         return -1;
+    }
 
     return 0;
 }
@@ -320,7 +314,8 @@ static void position_set_send(float x, float y, float z, float yaw)
     set_position.z = z;
     set_position.yaw = yaw;
 
-    mavlink_msg_set_position_target_local_ned_encode(SYSTEM_ID, MAV_COMP_ID_ALL, &msg, &set_position);
+    mavlink_msg_set_position_target_local_ned_encode(SYSTEM_ID, MAV_COMP_ID_ALL, &msg,
+                                                     &set_position);
     msg_send(&msg);
 }
 
@@ -393,40 +388,40 @@ static void timeout_callback()
 
     switch (t->action) {
     case CHECK_STATE:
-            /*
+        /*
              * It will only go the next task when we got all basic info.
              * note: home position is not necessary but this is useful to know
              * when PX4 got a GPS fix.
              */
-            if (have_basic_info_mask == BASIC_INFO_ALL_BITS) {
-                if (!armed && !in_the_air) {
-                    task_list_index++;
-                } else {
-                    printf("Invalid initial state, please land and disarm\n");
-                }
+        if (have_basic_info_mask == BASIC_INFO_ALL_BITS) {
+            if (!armed && !in_the_air) {
+                task_list_index++;
             } else {
-                static uint8_t count = 15;
-
-                if (count == 15) {
-                    printf("Waiting for:\n");
-                    if (!(have_basic_info_mask & BASIC_INFO_HEARTBEAT_BIT)) {
-                        printf("\t- heartbeat\n");
-                    }
-                    if (!(have_basic_info_mask & BASIC_INFO_LOCAL_POSITION_NED_BIT)) {
-                        printf("\t- local position NED\n");
-                    }
-                    if (!(have_basic_info_mask & BASIC_INFO_EXTENDED_SYS_STATE_BIT)) {
-                        printf("\t- basic extended info\n");
-                    }
-                    if (!(have_basic_info_mask & BASIC_INFO_HOME_POSITION)) {
-                        printf("\t- home position(GPS fix)\n");
-                    }
-                    count = 0;
-                } else {
-                    count++;
-                }
+                printf("Invalid initial state, please land and disarm\n");
             }
-            break;
+        } else {
+            static uint8_t count = 15;
+
+            if (count == 15) {
+                printf("Waiting for:\n");
+                if (!(have_basic_info_mask & BASIC_INFO_HEARTBEAT_BIT)) {
+                    printf("\t- heartbeat\n");
+                }
+                if (!(have_basic_info_mask & BASIC_INFO_LOCAL_POSITION_NED_BIT)) {
+                    printf("\t- local position NED\n");
+                }
+                if (!(have_basic_info_mask & BASIC_INFO_EXTENDED_SYS_STATE_BIT)) {
+                    printf("\t- basic extended info\n");
+                }
+                if (!(have_basic_info_mask & BASIC_INFO_HOME_POSITION)) {
+                    printf("\t- home position(GPS fix)\n");
+                }
+                count = 0;
+            } else {
+                count++;
+            }
+        }
+        break;
     case SET_MODE:
         if (current_mode == PX4_MODE_OFFBOARD) {
             task_list_index++;
@@ -436,7 +431,7 @@ static void timeout_callback()
         set_mode_send(PX4_MODE_OFFBOARD);
         break;
     case ARM_DISARM: {
-        if (armed == t->param1) {
+        if (static_cast<int>(armed) == t->param1) {
             task_list_index++;
             break;
         }
@@ -462,7 +457,7 @@ static void timeout_callback()
         mavlink_message_t msg;
         mavlink_command_long_t cmd = {};
 
-        cmd.command =  MAV_CMD_NAV_LAND;
+        cmd.command = MAV_CMD_NAV_LAND;
         cmd.target_system = TARGET_SYSTEM_ID;
         cmd.target_component = MAV_COMP_ID_ALL;
         cmd.param1 = NAN;
@@ -500,8 +495,7 @@ static void timeout_callback()
         break;
     }
     case WAIT_MOVE: {
-        if (abs(vehicle_z - z) < SETPOINT_RANGE
-            && abs(vehicle_y - y) < SETPOINT_RANGE
+        if (abs(vehicle_z - z) < SETPOINT_RANGE && abs(vehicle_y - y) < SETPOINT_RANGE
             && abs(vehicle_x - x) < SETPOINT_RANGE) {
             task_list_index++;
             printf("Target reached\n");
@@ -642,7 +636,7 @@ static int setup_timeout()
     ts.it_value.tv_sec = ts.it_interval.tv_sec;
     ts.it_value.tv_nsec = ts.it_interval.tv_nsec;
 
-    timerfd_settime(timeout_fd, 0, &ts, NULL);
+    timerfd_settime(timeout_fd, 0, &ts, nullptr);
 
     return 0;
 }
@@ -662,10 +656,9 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (setup_connection(ip, port) < 0 ||
-        setup_timeout() < 0 ||
-        setup_signal_handlers() < 0)
+    if (setup_connection(ip, port) < 0 || setup_timeout() < 0 || setup_signal_handlers() < 0) {
         goto fail;
+    }
 
     free(ip);
 
@@ -679,10 +672,12 @@ int main(int argc, char *argv[])
 fail:
     free(ip);
 
-    if (tcp_fd >= 0)
+    if (tcp_fd >= 0) {
         close(tcp_fd);
-    if (timeout_fd >=0)
+    }
+    if (timeout_fd >= 0) {
         close(timeout_fd);
+    }
 
     return EXIT_FAILURE;
 }

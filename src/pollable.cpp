@@ -21,6 +21,7 @@
 
 Pollable::~Pollable()
 {
-    if (fd > -1)
+    if (fd > -1) {
         ::close(fd);
+    }
 }

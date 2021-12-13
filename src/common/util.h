@@ -26,8 +26,8 @@
 
 #include "macro.h"
 
-typedef uint64_t usec_t;
-typedef uint64_t nsec_t;
+using usec_t = uint64_t;
+using nsec_t = uint64_t;
 #define USEC_INFINITY ((usec_t)-1)
 
 #define MSEC_PER_SEC  1000ULL
@@ -46,7 +46,7 @@ typedef uint64_t nsec_t;
 int safe_atoull(const char *s, unsigned long long *ret);
 int safe_atoul(const char *s, unsigned long *ret);
 int safe_atoi(const char *s, int *ret);
-usec_t now_usec(void);
+usec_t now_usec();
 usec_t ts_usec(const struct timespec *ts);
 
 int mkdir_p(const char *path, int len, mode_t mode);

@@ -23,9 +23,7 @@
  */
 class ConfFile {
 public:
-    ConfFile()
-        : _files(nullptr)
-        , _sections(nullptr){};
+    ConfFile() = default;
     ~ConfFile();
 
     struct section_iter {
@@ -132,8 +130,8 @@ public:
 #undef DECLARE_PARSE_INT
 
 private:
-    struct conffile *_files;
-    struct section *_sections;
+    struct conffile *_files{nullptr};
+    struct section *_sections{nullptr};
 
     int _parse_file(const char *addr, size_t len, const char *filename);
     struct section *_find_section(const char *section_name, size_t len);

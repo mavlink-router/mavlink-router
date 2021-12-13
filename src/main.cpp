@@ -57,16 +57,16 @@ static struct options opt = {
     .max_log_files = 0,
 };
 
-static const struct option long_options[] = {{"endpoints", required_argument, NULL, 'e'},
-                                             {"conf-file", required_argument, NULL, 'c'},
-                                             {"conf-dir", required_argument, NULL, 'd'},
-                                             {"report_msg_statistics", no_argument, NULL, 'r'},
-                                             {"tcp-port", required_argument, NULL, 't'},
-                                             {"tcp-endpoint", required_argument, NULL, 'p'},
-                                             {"log", required_argument, NULL, 'l'},
-                                             {"debug-log-level", required_argument, NULL, 'g'},
-                                             {"verbose", no_argument, NULL, 'v'},
-                                             {"version", no_argument, NULL, 'V'},
+static const struct option long_options[] = {{"endpoints", required_argument, nullptr, 'e'},
+                                             {"conf-file", required_argument, nullptr, 'c'},
+                                             {"conf-dir", required_argument, nullptr, 'd'},
+                                             {"report_msg_statistics", no_argument, nullptr, 'r'},
+                                             {"tcp-port", required_argument, nullptr, 't'},
+                                             {"tcp-endpoint", required_argument, nullptr, 'p'},
+                                             {"log", required_argument, nullptr, 'l'},
+                                             {"debug-log-level", required_argument, nullptr, 'g'},
+                                             {"verbose", no_argument, nullptr, 'v'},
+                                             {"version", no_argument, nullptr, 'V'},
                                              {}};
 
 static const char *short_options = "he:rt:c:d:l:p:g:vV";
@@ -108,14 +108,15 @@ static unsigned long find_next_endpoint_port(const char *ip)
     while (true) {
         struct endpoint_config *conf;
 
-        for (conf = opt.endpoints; conf; conf = conf->next) {
+        for (conf = opt.endpoints; conf != nullptr; conf = conf->next) {
             if (conf->type == Udp && streq(conf->address, ip) && conf->port == port) {
                 port++;
                 break;
             }
         }
-        if (!conf)
+        if (conf == nullptr) {
             break;
+        }
     }
 
     return port;
@@ -160,14 +161,18 @@ static bool validate_ip(const char *ip)
 
 static int log_level_from_str(const char *str)
 {
-    if (strcaseeq(str, "error"))
+    if (strcaseeq(str, "error")) {
         return (int)Log::Level::ERROR;
-    if (strcaseeq(str, "warning"))
+    }
+    if (strcaseeq(str, "warning")) {
         return (int)Log::Level::WARNING;
-    if (strcaseeq(str, "info"))
+    }
+    if (strcaseeq(str, "info")) {
         return (int)Log::Level::INFO;
-    if (strcaseeq(str, "debug"))
+    }
+    if (strcaseeq(str, "debug")) {
         return (int)Log::Level::DEBUG;
+    }
 
     return -EINVAL;
 }
@@ -177,37 +182,36 @@ static int add_tcp_endpoint_address(const char *name, size_t name_len, const cha
 {
     int ret;
 
-    struct endpoint_config *conf
-        = (struct endpoint_config *)calloc(1, sizeof(struct endpoint_config));
+    auto *conf = (struct endpoint_config *)calloc(1, sizeof(struct endpoint_config));
     assert_or_return(conf, -ENOMEM);
     conf->type = Tcp;
     conf->port = ULONG_MAX;
 
-    if (!conf->name && name) {
+    if ((conf->name == nullptr) && (name != nullptr)) {
         conf->name = strndup(name, name_len);
-        if (!conf->name) {
+        if (conf->name == nullptr) {
             ret = -ENOMEM;
             goto fail;
         }
     }
 
-    if (ip) {
+    if (ip != nullptr) {
         free(conf->address);
         conf->address = strdup(ip);
-        if (!conf->address) {
+        if (conf->address == nullptr) {
             ret = -ENOMEM;
             goto fail;
         }
     }
 
-    if (!conf->address) {
+    if (conf->address == nullptr) {
         ret = -EINVAL;
         goto fail;
     }
 
-    if (msgIdFilter) {
+    if (msgIdFilter != nullptr) {
         conf->msgIdFilter = strdup(msgIdFilter);
-        if (!conf->msgIdFilter) {
+        if (conf->msgIdFilter == nullptr) {
             ret = -ENOMEM;
             goto fail;
         }
@@ -242,37 +246,36 @@ static int add_endpoint_address(const char *name, size_t name_len, const char *i
 {
     int ret;
 
-    struct endpoint_config *conf
-        = (struct endpoint_config *)calloc(1, sizeof(struct endpoint_config));
+    auto *conf = (struct endpoint_config *)calloc(1, sizeof(struct endpoint_config));
     assert_or_return(conf, -ENOMEM);
     conf->type = Udp;
     conf->port = ULONG_MAX;
 
-    if (!conf->name && name) {
+    if ((conf->name == nullptr) && (name != nullptr)) {
         conf->name = strndup(name, name_len);
-        if (!conf->name) {
+        if (conf->name == nullptr) {
             ret = -ENOMEM;
             goto fail;
         }
     }
 
-    if (ip) {
+    if (ip != nullptr) {
         free(conf->address);
         conf->address = strdup(ip);
-        if (!conf->address) {
+        if (conf->address == nullptr) {
             ret = -ENOMEM;
             goto fail;
         }
     }
 
-    if (!conf->address) {
+    if (conf->address == nullptr) {
         ret = -EINVAL;
         goto fail;
     }
 
-    if (msgIdFilter) {
+    if (msgIdFilter != nullptr) {
         conf->msgIdFilter = strdup(msgIdFilter);
-        if (!conf->msgIdFilter) {
+        if (conf->msgIdFilter == nullptr) {
             ret = -ENOMEM;
             goto fail;
         }
@@ -307,30 +310,30 @@ static std::vector<unsigned long> *strlist_to_ul(const char *list, const char *l
     char *s, *tmp_str;
     std::unique_ptr<std::vector<unsigned long>> v{new std::vector<unsigned long>()};
 
-    if (!list || list[0] == '\0') {
+    if ((list == nullptr) || list[0] == '\0') {
         v->push_back(default_value);
         return v.release();
     }
 
     tmp_str = strdup(list);
-    if (!tmp_str) {
+    if (tmp_str == nullptr) {
         return nullptr;
     }
 
     s = strtok(tmp_str, delim);
-    while (s) {
+    while (s != nullptr) {
         unsigned long l;
         if (safe_atoul(s, &l) < 0) {
             log_error("Invalid %s %s", listname, s);
             goto error;
         }
         v->push_back(l);
-        s = strtok(NULL, delim);
+        s = strtok(nullptr, delim);
     }
 
     free(tmp_str);
 
-    if (!v->size()) {
+    if (v->empty()) {
         log_error("No valid %s on %s", listname, list);
         return nullptr;
     }
@@ -347,34 +350,33 @@ static int add_uart_endpoint(const char *name, size_t name_len, const char *uart
 {
     int ret;
 
-    struct endpoint_config *conf
-        = (struct endpoint_config *)calloc(1, sizeof(struct endpoint_config));
+    auto *conf = (struct endpoint_config *)calloc(1, sizeof(struct endpoint_config));
     assert_or_return(conf, -ENOMEM);
     conf->type = Uart;
 
-    if (name) {
+    if (name != nullptr) {
         conf->name = strndup(name, name_len);
-        if (!conf->name) {
+        if (conf->name == nullptr) {
             ret = -ENOMEM;
             goto fail;
         }
     }
 
     conf->device = strdup(uart_device);
-    if (!conf->device) {
+    if (conf->device == nullptr) {
         ret = -ENOMEM;
         goto fail;
     }
 
     conf->bauds = strlist_to_ul(bauds, "baud", ",", DEFAULT_BAUDRATE);
-    if (!conf->bauds) {
+    if (conf->bauds == nullptr) {
         ret = -EINVAL;
         goto fail;
     }
 
-    if (msgIdFilter) {
+    if (msgIdFilter != nullptr) {
         conf->msgIdFilter = strdup(msgIdFilter);
-        if (!conf->msgIdFilter) {
+        if (conf->msgIdFilter == nullptr) {
             ret = -ENOMEM;
             goto fail;
         }
@@ -404,7 +406,7 @@ static bool pre_parse_argv(int argc, char *argv[])
 
     int c;
 
-    while ((c = getopt_long(argc, argv, short_options, long_options, NULL)) >= 0) {
+    while ((c = getopt_long(argc, argv, short_options, long_options, nullptr)) >= 0) {
         switch (c) {
         case 'c': {
             opt.conf_file_name = optarg;
@@ -434,7 +436,7 @@ static int parse_argv(int argc, char *argv[])
     assert(argc >= 0);
     assert(argv);
 
-    while ((c = getopt_long(argc, argv, short_options, long_options, NULL)) >= 0) {
+    while ((c = getopt_long(argc, argv, short_options, long_options, nullptr)) >= 0) {
         switch (c) {
         case 'h':
             help(stdout);
@@ -454,7 +456,7 @@ static int parse_argv(int argc, char *argv[])
                 return -EINVAL;
             }
 
-            add_endpoint_address(NULL, 0, ip, port, false, NULL);
+            add_endpoint_address(nullptr, 0, ip, port, false, nullptr);
             free(ip);
             break;
         }
@@ -509,7 +511,7 @@ static int parse_argv(int argc, char *argv[])
                 return -EINVAL;
             }
 
-            add_tcp_endpoint_address(NULL, 0, ip, port, DEFAULT_RETRY_TCP_TIMEOUT, NULL);
+            add_tcp_endpoint_address(nullptr, 0, ip, port, DEFAULT_RETRY_TCP_TIMEOUT, nullptr);
             free(ip);
             break;
         }
@@ -550,10 +552,10 @@ static int parse_argv(int argc, char *argv[])
                 return -EINVAL;
             }
 
-            add_endpoint_address(NULL, 0, base, number, true, NULL);
+            add_endpoint_address(nullptr, 0, base, number, true, nullptr);
         } else {
-            const char *bauds = number != ULONG_MAX ? base + strlen(base) + 1 : NULL;
-            int ret = add_uart_endpoint(NULL, 0, base, bauds, false, NULL);
+            const char *bauds = number != ULONG_MAX ? base + strlen(base) + 1 : nullptr;
+            int ret = add_uart_endpoint(nullptr, 0, base, bauds, false, nullptr);
             if (ret < 0) {
                 free(base);
                 return ret;
@@ -570,12 +572,14 @@ static const char *get_conf_file_name()
 {
     char *s;
 
-    if (opt.conf_file_name)
+    if (opt.conf_file_name != nullptr) {
         return opt.conf_file_name;
+    }
 
     s = getenv("MAVLINK_ROUTERD_CONF_FILE");
-    if (s)
+    if (s != nullptr) {
         return s;
+    }
 
     return DEFAULT_CONFFILE;
 }
@@ -584,12 +588,14 @@ static const char *get_conf_dir()
 {
     char *s;
 
-    if (opt.conf_dir)
+    if (opt.conf_dir != nullptr) {
         return opt.conf_dir;
+    }
 
     s = getenv("MAVLINK_ROUTERD_CONF_DIR");
-    if (s)
+    if (s != nullptr) {
         return s;
+    }
 
     return DEFAULT_CONF_DIR;
 }
@@ -600,12 +606,14 @@ static int parse_mavlink_dialect(const char *val, size_t val_len, void *storage,
     assert(storage);
     assert(val_len);
 
-    enum mavlink_dialect *dialect = (enum mavlink_dialect *)storage;
+    auto *dialect = (enum mavlink_dialect *)storage;
 
-    if (storage_len < sizeof(options::mavlink_dialect))
+    if (storage_len < sizeof(options::mavlink_dialect)) {
         return -ENOBUFS;
-    if (val_len > INT_MAX)
+    }
+    if (val_len > INT_MAX) {
         return -EINVAL;
+    }
 
     if (memcaseeq(val, val_len, "auto", sizeof("auto") - 1)) {
         *dialect = Auto;
@@ -628,10 +636,12 @@ static int parse_log_level(const char *val, size_t val_len, void *storage, size_
     assert(storage);
     assert(val_len);
 
-    if (storage_len < sizeof(options::debug_log_level))
+    if (storage_len < sizeof(options::debug_log_level)) {
         return -ENOBUFS;
-    if (val_len > MAX_LOG_LEVEL_SIZE)
+    }
+    if (val_len > MAX_LOG_LEVEL_SIZE) {
         return -EINVAL;
+    }
 
     const char *log_level = strndupa(val, val_len);
     int lvl = log_level_from_str(log_level);
@@ -652,18 +662,20 @@ static int parse_log_mode(const char *val, size_t val_len, void *storage, size_t
     assert(storage);
     assert(val_len);
 
-    if (storage_len < sizeof(options::log_mode))
+    if (storage_len < sizeof(options::log_mode)) {
         return -ENOBUFS;
-    if (val_len > MAX_LOG_MODE_SIZE)
+    }
+    if (val_len > MAX_LOG_MODE_SIZE) {
         return -EINVAL;
+    }
 
     const char *log_mode_str = strndupa(val, val_len);
     LogMode log_mode;
-    if (strcaseeq(log_mode_str, "always"))
+    if (strcaseeq(log_mode_str, "always")) {
         log_mode = LogMode::always;
-    else if (strcaseeq(log_mode_str, "while-armed"))
+    } else if (strcaseeq(log_mode_str, "while-armed")) {
         log_mode = LogMode::while_armed;
-    else {
+    } else {
         log_error("Invalid argument for LogMode = %s", log_mode_str);
         return -EINVAL;
     }
@@ -679,10 +691,12 @@ static int parse_mode(const char *val, size_t val_len, void *storage, size_t sto
     assert(storage);
     assert(val_len);
 
-    if (storage_len < sizeof(bool))
+    if (storage_len < sizeof(bool)) {
         return -ENOBUFS;
-    if (val_len > INT_MAX)
+    }
+    if (val_len > INT_MAX) {
         return -EINVAL;
+    }
 
     bool *server = (bool *)storage;
     if (memcaseeq(val, val_len, "normal", sizeof("normal") - 1)) {
@@ -769,8 +783,9 @@ static int parse_confs(ConfFile &conf)
     };
 
     ret = conf.extract_options("General", option_table, ARRAY_SIZE(option_table), &opt);
-    if (ret < 0)
+    if (ret < 0) {
         return ret;
+    }
 
     iter = {};
     pattern = "uartendpoint *";
@@ -779,13 +794,15 @@ static int parse_confs(ConfFile &conf)
         struct option_uart opt_uart = {nullptr, nullptr};
         ret = conf.extract_options(&iter, option_table_uart, ARRAY_SIZE(option_table_uart),
                                    &opt_uart);
-        if (ret == 0)
+        if (ret == 0) {
             ret = add_uart_endpoint(iter.name + offset, iter.name_len - offset, opt_uart.device,
                                     opt_uart.bauds, opt_uart.flowcontrol, opt_uart.msgIdFilter);
+        }
         free(opt_uart.device);
         free(opt_uart.bauds);
-        if (ret < 0)
+        if (ret < 0) {
             return ret;
+        }
     }
 
     iter = {};
@@ -812,8 +829,9 @@ static int parse_confs(ConfFile &conf)
         }
 
         free(opt_udp.addr);
-        if (ret < 0)
+        if (ret < 0) {
             return ret;
+        }
     }
 
     iter = {};
@@ -835,8 +853,9 @@ static int parse_confs(ConfFile &conf)
             }
         }
         free(opt_tcp.addr);
-        if (ret < 0)
+        if (ret < 0) {
             return ret;
+        }
     }
 
     return 0;
@@ -869,10 +888,11 @@ static int parse_conf_files()
     dirname = get_conf_dir();
     // Then, parse all files on configuration directory
     dir = opendir(dirname);
-    if (!dir)
+    if (dir == nullptr) {
         return parse_confs(conf);
+    }
 
-    while ((ent = readdir(dir))) {
+    while ((ent = readdir(dir)) != nullptr) {
         char path[PATH_MAX];
         struct stat st;
 
@@ -886,7 +906,7 @@ static int parse_conf_files()
             continue;
         }
         files[i] = strdup(path);
-        if (!files[i]) {
+        if (files[i] == nullptr) {
             ret = -ENOMEM;
             goto fail;
         }
@@ -902,8 +922,9 @@ static int parse_conf_files()
 
     for (j = 0; j < i; j++) {
         ret = conf.parse(files[j]);
-        if (ret < 0)
+        if (ret < 0) {
             goto fail;
+        }
         free(files[j]);
     }
 
@@ -932,24 +953,29 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    if (parse_conf_files() < 0)
+    if (parse_conf_files() < 0) {
         goto close_log;
+    }
 
-    if (parse_argv(argc, argv) != 2)
+    if (parse_argv(argc, argv) != 2) {
         goto close_log;
+    }
 
     Log::set_max_level((Log::Level)opt.debug_log_level);
 
     dbg("Cmd line and options parsed");
 
-    if (mainloop.open() < 0)
+    if (mainloop.open() < 0) {
         goto close_log;
+    }
 
-    if (opt.tcp_port == ULONG_MAX)
+    if (opt.tcp_port == ULONG_MAX) {
         opt.tcp_port = MAVLINK_TCP_PORT;
+    }
 
-    if (!mainloop.add_endpoints(mainloop, &opt))
+    if (!mainloop.add_endpoints(mainloop, &opt)) {
         goto endpoint_error;
+    }
 
     retcode = mainloop.loop();
 

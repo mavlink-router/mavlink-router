@@ -31,7 +31,7 @@
 
 #define SYSTEM_ID 10
 
-#define AUTH_TIMEOUT_SEC 10
+#define AUTH_TIMEOUT_SEC      10
 #define HEARTBEAT_TIMEOUT_SEC 3
 
 #define MAX_VALID_ALTITUDE 15.0f
@@ -49,12 +49,14 @@ static timespec heartbeat_timeout;
 
 static uint8_t target_system;
 
-static enum {
+enum state_t {
     STATE_IDLE = 0,
     STATE_WAITING_MISSING_COUNT,
     STATE_WAITING_MISSION_ITEMS,
     STATE_LAST
-} state = STATE_IDLE;
+};
+
+static state_t state = STATE_IDLE;
 static uint16_t mission_item_count;
 static bool mission_valid;
 static uint16_t first_mission_item_invalid;
@@ -66,12 +68,12 @@ static void exit_signal_handler(int signum)
 
 static void setup_signal_handlers()
 {
-    struct sigaction sa = { };
+    struct sigaction sa = {};
 
     sa.sa_flags = SA_NOCLDSTOP;
     sa.sa_handler = exit_signal_handler;
-    sigaction(SIGTERM, &sa, NULL);
-    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGTERM, &sa, nullptr);
+    sigaction(SIGINT, &sa, nullptr);
 }
 
 static int msg_send(mavlink_message_t *msg)
@@ -119,9 +121,8 @@ static void mission_ack_send()
 
 static void handle_command_long(const mavlink_message_t *msg, mavlink_command_long_t *cmd)
 {
-    if (cmd->command != MAV_CMD_ARM_AUTHORIZATION_REQUEST
-            || state != STATE_IDLE
-            || cmd->target_system != SYSTEM_ID) {
+    if (cmd->command != MAV_CMD_ARM_AUTHORIZATION_REQUEST || state != STATE_IDLE
+        || cmd->target_system != SYSTEM_ID) {
         return;
     }
 
@@ -154,8 +155,7 @@ static void handle_command_long(const mavlink_message_t *msg, mavlink_command_lo
 
 static void handle_mission_count(mavlink_mission_count_t *mission_count)
 {
-    if (state != STATE_WAITING_MISSING_COUNT
-            || mission_count->target_system != SYSTEM_ID) {
+    if (state != STATE_WAITING_MISSING_COUNT || mission_count->target_system != SYSTEM_ID) {
         return;
     }
 
@@ -186,8 +186,7 @@ static void handle_mission_count(mavlink_mission_count_t *mission_count)
 
 static void handle_mission_item_int(mavlink_mission_item_int_t *mission_item)
 {
-    if (state != STATE_WAITING_MISSION_ITEMS
-            || mission_item->target_system != SYSTEM_ID) {
+    if (state != STATE_WAITING_MISSION_ITEMS || mission_item->target_system != SYSTEM_ID) {
         return;
     }
 
@@ -195,13 +194,14 @@ static void handle_mission_item_int(mavlink_mission_item_int_t *mission_item)
     x /= 10000000;
     y /= 10000000;
 
-    printf("Mission item { seq=%u mission_type=%u x=%f y=%f altitude=%f }\n",
-           mission_item->seq, mission_item->mission_type, x, y, mission_item->z);
+    printf("Mission item { seq=%u mission_type=%u x=%f y=%f altitude=%f }\n", mission_item->seq,
+           mission_item->mission_type, x, y, mission_item->z);
 
     if (mission_valid && mission_item->z > MAX_VALID_ALTITUDE) {
         mission_valid = false;
         first_mission_item_invalid = mission_item->seq;
-        printf("Arm request will be denied because mission item seq=%u have a invalid altitude, altitude=%f max accepted altitude=%f\n",
+        printf("Arm request will be denied because mission item seq=%u have a invalid altitude, "
+               "altitude=%f max accepted altitude=%f\n",
                mission_item->seq, mission_item->z, MAX_VALID_ALTITUDE);
     }
 
