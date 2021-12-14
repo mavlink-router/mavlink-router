@@ -187,17 +187,14 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid
 
 void Mainloop::process_tcp_hangups()
 {
-    // Remove endpoints, which are invalid and have no retry timeout
+    // Remove endpoints, which are invalid
     for (auto it = g_endpoints.begin(); it != g_endpoints.end();) {
         if (it->get()->get_type() == ENDPOINT_TYPE_TCP) {
             auto *tcp_endpoint = static_cast<TcpEndpoint *>(it->get());
             if (!tcp_endpoint->is_valid()) {
-                if (tcp_endpoint->retry_timeout > 0) {
-                    add_tcp_retry(tcp_endpoint);
-                    ++it;
-                } else {
-                    it = g_endpoints.erase(it);
-                }
+                it = g_endpoints.erase(it);
+            } else {
+                ++it;
             }
         } else {
             ++it;
@@ -205,14 +202,6 @@ void Mainloop::process_tcp_hangups()
     }
 
     should_process_tcp_hangups = false;
-}
-
-void Mainloop::_add_tcp_endpoint(TcpEndpoint *tcp)
-{
-    g_endpoints.emplace_back(tcp);
-
-    auto endpoint = g_endpoints.back();
-    this->add_fd(endpoint->fd, endpoint.get(), EPOLLIN);
 }
 
 void Mainloop::handle_tcp_connection()
@@ -227,7 +216,8 @@ void Mainloop::handle_tcp_connection()
         goto accept_error;
     }
 
-    _add_tcp_endpoint(tcp);
+    g_endpoints.emplace_back(tcp);
+    this->add_fd(g_endpoints.back()->fd, g_endpoints.back().get(), EPOLLIN);
 
     return;
 
@@ -372,13 +362,13 @@ bool Mainloop::add_endpoints(const Configuration &config)
 
     // Create TCP endpoints
     for (const auto &conf : config.tcp_configs) {
-        std::unique_ptr<TcpEndpoint> tcp{new TcpEndpoint{conf.name}};
+        auto tcp = std::make_shared<TcpEndpoint>(conf.name);
 
-        if (!tcp->setup(conf)) {
-            continue;
+        if (!tcp->setup(conf)) { // handles reconnect and add_fd
+            return false;        // only on fatal errors
         }
 
-        _add_tcp_endpoint(tcp.release());
+        g_endpoints.emplace_back(tcp);
     }
 
     // Create TCP server
@@ -518,35 +508,4 @@ void Mainloop::_del_timeouts()
             }
         }
     }
-}
-
-void Mainloop::add_tcp_retry(TcpEndpoint *tcp)
-{
-    Timeout *t;
-    if (tcp->retry_timeout <= 0) {
-        return;
-    }
-
-    tcp->close();
-    t = add_timeout(MSEC_PER_SEC * tcp->retry_timeout,
-                    std::bind(&Mainloop::_retry_timeout_cb, this, std::placeholders::_1), tcp);
-
-    if (t == nullptr) {
-        log_warning("Could not create retry timeout for TCP endpoint %s:%lu\n"
-                    "No attempts to reconnect will be made",
-                    tcp->get_ip().c_str(), tcp->get_port());
-    }
-}
-
-bool Mainloop::_retry_timeout_cb(void *data)
-{
-    auto *tcp = (TcpEndpoint *)data;
-
-    if (!tcp->reopen()) {
-        return true; // try again
-    }
-
-    _add_tcp_endpoint(tcp);
-
-    return false; // connection is fine now, no retry
 }

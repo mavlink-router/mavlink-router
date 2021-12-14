@@ -276,10 +276,13 @@ public:
 
 protected:
     bool open(const std::string &ip, unsigned long port);
-    int open_ipv4(const char *ip, unsigned long port);
-    int open_ipv6(const char *ip, unsigned long port);
+    static int open_ipv4(const char *ip, unsigned long port, sockaddr_in &sockaddr);
+    static int open_ipv6(const char *ip, unsigned long port, sockaddr_in6 &sockaddr6);
 
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
+
+    void _schedule_reconnect();
+    bool _retry_timeout_cb(void *data);
 
 private:
     std::string _ip{};

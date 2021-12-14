@@ -34,6 +34,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/epoll.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -1189,11 +1190,12 @@ bool TcpEndpoint::setup(TcpEndpointConfig conf)
         log_warning("Could not open %s:%ld, re-trying every %d sec", conf.address.c_str(),
                     conf.port, retry_timeout);
         if (this->retry_timeout > 0) {
-            Mainloop::get_instance().add_tcp_retry(this);
+            _schedule_reconnect();
         }
-        return false;
+        return true;
     }
 
+    Mainloop::get_instance().add_fd(fd, this, EPOLLIN);
     return true;
 }
 
@@ -1231,16 +1233,16 @@ int TcpEndpoint::accept(int listener_fd)
     return fd;
 }
 
-int TcpEndpoint::open_ipv6(const char *ip, unsigned long port)
+int TcpEndpoint::open_ipv6(const char *ip, unsigned long port, sockaddr_in6 &sockaddr6)
 {
-    fd = socket(AF_INET6, SOCK_STREAM, 0);
+    auto fd = socket(AF_INET6, SOCK_STREAM, 0);
     if (fd == -1) {
         log_error("Could not create IPv6 socket for %s:%lu (%m)", ip, port);
         return -1;
     }
 
     /* strip square brackets from ip string */
-    char *ip_str = strdup(&_ip[1]);
+    char *ip_str = strdup(&ip[1]);
     ip_str[strlen(ip_str) - 1] = '\0';
 
     /* multicast address is not allowed for TCP sockets */
@@ -1268,9 +1270,9 @@ fail:
     return fd;
 }
 
-int TcpEndpoint::open_ipv4(const char *ip, unsigned long port)
+int TcpEndpoint::open_ipv4(const char *ip, unsigned long port, sockaddr_in &sockaddr)
 {
-    fd = socket(AF_INET, SOCK_STREAM, 0);
+    auto fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd == -1) {
         log_error("Could not create IPv4 socket for %s:%lu (%m)", ip, port);
         return -1;
@@ -1291,11 +1293,11 @@ bool TcpEndpoint::open(const std::string &ip, unsigned long port)
     struct sockaddr *sock;
     socklen_t addrlen;
     if (this->ipv6) {
-        open_ipv6(ip.c_str(), port);
+        fd = open_ipv6(ip.c_str(), port, this->sockaddr6);
         sock = (struct sockaddr *)&this->sockaddr6;
         addrlen = sizeof(sockaddr6);
     } else {
-        open_ipv4(ip.c_str(), port);
+        fd = open_ipv4(ip.c_str(), port, this->sockaddr);
         sock = (struct sockaddr *)&this->sockaddr;
         addrlen = sizeof(sockaddr);
     }
@@ -1306,7 +1308,7 @@ bool TcpEndpoint::open(const std::string &ip, unsigned long port)
 
     // common setup
     if (connect(fd, sock, addrlen) < 0) {
-        log_error("Error connecting to %s:%lu (%m)", ip.c_str(), port);
+        log_error("%d Error connecting to %s:%lu (%m)", fd, ip.c_str(), port);
         goto fail;
     }
 
@@ -1322,6 +1324,7 @@ bool TcpEndpoint::open(const std::string &ip, unsigned long port)
 
 fail:
     ::close(fd);
+    fd = -1;
     return false;
 }
 
@@ -1349,7 +1352,12 @@ ssize_t TcpEndpoint::_read_msg(uint8_t *buf, size_t len)
 
     // a read of zero on a stream socket means that other side shut down
     if (r == 0 && len != 0) {
-        _valid = false;
+        if (retry_timeout > 0) {
+            this->_schedule_reconnect();
+            _valid = true; // still valid, b/c endpoint handles reconnect internally
+        } else {
+            _valid = false; // client connection can be deleted forever
+        }
         return EOF; // TODO is EOF always negative?
     }
 
@@ -1385,7 +1393,12 @@ int TcpEndpoint::write_msg(const struct buffer *pbuf)
             log_error("TCP %s: Error sending tcp packet (%m)", _name.c_str());
         }
         if (errno == EPIPE) {
-            _valid = false;
+            if (retry_timeout > 0) {
+                this->_schedule_reconnect();
+                _valid = true; // still valid, b/c endpoint handles reconnect internally
+            } else {
+                _valid = false; // client connection can be deleted forever
+            }
         }
         return -errno;
     };
@@ -1408,6 +1421,7 @@ int TcpEndpoint::write_msg(const struct buffer *pbuf)
 void TcpEndpoint::close()
 {
     if (fd > -1) {
+        Mainloop::get_instance().remove_fd(fd);
         ::close(fd);
 
         log_info("TCP [%d]%s: Connection closed", fd, _name.c_str());
@@ -1436,4 +1450,37 @@ bool TcpEndpoint::validate_config(const TcpEndpointConfig &config)
     }
 
     return true;
+}
+
+void TcpEndpoint::_schedule_reconnect()
+{
+    Timeout *t;
+    if (retry_timeout <= 0) {
+        return;
+    }
+
+    this->close();
+
+    t = Mainloop::get_instance().add_timeout(
+        MSEC_PER_SEC * retry_timeout,
+        std::bind(&TcpEndpoint::_retry_timeout_cb, this, std::placeholders::_1), this);
+
+    if (t == nullptr) {
+        log_warning("Could not create retry timeout for TCP endpoint %s:%lu\n"
+                    "No attempts to reconnect will be made",
+                    _ip.c_str(), _port);
+    }
+}
+
+bool TcpEndpoint::_retry_timeout_cb(void *data)
+{
+    auto *tcp = (TcpEndpoint *)data;
+
+    if (!tcp->reopen()) {
+        return true; // try again
+    }
+
+    Mainloop::get_instance().add_fd(fd, tcp, EPOLLIN);
+
+    return false; // connection is fine now, no retry
 }

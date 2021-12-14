@@ -91,8 +91,6 @@ public:
      */
     void request_exit(int retcode);
 
-    void add_tcp_retry(TcpEndpoint *tcp);
-
 private:
     static const unsigned int LOG_AGGREGATE_INTERVAL_SEC = 5;
 
@@ -110,7 +108,6 @@ private:
 
     int tcp_open(unsigned long tcp_port);
     void _del_timeouts();
-    void _add_tcp_endpoint(TcpEndpoint *tcp);
     bool _retry_timeout_cb(void *data);
     bool _log_aggregate_timeout(void *data);
 
