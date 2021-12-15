@@ -20,8 +20,8 @@
 #include <dirent.h>
 #include <getopt.h>
 #include <limits.h>
-#include <regex>
 #include <stddef.h>
+#include <stdexcept>
 #include <stdio.h>
 #include <string>
 #include <sys/stat.h>
@@ -33,29 +33,17 @@
 
 #include "comm.h"
 #include "endpoint.h"
+#include "logendpoint.h"
 #include "mainloop.h"
 
-#define MAVLINK_TCP_PORT          5760
-#define DEFAULT_BAUDRATE          115200U
-#define DEFAULT_CONFFILE          "/etc/mavlink-router/main.conf"
-#define DEFAULT_CONF_DIR          "/etc/mavlink-router/config.d"
-#define DEFAULT_RETRY_TCP_TIMEOUT 5
+#define MAVLINK_TCP_PORT              5760
+#define DEFAULT_REPORT_MSG_STATISTICS false
+#define DEFAULT_DEBUG_LOG_LEVEL       Log::Level::INFO
+#define DEFAULT_CONFFILE              "/etc/mavlink-router/main.conf"
+#define DEFAULT_CONF_DIR              "/etc/mavlink-router/config.d"
+#define DEFAULT_RETRY_TCP_TIMEOUT     5
 
 extern const char *BUILD_VERSION;
-
-static struct options opt = {
-    .endpoints = nullptr,
-    .conf_file_name = nullptr,
-    .conf_dir = nullptr,
-    .tcp_port = ULONG_MAX,
-    .report_msg_statistics = false,
-    .logs_dir = nullptr,
-    .log_mode = LogMode::always,
-    .debug_log_level = (int)Log::Level::INFO,
-    .mavlink_dialect = Auto,
-    .min_free_space = 0,
-    .max_log_files = 0,
-};
 
 static const struct option long_options[] = {{"endpoints", required_argument, nullptr, 'e'},
                                              {"conf-file", required_argument, nullptr, 'c'},
@@ -101,20 +89,13 @@ static void help(FILE *fp)
         program_invocation_short_name);
 }
 
-static unsigned long find_next_endpoint_port(const char *ip)
+static uint32_t find_next_udp_port(const std::string &ip, const Configuration &config)
 {
-    unsigned long port = 14550U;
+    uint32_t port = 14550U;
 
-    while (true) {
-        struct endpoint_config *conf;
-
-        for (conf = opt.endpoints; conf != nullptr; conf = conf->next) {
-            if (conf->type == Udp && streq(conf->address, ip) && conf->port == port) {
-                port++;
-                break;
-            }
-        }
-        if (conf == nullptr) {
+    for (const auto &c : config.udp_configs) {
+        if (ip == c.address && port == c.port) {
+            port++;
             break;
         }
     }
@@ -141,263 +122,25 @@ static int split_on_last_colon(const char *str, char **base, unsigned long *numb
     return 0;
 }
 
-static bool validate_ipv6(const char *ip)
-{
-    // simplyfied pattern
-    std::regex ipv6_regex("\\[(([a-f\\d]{0,4}:)+[a-f\\d]{0,4})\\]");
-    return std::regex_match(ip, ipv6_regex);
-}
-
-static bool validate_ipv4(const char *ip)
-{
-    std::regex ipv4_regex("(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})");
-    return regex_match(ip, ipv4_regex);
-}
-
-static bool validate_ip(const char *ip)
-{
-    return validate_ipv4(ip) || validate_ipv6(ip);
-}
-
-static int log_level_from_str(const char *str)
+static Log::Level log_level_from_str(const char *str)
 {
     if (strcaseeq(str, "error")) {
-        return (int)Log::Level::ERROR;
+        return Log::Level::ERROR;
     }
     if (strcaseeq(str, "warning")) {
-        return (int)Log::Level::WARNING;
+        return Log::Level::WARNING;
     }
     if (strcaseeq(str, "info")) {
-        return (int)Log::Level::INFO;
+        return Log::Level::INFO;
     }
     if (strcaseeq(str, "debug")) {
-        return (int)Log::Level::DEBUG;
+        return Log::Level::DEBUG;
     }
 
-    return -EINVAL;
+    throw std::invalid_argument("log_level_from_str: unkown string value");
 }
 
-static int add_tcp_endpoint_address(const char *name, size_t name_len, const char *ip,
-                                    long unsigned port, int timeout, const char *msgIdFilter)
-{
-    int ret;
-
-    auto *conf = (struct endpoint_config *)calloc(1, sizeof(struct endpoint_config));
-    assert_or_return(conf, -ENOMEM);
-    conf->type = Tcp;
-    conf->port = ULONG_MAX;
-
-    if ((conf->name == nullptr) && (name != nullptr)) {
-        conf->name = strndup(name, name_len);
-        if (conf->name == nullptr) {
-            ret = -ENOMEM;
-            goto fail;
-        }
-    }
-
-    if (ip != nullptr) {
-        free(conf->address);
-        conf->address = strdup(ip);
-        if (conf->address == nullptr) {
-            ret = -ENOMEM;
-            goto fail;
-        }
-    }
-
-    if (conf->address == nullptr) {
-        ret = -EINVAL;
-        goto fail;
-    }
-
-    if (msgIdFilter != nullptr) {
-        conf->msgIdFilter = strdup(msgIdFilter);
-        if (conf->msgIdFilter == nullptr) {
-            ret = -ENOMEM;
-            goto fail;
-        }
-    }
-
-    if (port != ULONG_MAX) {
-        conf->port = port;
-    }
-
-    if (conf->port == ULONG_MAX) {
-        ret = -EINVAL;
-        goto fail;
-    }
-
-    conf->retry_timeout = timeout;
-
-    conf->next = opt.endpoints;
-    opt.endpoints = conf;
-
-    return 0;
-
-fail:
-    free(conf->address);
-    free(conf->name);
-    free(conf);
-
-    return ret;
-}
-
-static int add_endpoint_address(const char *name, size_t name_len, const char *ip,
-                                long unsigned port, bool server, const char *msgIdFilter)
-{
-    int ret;
-
-    auto *conf = (struct endpoint_config *)calloc(1, sizeof(struct endpoint_config));
-    assert_or_return(conf, -ENOMEM);
-    conf->type = Udp;
-    conf->port = ULONG_MAX;
-
-    if ((conf->name == nullptr) && (name != nullptr)) {
-        conf->name = strndup(name, name_len);
-        if (conf->name == nullptr) {
-            ret = -ENOMEM;
-            goto fail;
-        }
-    }
-
-    if (ip != nullptr) {
-        free(conf->address);
-        conf->address = strdup(ip);
-        if (conf->address == nullptr) {
-            ret = -ENOMEM;
-            goto fail;
-        }
-    }
-
-    if (conf->address == nullptr) {
-        ret = -EINVAL;
-        goto fail;
-    }
-
-    if (msgIdFilter != nullptr) {
-        conf->msgIdFilter = strdup(msgIdFilter);
-        if (conf->msgIdFilter == nullptr) {
-            ret = -ENOMEM;
-            goto fail;
-        }
-    }
-
-    if (port != ULONG_MAX) {
-        conf->port = port;
-    }
-
-    if (conf->port == ULONG_MAX) {
-        conf->port = find_next_endpoint_port(conf->address);
-    }
-
-    conf->server = server;
-
-    conf->next = opt.endpoints;
-    opt.endpoints = conf;
-
-    return 0;
-
-fail:
-    free(conf->address);
-    free(conf->name);
-    free(conf);
-
-    return ret;
-}
-
-static std::vector<unsigned long> *strlist_to_ul(const char *list, const char *listname,
-                                                 const char *delim, unsigned long default_value)
-{
-    char *s, *tmp_str;
-    std::unique_ptr<std::vector<unsigned long>> v{new std::vector<unsigned long>()};
-
-    if ((list == nullptr) || list[0] == '\0') {
-        v->push_back(default_value);
-        return v.release();
-    }
-
-    tmp_str = strdup(list);
-    if (tmp_str == nullptr) {
-        return nullptr;
-    }
-
-    s = strtok(tmp_str, delim);
-    while (s != nullptr) {
-        unsigned long l;
-        if (safe_atoul(s, &l) < 0) {
-            log_error("Invalid %s %s", listname, s);
-            goto error;
-        }
-        v->push_back(l);
-        s = strtok(nullptr, delim);
-    }
-
-    free(tmp_str);
-
-    if (v->empty()) {
-        log_error("No valid %s on %s", listname, list);
-        return nullptr;
-    }
-
-    return v.release();
-
-error:
-    free(tmp_str);
-    return nullptr;
-}
-
-static int add_uart_endpoint(const char *name, size_t name_len, const char *uart_device,
-                             const char *bauds, bool flowcontrol, const char *msgIdFilter)
-{
-    int ret;
-
-    auto *conf = (struct endpoint_config *)calloc(1, sizeof(struct endpoint_config));
-    assert_or_return(conf, -ENOMEM);
-    conf->type = Uart;
-
-    if (name != nullptr) {
-        conf->name = strndup(name, name_len);
-        if (conf->name == nullptr) {
-            ret = -ENOMEM;
-            goto fail;
-        }
-    }
-
-    conf->device = strdup(uart_device);
-    if (conf->device == nullptr) {
-        ret = -ENOMEM;
-        goto fail;
-    }
-
-    conf->bauds = strlist_to_ul(bauds, "baud", ",", DEFAULT_BAUDRATE);
-    if (conf->bauds == nullptr) {
-        ret = -EINVAL;
-        goto fail;
-    }
-
-    if (msgIdFilter != nullptr) {
-        conf->msgIdFilter = strdup(msgIdFilter);
-        if (conf->msgIdFilter == nullptr) {
-            ret = -ENOMEM;
-            goto fail;
-        }
-    }
-
-    conf->flowcontrol = flowcontrol;
-
-    conf->next = opt.endpoints;
-    opt.endpoints = conf;
-
-    return 0;
-
-fail:
-    free(conf->device);
-    free(conf->name);
-    free(conf);
-
-    return ret;
-}
-
-static bool pre_parse_argv(int argc, char *argv[])
+static bool pre_parse_argv(int argc, char *argv[], Configuration &config)
 {
     // This function parses only conf-file and conf-dir from
     // command line, so we can read the conf files.
@@ -409,11 +152,11 @@ static bool pre_parse_argv(int argc, char *argv[])
     while ((c = getopt_long(argc, argv, short_options, long_options, nullptr)) >= 0) {
         switch (c) {
         case 'c': {
-            opt.conf_file_name = optarg;
+            config.conf_file_name = optarg;
             break;
         }
         case 'd': {
-            opt.conf_dir = optarg;
+            config.conf_dir = optarg;
             break;
         }
         case 'V':
@@ -428,7 +171,7 @@ static bool pre_parse_argv(int argc, char *argv[])
     return true;
 }
 
-static int parse_argv(int argc, char *argv[])
+static int parse_argv(int argc, char *argv[], Configuration &config)
 {
     int c;
     struct stat st;
@@ -444,28 +187,40 @@ static int parse_argv(int argc, char *argv[])
         case 'e': {
             char *ip;
             unsigned long port;
+            UdpEndpointConfig opt_udp{};
+            opt_udp.name = "CLI";
+            opt_udp.mode = UdpEndpointConfig::Mode::Client;
 
             if (split_on_last_colon(optarg, &ip, &port) < 0) {
                 log_error("Invalid port in argument: %s", optarg);
                 help(stderr);
                 return -EINVAL;
             }
-            if (!validate_ip(ip)) {
-                log_error("Invalid IP address in argument: %s", optarg);
-                help(stderr);
+            if (ULONG_MAX != port) {
+                opt_udp.port = port;
+            } else {
+                opt_udp.port = find_next_udp_port(opt_udp.address, config);
+            }
+
+            opt_udp.address = std::string(ip);
+
+            if (!UdpEndpoint::validate_config(opt_udp)) {
+                free(ip);
+                help(stderr); // error message was already logged by validate_config()
                 return -EINVAL;
             }
 
-            add_endpoint_address(nullptr, 0, ip, port, false, nullptr);
+            config.udp_configs.push_back(opt_udp);
+
             free(ip);
             break;
         }
         case 'r': {
-            opt.report_msg_statistics = true;
+            config.report_msg_statistics = true;
             break;
         }
         case 't': {
-            if (safe_atoul(optarg, &opt.tcp_port) < 0) {
+            if (safe_atoul(optarg, &config.tcp_port) < 0) {
                 log_error("Invalid argument for tcp-port = %s", optarg);
                 help(stderr);
                 return -EINVAL;
@@ -473,45 +228,55 @@ static int parse_argv(int argc, char *argv[])
             break;
         }
         case 'l': {
-            opt.logs_dir = strdup(optarg);
+            config.log_config.logs_dir = strdup(optarg);
             break;
         }
         case 'g': {
-            int lvl = log_level_from_str(optarg);
-            if (lvl == -EINVAL) {
+            try {
+                config.debug_log_level = log_level_from_str(optarg);
+            } catch (const std::exception &e) {
                 log_error("Invalid argument for debug-log-level = %s", optarg);
                 help(stderr);
                 return -EINVAL;
             }
-            opt.debug_log_level = lvl;
             break;
         }
         case 'v': {
-            opt.debug_log_level = (int)Log::Level::DEBUG;
+            config.debug_log_level = Log::Level::DEBUG;
             break;
         }
         case 'p': {
             char *ip;
             unsigned long port;
 
+            TcpEndpointConfig opt_tcp{};
+            opt_tcp.name = "CLI";
+            opt_tcp.retry_timeout = DEFAULT_RETRY_TCP_TIMEOUT;
+
             if (split_on_last_colon(optarg, &ip, &port) < 0) {
                 log_error("Invalid port in argument: %s", optarg);
                 help(stderr);
                 return -EINVAL;
             }
-            if (port == ULONG_MAX) {
+
+            opt_tcp.port = port;
+            if (ULONG_MAX == opt_tcp.port) {
                 log_error("Missing port in argument: %s", optarg);
                 free(ip);
                 help(stderr);
                 return -EINVAL;
             }
-            if (!validate_ip(ip)) {
-                log_error("Invalid IP address in argument: %s", optarg);
-                help(stderr);
+
+            opt_tcp.address = std::string(ip);
+
+            if (!TcpEndpoint::validate_config(opt_tcp)) {
+                free(ip);
+                help(stderr); // error message was already logged by validate_config()
                 return -EINVAL;
             }
 
-            add_tcp_endpoint_address(nullptr, 0, ip, port, DEFAULT_RETRY_TCP_TIMEOUT, nullptr);
+            config.tcp_configs.push_back(opt_tcp);
+
             free(ip);
             break;
         }
@@ -540,26 +305,38 @@ static int parse_argv(int argc, char *argv[])
         }
 
         if (stat(base, &st) == -1 || !S_ISCHR(st.st_mode)) {
-            if (number == ULONG_MAX) {
+            UdpEndpointConfig opt_udp{};
+            opt_udp.name = "CLI";
+            opt_udp.mode = UdpEndpointConfig::Mode::Server;
+
+            opt_udp.port = number;
+            if (ULONG_MAX == opt_udp.port) {
                 log_error("Invalid argument for UDP port = %s", argv[optind]);
                 help(stderr);
                 free(base);
                 return -EINVAL;
             }
-            if (!validate_ip(base)) {
-                log_error("Invalid IP address in argument: %s", argv[optind]);
-                help(stderr);
+
+            opt_udp.address = std::string(base);
+
+            if (!UdpEndpoint::validate_config(opt_udp)) {
+                help(stderr); // error message was already logged by validate_config()
                 return -EINVAL;
             }
 
-            add_endpoint_address(nullptr, 0, base, number, true, nullptr);
+            config.udp_configs.push_back(opt_udp);
         } else {
+            UartEndpointConfig opt_uart{};
+            opt_uart.name = "CLI";
+            opt_uart.device = std::string(base);
+
             const char *bauds = number != ULONG_MAX ? base + strlen(base) + 1 : nullptr;
-            int ret = add_uart_endpoint(nullptr, 0, base, bauds, false, nullptr);
-            if (ret < 0) {
-                free(base);
-                return ret;
+            if (bauds != nullptr) {
+                opt_uart.baudrates.push_back(atoi(bauds));
             }
+            opt_uart.baudrates.push_back(DEFAULT_BAUDRATE);
+
+            config.uart_configs.push_back(opt_uart);
         }
         free(base);
         optind++;
@@ -568,65 +345,36 @@ static int parse_argv(int argc, char *argv[])
     return 2;
 }
 
-static const char *get_conf_file_name()
+static std::string get_conf_file_name(const Configuration &config)
 {
     char *s;
 
-    if (opt.conf_file_name != nullptr) {
-        return opt.conf_file_name;
+    if (!config.conf_file_name.empty()) {
+        return config.conf_file_name;
     }
 
     s = getenv("MAVLINK_ROUTERD_CONF_FILE");
     if (s != nullptr) {
-        return s;
+        return std::string(s);
     }
 
     return DEFAULT_CONFFILE;
 }
 
-static const char *get_conf_dir()
+static std::string get_conf_dir(const Configuration &config)
 {
     char *s;
 
-    if (opt.conf_dir != nullptr) {
-        return opt.conf_dir;
+    if (!config.conf_dir.empty()) {
+        return config.conf_dir;
     }
 
     s = getenv("MAVLINK_ROUTERD_CONF_DIR");
     if (s != nullptr) {
-        return s;
+        return std::string(s);
     }
 
     return DEFAULT_CONF_DIR;
-}
-
-static int parse_mavlink_dialect(const char *val, size_t val_len, void *storage, size_t storage_len)
-{
-    assert(val);
-    assert(storage);
-    assert(val_len);
-
-    auto *dialect = (enum mavlink_dialect *)storage;
-
-    if (storage_len < sizeof(options::mavlink_dialect)) {
-        return -ENOBUFS;
-    }
-    if (val_len > INT_MAX) {
-        return -EINVAL;
-    }
-
-    if (memcaseeq(val, val_len, "auto", sizeof("auto") - 1)) {
-        *dialect = Auto;
-    } else if (memcaseeq(val, val_len, "common", sizeof("common") - 1)) {
-        *dialect = Common;
-    } else if (memcaseeq(val, val_len, "ardupilotmega", sizeof("ardupilotmega") - 1)) {
-        *dialect = Ardupilotmega;
-    } else {
-        log_error("Invalid argument for MavlinkDialect = %.*s", (int)val_len, val);
-        return -EINVAL;
-    }
-
-    return 0;
 }
 
 #define MAX_LOG_LEVEL_SIZE 10
@@ -636,7 +384,7 @@ static int parse_log_level(const char *val, size_t val_len, void *storage, size_
     assert(storage);
     assert(val_len);
 
-    if (storage_len < sizeof(options::debug_log_level)) {
+    if (storage_len < sizeof(Configuration::debug_log_level)) {
         return -ENOBUFS;
     }
     if (val_len > MAX_LOG_LEVEL_SIZE) {
@@ -644,218 +392,102 @@ static int parse_log_level(const char *val, size_t val_len, void *storage, size_
     }
 
     const char *log_level = strndupa(val, val_len);
-    int lvl = log_level_from_str(log_level);
-    if (lvl == -EINVAL) {
+    try {
+        auto *level = (Log::Level *)storage;
+        *level = log_level_from_str(log_level);
+    } catch (const std::exception &e) {
         log_error("Invalid argument for DebugLogLevel = %s", log_level);
         return -EINVAL;
     }
-    *((int *)storage) = lvl;
 
     return 0;
 }
 #undef MAX_LOG_LEVEL_SIZE
 
-#define MAX_LOG_MODE_SIZE 20
-static int parse_log_mode(const char *val, size_t val_len, void *storage, size_t storage_len)
-{
-    assert(val);
-    assert(storage);
-    assert(val_len);
-
-    if (storage_len < sizeof(options::log_mode)) {
-        return -ENOBUFS;
-    }
-    if (val_len > MAX_LOG_MODE_SIZE) {
-        return -EINVAL;
-    }
-
-    const char *log_mode_str = strndupa(val, val_len);
-    LogMode log_mode;
-    if (strcaseeq(log_mode_str, "always")) {
-        log_mode = LogMode::always;
-    } else if (strcaseeq(log_mode_str, "while-armed")) {
-        log_mode = LogMode::while_armed;
-    } else {
-        log_error("Invalid argument for LogMode = %s", log_mode_str);
-        return -EINVAL;
-    }
-    *((LogMode *)storage) = log_mode;
-
-    return 0;
-}
-#undef MAX_LOG_MODE_SIZE
-
-static int parse_mode(const char *val, size_t val_len, void *storage, size_t storage_len)
-{
-    assert(val);
-    assert(storage);
-    assert(val_len);
-
-    if (storage_len < sizeof(bool)) {
-        return -ENOBUFS;
-    }
-    if (val_len > INT_MAX) {
-        return -EINVAL;
-    }
-
-    bool *server = (bool *)storage;
-    if (memcaseeq(val, val_len, "normal", sizeof("normal") - 1)) {
-        *server = false;
-    } else if (memcaseeq(val, val_len, "eavesdropping", sizeof("eavesdropping") - 1)) {
-        log_warning("Eavesdropping mode is deprecated and rather act like udpin/server");
-        *server = true;
-    } else if (memcaseeq(val, val_len, "server", sizeof("server") - 1)) {
-        *server = true;
-    } else {
-        log_error("Unknown 'mode' key: %.*s", (int)val_len, val);
-        return -EINVAL;
-    }
-
-    return 0;
-}
-
-static int parse_confs(ConfFile &conf)
+static int parse_confs(ConfFile &conffile, Configuration &config)
 {
     int ret;
     size_t offset;
     struct ConfFile::section_iter iter;
-    const char *pattern;
 
-    static const ConfFile::OptionsTable option_table[] = {
-        {"TcpServerPort", false, ConfFile::parse_ul, OPTIONS_TABLE_STRUCT_FIELD(options, tcp_port)},
+    static const ConfFile::OptionsTable global_option_table[] = {
+        {"TcpServerPort", false, ConfFile::parse_ul,
+         OPTIONS_TABLE_STRUCT_FIELD(Configuration, tcp_port)},
         {"ReportStats", false, ConfFile::parse_bool,
-         OPTIONS_TABLE_STRUCT_FIELD(options, report_msg_statistics)},
-        {"MavlinkDialect", false, parse_mavlink_dialect,
-         OPTIONS_TABLE_STRUCT_FIELD(options, mavlink_dialect)},
-        {"Log", false, ConfFile::parse_str_dup, OPTIONS_TABLE_STRUCT_FIELD(options, logs_dir)},
-        {"LogMode", false, parse_log_mode, OPTIONS_TABLE_STRUCT_FIELD(options, log_mode)},
+         OPTIONS_TABLE_STRUCT_FIELD(Configuration, report_msg_statistics)},
         {"DebugLogLevel", false, parse_log_level,
-         OPTIONS_TABLE_STRUCT_FIELD(options, debug_log_level)},
-        {"MinFreeSpace", false, ConfFile::parse_ul,
-         OPTIONS_TABLE_STRUCT_FIELD(options, min_free_space)},
-        {"MaxLogFiles", false, ConfFile::parse_ul,
-         OPTIONS_TABLE_STRUCT_FIELD(options, max_log_files)},
+         OPTIONS_TABLE_STRUCT_FIELD(Configuration, debug_log_level)},
     };
 
-    struct option_uart {
-        char *device;
-        char *bauds;
-        bool flowcontrol;
-        char *msgIdFilter;
-    };
-    static const ConfFile::OptionsTable option_table_uart[] = {
-        {"baud", false, ConfFile::parse_str_dup, OPTIONS_TABLE_STRUCT_FIELD(option_uart, bauds)},
-        {"device", true, ConfFile::parse_str_dup, OPTIONS_TABLE_STRUCT_FIELD(option_uart, device)},
-        {"FlowControl", false, ConfFile::parse_bool,
-         OPTIONS_TABLE_STRUCT_FIELD(option_uart, flowcontrol)},
-        {"AllowMsgIdOut", false, ConfFile::parse_str_dup,
-         OPTIONS_TABLE_STRUCT_FIELD(option_uart, msgIdFilter)},
-    };
+    ret = conffile.extract_options("General", global_option_table, ARRAY_SIZE(global_option_table),
+                                   &config);
+    if (ret < 0) {
+        return ret;
+    }
 
-    struct option_udp {
-        char *addr;
-        bool server;
-        unsigned long port;
-        char *msgIdFilter;
-    };
-    static const ConfFile::OptionsTable option_table_udp[] = {
-        {"address", true, ConfFile::parse_str_dup, OPTIONS_TABLE_STRUCT_FIELD(option_udp, addr)},
-        {"mode", true, parse_mode, OPTIONS_TABLE_STRUCT_FIELD(option_udp, server)},
-        {"port", false, ConfFile::parse_ul, OPTIONS_TABLE_STRUCT_FIELD(option_udp, port)},
-        {"filter", false, ConfFile::parse_str_dup,
-         OPTIONS_TABLE_STRUCT_FIELD(option_udp, msgIdFilter)}, // legacy AllowMsgIdOut
-        {"AllowMsgIdOut", false, ConfFile::parse_str_dup,
-         OPTIONS_TABLE_STRUCT_FIELD(option_udp, msgIdFilter)},
-    };
-
-    struct option_tcp {
-        char *addr;
-        unsigned long port;
-        int timeout;
-        char *msgIdFilter;
-    };
-    static const ConfFile::OptionsTable option_table_tcp[] = {
-        {"address", true, ConfFile::parse_str_dup, OPTIONS_TABLE_STRUCT_FIELD(option_tcp, addr)},
-        {"port", true, ConfFile::parse_ul, OPTIONS_TABLE_STRUCT_FIELD(option_tcp, port)},
-        {"RetryTimeout", false, ConfFile::parse_i, OPTIONS_TABLE_STRUCT_FIELD(option_tcp, timeout)},
-        {"AllowMsgIdOut", false, ConfFile::parse_str_dup,
-         OPTIONS_TABLE_STRUCT_FIELD(option_tcp, msgIdFilter)},
-    };
-
-    ret = conf.extract_options("General", option_table, ARRAY_SIZE(option_table), &opt);
+    ret = conffile.extract_options("General", LogEndpoint::option_table,
+                                   ARRAY_SIZE(LogEndpoint::option_table), &config.log_config);
     if (ret < 0) {
         return ret;
     }
 
     iter = {};
-    pattern = "uartendpoint *";
-    offset = strlen(pattern) - 1;
-    while (conf.get_sections(pattern, &iter) == 0) {
-        struct option_uart opt_uart = {nullptr, nullptr};
-        ret = conf.extract_options(&iter, option_table_uart, ARRAY_SIZE(option_table_uart),
-                                   &opt_uart);
-        if (ret == 0) {
-            ret = add_uart_endpoint(iter.name + offset, iter.name_len - offset, opt_uart.device,
-                                    opt_uart.bauds, opt_uart.flowcontrol, opt_uart.msgIdFilter);
-        }
-        free(opt_uart.device);
-        free(opt_uart.bauds);
-        if (ret < 0) {
+    offset = strlen(UartEndpoint::section_pattern) - 1;
+    while (conffile.get_sections(UartEndpoint::section_pattern, &iter) == 0) {
+        UartEndpointConfig opt_uart{};
+        opt_uart.name = std::string(iter.name + offset, iter.name_len - offset);
+
+        ret = conffile.extract_options(&iter, UartEndpoint::option_table,
+                                       ARRAY_SIZE(UartEndpoint::option_table), &opt_uart);
+        if (ret != 0) {
             return ret;
         }
+        if (!UartEndpoint::validate_config(opt_uart)) {
+            return -EINVAL; // error message was already logged by validate_config()
+        }
+        config.uart_configs.push_back(opt_uart);
     }
 
     iter = {};
-    pattern = "udpendpoint *";
-    offset = strlen(pattern) - 1;
-    while (conf.get_sections(pattern, &iter) == 0) {
-        struct option_udp opt_udp = {nullptr, false, ULONG_MAX};
-        ret = conf.extract_options(&iter, option_table_udp, ARRAY_SIZE(option_table_udp), &opt_udp);
-        if (ret == 0) {
-            if (opt_udp.server && opt_udp.port == ULONG_MAX) {
-                log_error("Expected 'port' key for section %.*s", (int)iter.name_len, iter.name);
-                ret = -EINVAL;
-            } else {
-                if (!validate_ip(opt_udp.addr)) {
-                    log_error("Invalid IP address in section %.*s: %s", (int)iter.name_len,
-                              iter.name, opt_udp.addr);
-                    ret = -EINVAL;
-                } else {
-                    ret = add_endpoint_address(iter.name + offset, iter.name_len - offset,
-                                               opt_udp.addr, opt_udp.port, opt_udp.server,
-                                               opt_udp.msgIdFilter);
-                }
-            }
-        }
+    offset = strlen(UdpEndpoint::section_pattern) - 1;
+    while (conffile.get_sections(UdpEndpoint::section_pattern, &iter) == 0) {
+        UdpEndpointConfig opt_udp{};
+        opt_udp.name = std::string(iter.name + offset, iter.name_len - offset);
+        opt_udp.port = ULONG_MAX; // unset port value to be checked later on
 
-        free(opt_udp.addr);
-        if (ret < 0) {
+        ret = conffile.extract_options(&iter, UdpEndpoint::option_table,
+                                       ARRAY_SIZE(UdpEndpoint::option_table), &opt_udp);
+        if (ret != 0) {
             return ret;
         }
+
+        if (UdpEndpointConfig::Mode::Client == opt_udp.mode && ULONG_MAX == opt_udp.port) {
+            opt_udp.port = find_next_udp_port(opt_udp.address, config);
+        }
+
+        if (!UdpEndpoint::validate_config(opt_udp)) {
+            return -EINVAL; // error message was already logged by validate_config()
+        }
+        config.udp_configs.push_back(opt_udp);
     }
 
     iter = {};
-    pattern = "tcpendpoint *";
-    offset = strlen(pattern) - 1;
-    while (conf.get_sections(pattern, &iter) == 0) {
-        struct option_tcp opt_tcp = {nullptr, ULONG_MAX, DEFAULT_RETRY_TCP_TIMEOUT};
-        ret = conf.extract_options(&iter, option_table_tcp, ARRAY_SIZE(option_table_tcp), &opt_tcp);
-
-        if (ret == 0) {
-            if (!validate_ip(opt_tcp.addr)) {
-                log_error("Invalid IP address in section %.*s: %s", (int)iter.name_len, iter.name,
-                          opt_tcp.addr);
-                ret = -EINVAL;
-            } else {
-                ret = add_tcp_endpoint_address(iter.name + offset, iter.name_len - offset,
-                                               opt_tcp.addr, opt_tcp.port, opt_tcp.timeout,
-                                               opt_tcp.msgIdFilter);
-            }
-        }
-        free(opt_tcp.addr);
-        if (ret < 0) {
+    offset = strlen(TcpEndpoint::section_pattern) - 1;
+    while (conffile.get_sections(TcpEndpoint::section_pattern, &iter) == 0) {
+        TcpEndpointConfig opt_tcp{};
+        opt_tcp.name = std::string(iter.name + offset, iter.name_len - offset);
+        opt_tcp.port = ULONG_MAX; // unset port value to be checked later on
+        opt_tcp.retry_timeout = DEFAULT_RETRY_TCP_TIMEOUT;
+        ret = conffile.extract_options(&iter, TcpEndpoint::option_table,
+                                       ARRAY_SIZE(TcpEndpoint::option_table), &opt_tcp);
+        if (ret != 0) {
             return ret;
         }
+
+        if (!TcpEndpoint::validate_config(opt_tcp)) {
+            return -EINVAL; // error message was already logged by validate_config()
+        }
+        config.tcp_configs.push_back(opt_tcp);
     }
 
     return 0;
@@ -866,71 +498,72 @@ static int cmpstr(const void *s1, const void *s2)
     return strcmp(*(const char **)s1, *(const char **)s2);
 }
 
-static int parse_conf_files()
+static int parse_conf_files(Configuration &config)
 {
     DIR *dir;
     struct dirent *ent;
-    const char *filename, *dirname;
     int ret = 0;
     char *files[128] = {};
     int i = 0, j = 0;
-    ConfFile conf;
+
+    ConfFile conffile;
 
     // First, open default conf file
-    filename = get_conf_file_name();
-    ret = conf.parse(filename);
+    auto filename = get_conf_file_name(config);
+    ret = conffile.parse(filename);
 
     // If there's no default conf file, everything is good
     if (ret < 0 && ret != -ENOENT) {
         return ret;
     }
 
-    dirname = get_conf_dir();
     // Then, parse all files on configuration directory
-    dir = opendir(dirname);
-    if (dir == nullptr) {
-        return parse_confs(conf);
+    auto dirname = get_conf_dir(config);
+    dir = opendir(dirname.c_str());
+    if (dir != nullptr) {
+        while ((ent = readdir(dir)) != nullptr) {
+            char path[PATH_MAX];
+            struct stat st;
+
+            ret = snprintf(path, sizeof(path), "%s/%s", dirname.c_str(), ent->d_name);
+            if (ret >= (int)sizeof(path)) {
+                log_error("Couldn't open directory %s", dirname.c_str());
+                ret = -EINVAL;
+                goto fail;
+            }
+            if (stat(path, &st) < 0 || !S_ISREG(st.st_mode)) {
+                continue;
+            }
+            files[i] = strdup(path);
+            if (files[i] == nullptr) {
+                ret = -ENOMEM;
+                goto fail;
+            }
+            i++;
+
+            if ((size_t)i > sizeof(files) / sizeof(*files)) {
+                log_warning("Too many files on %s. Not all of them will be considered",
+                            dirname.c_str());
+                break;
+            }
+        }
+
+        qsort(files, (size_t)i, sizeof(char *), cmpstr);
+
+        for (j = 0; j < i; j++) {
+            ret = conffile.parse(files[j]);
+            if (ret < 0) {
+                goto fail;
+            }
+            free(files[j]);
+        }
+
+        closedir(dir);
     }
 
-    while ((ent = readdir(dir)) != nullptr) {
-        char path[PATH_MAX];
-        struct stat st;
+    // Finally get configuration values from all config files
+    return parse_confs(conffile, config);
 
-        ret = snprintf(path, sizeof(path), "%s/%s", dirname, ent->d_name);
-        if (ret >= (int)sizeof(path)) {
-            log_error("Couldn't open directory %s", dirname);
-            ret = -EINVAL;
-            goto fail;
-        }
-        if (stat(path, &st) < 0 || !S_ISREG(st.st_mode)) {
-            continue;
-        }
-        files[i] = strdup(path);
-        if (files[i] == nullptr) {
-            ret = -ENOMEM;
-            goto fail;
-        }
-        i++;
-
-        if ((size_t)i > sizeof(files) / sizeof(*files)) {
-            log_warning("Too many files on %s. Not all of them will be considered", dirname);
-            break;
-        }
-    }
-
-    qsort(files, (size_t)i, sizeof(char *), cmpstr);
-
-    for (j = 0; j < i; j++) {
-        ret = conf.parse(files[j]);
-        if (ret < 0) {
-            goto fail;
-        }
-        free(files[j]);
-    }
-
-    closedir(dir);
-
-    return parse_confs(conf);
 fail:
     while (j < i) {
         free(files[j++]);
@@ -945,51 +578,44 @@ int main(int argc, char *argv[])
 {
     Mainloop &mainloop = Mainloop::init();
     int retcode;
+    Configuration config{};
+    config.tcp_port = MAVLINK_TCP_PORT;
+    config.report_msg_statistics = DEFAULT_REPORT_MSG_STATISTICS;
+    config.debug_log_level = DEFAULT_DEBUG_LOG_LEVEL;
 
     Log::open();
+    log_info(PACKAGE " version %s", BUILD_VERSION);
 
-    if (!pre_parse_argv(argc, argv)) {
+    if (!pre_parse_argv(argc, argv, config)) {
         Log::close();
         return 0;
     }
 
-    if (parse_conf_files() < 0) {
+    // Build remaining config from config files and CLI parameters
+    if (parse_conf_files(config) < 0) {
         goto close_log;
     }
 
-    if (parse_argv(argc, argv) != 2) {
+    if (parse_argv(argc, argv, config) != 2) {
         goto close_log;
     }
-
-    Log::set_max_level((Log::Level)opt.debug_log_level);
-
     dbg("Cmd line and options parsed");
 
+    Log::set_max_level(config.debug_log_level);
+
+    // Create endpoint instances and run
     if (mainloop.open() < 0) {
         goto close_log;
     }
 
-    if (opt.tcp_port == ULONG_MAX) {
-        opt.tcp_port = MAVLINK_TCP_PORT;
-    }
-
-    if (!mainloop.add_endpoints(mainloop, &opt)) {
-        goto endpoint_error;
+    if (!mainloop.add_endpoints(config)) {
+        goto close_log;
     }
 
     retcode = mainloop.loop();
 
-    mainloop.free_endpoints(&opt);
-
-    free(opt.logs_dir);
-
     Log::close();
-
     return retcode ? EXIT_FAILURE : 0;
-
-endpoint_error:
-    mainloop.free_endpoints(&opt);
-    free(opt.logs_dir);
 
 close_log:
     Log::close();

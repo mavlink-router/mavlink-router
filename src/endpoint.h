@@ -17,16 +17,50 @@
  */
 #pragma once
 
+#include <common/conf_file.h>
 #include <common/mavlink.h>
 
 #include <memory>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "comm.h"
 #include "pollable.h"
 #include "timeout.h"
 
-class Mainloop;
+#define DEFAULT_BAUDRATE 115200U
+
+#define ENDPOINT_TYPE_UART "UART"
+#define ENDPOINT_TYPE_UDP  "UDP"
+#define ENDPOINT_TYPE_TCP  "TCP"
+#define ENDPOINT_TYPE_LOG  "Log"
+
+struct UartEndpointConfig {
+    std::string name;
+    std::string device;
+    std::vector<speed_t> baudrates;
+    bool flowcontrol{false};
+    std::vector<uint8_t> allow_msg_id_out;
+};
+
+struct UdpEndpointConfig {
+    enum class Mode { Undefined = 0, Server, Client };
+
+    std::string name;
+    std::string address;
+    unsigned long port;
+    Mode mode;
+    std::vector<uint8_t> allow_msg_id_out;
+};
+
+struct TcpEndpointConfig {
+    std::string name;
+    std::string address;
+    unsigned long port;
+    int retry_timeout;
+    std::vector<uint8_t> allow_msg_id_out;
+};
 
 /*
  * mavlink 2.0 packet in its wire format
@@ -84,7 +118,7 @@ public:
         Rejected,
     };
 
-    Endpoint(const char *name);
+    Endpoint(std::string type, std::string name);
     ~Endpoint() override;
 
     int handle_read() override;
@@ -96,20 +130,23 @@ public:
 
     void log_aggregate(unsigned int interval_sec);
 
-    uint8_t get_trimmed_zeros(const mavlink_msg_entry_t *msg_entry, const struct buffer *buffer);
+    static uint8_t get_trimmed_zeros(const mavlink_msg_entry_t *msg_entry,
+                                     const struct buffer *buffer);
 
-    bool has_sys_id(unsigned sysid);
-    bool has_sys_comp_id(unsigned sys_comp_id);
-    bool has_sys_comp_id(unsigned sysid, unsigned compid)
+    bool has_sys_id(unsigned sysid) const;
+    bool has_sys_comp_id(unsigned sys_comp_id) const;
+    bool has_sys_comp_id(unsigned sysid, unsigned compid) const
     {
         uint16_t sys_comp_id = ((sysid & 0xff) << 8) | (compid & 0xff);
         return has_sys_comp_id(sys_comp_id);
     }
 
     AcceptState accept_msg(int target_sysid, int target_compid, uint8_t src_sysid,
-                           uint8_t src_compid, uint32_t msg_id);
+                           uint8_t src_compid, uint32_t msg_id) const;
 
     void filter_add_allowed_msg_id(uint32_t msg_id) { _allowed_msg_ids.push_back(msg_id); }
+
+    std::string get_type() const { return this->_type; }
 
     struct buffer rx_buf;
     struct buffer tx_buf;
@@ -121,7 +158,8 @@ protected:
     bool _check_crc(const mavlink_msg_entry_t *msg_entry) const;
     void _add_sys_comp_id(uint16_t sys_comp_id);
 
-    const char *_name;
+    const std::string _type; ///< UART, UDP, TCP, Log
+    std::string _name;       ///< Endpoint name from config file
     size_t _last_packet_len = 0;
 
     // Statistics
@@ -150,20 +188,24 @@ private:
 
 class UartEndpoint : public Endpoint {
 public:
-    UartEndpoint()
-        : Endpoint{"UART"}
-    {
-    }
+    UartEndpoint(std::string name);
     ~UartEndpoint() override;
     int write_msg(const struct buffer *pbuf) override;
     int flush_pending_msgs() override { return -ENOSYS; }
 
-    int open(const char *path);
-    int set_speed(speed_t baudrate);
-    int set_flow_control(bool enabled);
-    int add_speeds(std::vector<unsigned long> bauds);
+    bool setup(UartEndpointConfig config); ///< open UART device and apply config
+
+    static const ConfFile::OptionsTable option_table[4];
+    static const char *section_pattern;
+    static int parse_baudrates(const char *val, size_t val_len, void *storage, size_t storage_len);
+    static bool validate_config(const UartEndpointConfig &config);
 
 protected:
+    bool open(const char *path);
+    int set_speed(speed_t baudrate);
+    int set_flow_control(bool enabled);
+    int add_speeds(const std::vector<speed_t> &bauds);
+
     int read_msg(struct buffer *pbuf, int *target_sysid, int *target_compid, uint8_t *src_sysid,
                  uint8_t *src_compid, uint32_t *msg_id) override;
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
@@ -171,40 +213,48 @@ protected:
 private:
     size_t _current_baud_idx = 0;
     Timeout *_change_baud_timeout = nullptr;
-    std::vector<unsigned long> _baudrates;
+    std::vector<uint32_t> _baudrates;
 
     bool _change_baud_cb(void *data);
 };
 
 class UdpEndpoint : public Endpoint {
 public:
-    UdpEndpoint();
+    UdpEndpoint(std::string name);
     ~UdpEndpoint() override = default;
 
     int write_msg(const struct buffer *pbuf) override;
     int flush_pending_msgs() override { return -ENOSYS; }
 
-    int open(const char *ip, unsigned long port, bool server = false);
+    bool setup(UdpEndpointConfig config); ///< open socket and apply config
 
     struct sockaddr_in sockaddr;
     struct sockaddr_in6 sockaddr6;
 
     bool ipv6;
 
+    static const ConfFile::OptionsTable option_table[5];
+    static const char *section_pattern;
+    static int parse_udp_mode(const char *val, size_t val_len, void *storage, size_t storage_len);
+    static bool validate_config(const UdpEndpointConfig &config);
+
 protected:
-    int open_ipv4(const char *ip, unsigned long port, bool server);
-    int open_ipv6(const char *ip, unsigned long port, bool server);
+    bool open(const char *ip, unsigned long port,
+              UdpEndpointConfig::Mode mode = UdpEndpointConfig::Mode::Client);
+    int open_ipv4(const char *ip, unsigned long port, UdpEndpointConfig::Mode mode);
+    int open_ipv6(const char *ip, unsigned long port, UdpEndpointConfig::Mode mode);
 
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
 };
 
 class TcpEndpoint : public Endpoint {
 public:
-    TcpEndpoint();
+    TcpEndpoint(std::string name);
     ~TcpEndpoint() override;
 
-    int accept(int listener_fd);
-    int open(const char *ip, unsigned long port);
+    int accept(int listener_fd);        ///< accept incoming connection
+    bool setup(TcpEndpointConfig conf); ///< open connection and apply config
+    bool reopen();                      ///< re-try connecting to the server
     void close();
 
     int write_msg(const struct buffer *pbuf) override;
@@ -213,23 +263,29 @@ public:
     struct sockaddr_in sockaddr;
     struct sockaddr_in6 sockaddr6;
     bool ipv6;
-    int retry_timeout = 0;
+    int retry_timeout = 0; // disable retry by default
 
-    inline const char *get_ip() { return _ip; }
-
+    inline std::string get_ip() { return _ip; }
     inline unsigned long get_port() const { return _port; }
-
     bool is_valid() override { return _valid; };
     bool is_critical() override { return false; };
 
+    static const ConfFile::OptionsTable option_table[4];
+    static const char *section_pattern;
+    static bool validate_config(const TcpEndpointConfig &config);
+
 protected:
-    int open_ipv4(const char *ip, unsigned long port);
-    int open_ipv6(const char *ip, unsigned long port);
+    bool open(const std::string &ip, unsigned long port);
+    static int open_ipv4(const char *ip, unsigned long port, sockaddr_in &sockaddr);
+    static int open_ipv6(const char *ip, unsigned long port, sockaddr_in6 &sockaddr6);
 
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
 
+    void _schedule_reconnect();
+    bool _retry_timeout_cb(void *data);
+
 private:
-    char *_ip = nullptr;
+    std::string _ip{};
     unsigned long _port = 0;
     bool _valid = true;
 };

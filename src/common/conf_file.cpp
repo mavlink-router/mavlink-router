@@ -23,6 +23,7 @@
 #include <fnmatch.h>
 #include <limits.h>
 #include <string.h>
+#include <string>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -61,21 +62,19 @@ ConfFile::~ConfFile()
     release_all();
 }
 
-int ConfFile::parse(const char *filename)
+int ConfFile::parse(const std::string &filename)
 {
     int fd, ret = 0;
     void *addr;
     struct stat fstat;
 
-    assert(filename);
-
-    fd = open(filename, O_RDONLY | O_CLOEXEC);
+    fd = open(filename.c_str(), O_RDONLY | O_CLOEXEC);
     if (fd < 0) {
-        log_error("Could not open conf file '%s' (%m)", filename);
+        log_error("Could not open conf file '%s' (%m)", filename.c_str());
         return -errno;
     }
 
-    if (stat(filename, &fstat) < 0) {
+    if (stat(filename.c_str(), &fstat) < 0) {
         ret = -errno;
         goto error;
     }
@@ -88,7 +87,7 @@ int ConfFile::parse(const char *filename)
 
     close(fd);
 
-    _files = new conffile{addr, (size_t)fstat.st_size, strdup(filename), _files};
+    _files = new conffile{addr, (size_t)fstat.st_size, strdup(filename.c_str()), _files};
 
     ret = _parse_file((char *)addr, (size_t)fstat.st_size, _files->filename);
     if (ret < 0) {
@@ -488,6 +487,44 @@ int ConfFile::parse_str_buf(const char *val, size_t val_len, void *storage, size
 
     memcpy(storage, val, val_len);
     ((char *)storage)[val_len] = '\0';
+
+    return 0;
+}
+
+int ConfFile::parse_stdstring(const char *val, size_t val_len, void *storage, size_t storage_len)
+{
+    auto *ptr = (std::string *)storage;
+
+    assert(val);
+    assert(storage);
+    assert(val_len);
+
+    if (storage_len < sizeof(char *)) {
+        return -ENOBUFS;
+    }
+
+    ptr->assign(val, val_len);
+    return 0;
+}
+
+int ConfFile::parse_uint8_vector(const char *val, size_t val_len, void *storage, size_t storage_len)
+{
+    assert(val);
+    assert(storage);
+    assert(val_len);
+
+    if (storage_len < sizeof(bool)) {
+        return -ENOBUFS;
+    }
+
+    char *filter_string = strndupa(val, val_len);
+    auto *target = (std::vector<uint8_t> *)storage;
+
+    char *token = strtok(filter_string, ",");
+    while (token != nullptr) {
+        target->push_back(atoi(token));
+        token = strtok(nullptr, ",");
+    }
 
     return 0;
 }
