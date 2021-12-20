@@ -228,7 +228,7 @@ static int parse_argv(int argc, char *argv[], Configuration &config)
             break;
         }
         case 'l': {
-            config.log_config.logs_dir = strdup(optarg);
+            config.log_config.logs_dir.assign((const char *)optarg);
             break;
         }
         case 'g': {
