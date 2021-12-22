@@ -506,14 +506,14 @@ void Endpoint::print_statistics()
     printf("%s Endpoint [%d]%s {", _type.c_str(), fd, _name.c_str());
     printf("\n\tReceived messages {");
     printf("\n\t\tCRC error: %u %u%% %luKBytes", _stat.read.crc_error,
-           (_stat.read.crc_error * 100) / read_total, _stat.read.crc_error_bytes / 1000);
+           (_stat.read.crc_error * 100) / read_total, (long unsigned int)_stat.read.crc_error_bytes / 1000);
     printf("\n\t\tSequence lost: %u %u%%", _stat.read.drop_seq_total,
            (_stat.read.drop_seq_total * 100) / read_total);
-    printf("\n\t\tHandled: %u %luKBytes", _stat.read.handled, _stat.read.handled_bytes / 1000);
+    printf("\n\t\tHandled: %u %luKBytes", _stat.read.handled, (long unsigned int)_stat.read.handled_bytes / 1000);
     printf("\n\t\tTotal: %u", _stat.read.total);
     printf("\n\t}");
     printf("\n\tTransmitted messages {");
-    printf("\n\t\tTotal: %u %luKBytes", _stat.write.total, _stat.write.bytes / 1000);
+    printf("\n\t\tTotal: %u %luKBytes", _stat.write.total, (long unsigned int)_stat.write.bytes / 1000);
     printf("\n\t}");
     printf("\n}\n");
 }
