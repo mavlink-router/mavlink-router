@@ -45,7 +45,7 @@
 #define MAX_RETRIES   10
 
 const ConfFile::OptionsTable LogEndpoint::option_table[] = {
-    {"Log", false, ConfFile::parse_str_dup, OPTIONS_TABLE_STRUCT_FIELD(LogOptions, logs_dir)},
+    {"Log", false, ConfFile::parse_stdstring, OPTIONS_TABLE_STRUCT_FIELD(LogOptions, logs_dir)},
     {"LogMode", false, LogEndpoint::parse_log_mode,
      OPTIONS_TABLE_STRUCT_FIELD(LogOptions, log_mode)},
     {"MavlinkDialect", false, LogEndpoint::parse_mavlink_dialect,
