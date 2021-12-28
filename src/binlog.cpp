@@ -80,10 +80,8 @@ int BinLog::write_msg(const struct buffer *buffer)
     uint32_t msg_id;
     uint8_t *payload;
     uint16_t payload_len;
-    uint8_t trimmed_zeros;
     uint8_t source_system_id;
     uint8_t source_component_id;
-    mavlink_remote_log_data_block_t *binlog_data;
 
     if (mavlink2) {
         auto *msg = (struct mavlink_router_mavlink2_header *)buffer->data;
@@ -124,12 +122,14 @@ int BinLog::write_msg(const struct buffer *buffer)
         payload_len = msg_entry->max_msg_len;
     }
 
+    uint8_t trimmed_zeros;
     if (mavlink2) {
         trimmed_zeros = get_trimmed_zeros(msg_entry, buffer);
     } else {
         trimmed_zeros = 0;
     }
 
+    mavlink_remote_log_data_block_t *binlog_data;
     if (trimmed_zeros) {
         binlog_data
             = (mavlink_remote_log_data_block_t *)alloca(sizeof(mavlink_remote_log_data_block_t));

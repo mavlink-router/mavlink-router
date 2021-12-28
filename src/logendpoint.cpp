@@ -249,12 +249,11 @@ uint32_t LogEndpoint::_get_prefix(DIR *dir)
 
 DIR *LogEndpoint::_open_or_create_dir(const char *name)
 {
-    int r;
     DIR *dir = opendir(name);
 
     // If failed because dir doesn't exist, try to create it
     if (!dir && errno == ENOENT) {
-        r = mkdir_p(name, strlen(name), 0755);
+        const int r = mkdir_p(name, strlen(name), 0755);
         if (r < 0) {
             errno = -r;
             return nullptr;
@@ -267,14 +266,10 @@ DIR *LogEndpoint::_open_or_create_dir(const char *name)
 
 int LogEndpoint::_get_file(const char *extension)
 {
-    time_t t = time(nullptr);
-    struct tm *timeinfo = localtime(&t);
-    uint32_t i;
-    int j, r;
-    DIR *dir;
-    int dir_fd;
+    const time_t t = time(nullptr);
+    const struct tm *timeinfo = localtime(&t);
 
-    dir = _open_or_create_dir(_config.logs_dir.c_str());
+    DIR *dir = _open_or_create_dir(_config.logs_dir.c_str());
     if (!dir) {
         log_error("Could not open log dir (%m)");
         return -1;
@@ -282,11 +277,11 @@ int LogEndpoint::_get_file(const char *extension)
     // Close dir when leaving function.
     std::shared_ptr<void> defer(dir, [](DIR *p) { closedir(p); });
 
-    i = _get_prefix(dir);
-    dir_fd = dirfd(dir);
+    const uint32_t i = _get_prefix(dir);
+    const int dir_fd = dirfd(dir);
 
-    for (j = 0; j <= MAX_RETRIES; j++) {
-        r = snprintf(_filename, sizeof(_filename), "%05u-%i-%02i-%02i_%02i-%02i-%02i.%s", i + j,
+    for (int j = 0; j <= MAX_RETRIES; j++) {
+        int r = snprintf(_filename, sizeof(_filename), "%05u-%i-%02i-%02i_%02i-%02i-%02i.%s", i + j,
                      timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday,
                      timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec, extension);
 
