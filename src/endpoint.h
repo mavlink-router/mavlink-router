@@ -151,8 +151,7 @@ public:
     struct buffer tx_buf;
 
 protected:
-    virtual int read_msg(struct buffer *pbuf, int *target_sysid, int *target_compid,
-                         uint8_t *src_sysid, uint8_t *src_compid, uint32_t *msg_id);
+    virtual int read_msg(struct buffer *pbuf);
     virtual ssize_t _read_msg(uint8_t *buf, size_t len) = 0;
     bool _check_crc(const mavlink_msg_entry_t *msg_entry) const;
     void _add_sys_comp_id(uint16_t sys_comp_id);
@@ -205,8 +204,7 @@ protected:
     int set_flow_control(bool enabled);
     int add_speeds(const std::vector<speed_t> &bauds);
 
-    int read_msg(struct buffer *pbuf, int *target_sysid, int *target_compid, uint8_t *src_sysid,
-                 uint8_t *src_compid, uint32_t *msg_id) override;
+    int read_msg(struct buffer *pbuf) override;
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
 
 private:
