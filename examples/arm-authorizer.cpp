@@ -194,15 +194,21 @@ static void handle_mission_item_int(mavlink_mission_item_int_t *mission_item)
     x /= 10000000;
     y /= 10000000;
 
-    printf("Mission item { seq=%u mission_type=%u x=%f y=%f altitude=%f }\n", mission_item->seq,
-           mission_item->mission_type, x, y, mission_item->z);
+    printf("Mission item { seq=%u mission_type=%u x=%f y=%f altitude=%f }\n",
+           mission_item->seq,
+           mission_item->mission_type,
+           x,
+           y,
+           mission_item->z);
 
     if (mission_valid && mission_item->z > MAX_VALID_ALTITUDE) {
         mission_valid = false;
         first_mission_item_invalid = mission_item->seq;
         printf("Arm request will be denied because mission item seq=%u have a invalid altitude, "
                "altitude=%f max accepted altitude=%f\n",
-               mission_item->seq, mission_item->z, MAX_VALID_ALTITUDE);
+               mission_item->seq,
+               mission_item->z,
+               MAX_VALID_ALTITUDE);
     }
 
     mission_item->seq++;

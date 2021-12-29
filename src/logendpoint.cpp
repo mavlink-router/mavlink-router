@@ -141,7 +141,8 @@ void LogEndpoint::_delete_old_logs()
         log_error("[Log Deletion] Error when measuring free disk space: %m");
     }
     log_debug("[Log Deletion]  Total free space: %lumb. Min free space: %lumb",
-              free_space / (1ul << 20), _config.min_free_space / (1ul << 20));
+              free_space / (1ul << 20),
+              _config.min_free_space / (1ul << 20));
 
     // This check is not necessary, it just saves on some file IO.
     if (free_space > _config.min_free_space && _config.max_log_files == 0) {
@@ -173,7 +174,14 @@ void LogEndpoint::_delete_old_logs()
     while ((ent = readdir(dir)) != nullptr) {
         // Even though we don't need the timestamp, we want to match as much of the filename as
         // possible, so we don't accidentally delete something that isn't a log.
-        if (sscanf(ent->d_name, "%u-%u-%u-%u_%u-%u-%u.", &idx, &year, &month, &day, &hour, &minute,
+        if (sscanf(ent->d_name,
+                   "%u-%u-%u-%u_%u-%u-%u.",
+                   &idx,
+                   &year,
+                   &month,
+                   &day,
+                   &hour,
+                   &minute,
                    &second)
             == 7) {
             struct stat file_stat;
@@ -209,10 +217,14 @@ void LogEndpoint::_delete_old_logs()
         std::string &filename = std::get<0>(pair.second);
         const unsigned long filesize = std::get<1>(pair.second);
         char log_file[PATH_MAX];
-        if (snprintf(log_file, sizeof(log_file), "%s/%s", _config.logs_dir.c_str(),
+        if (snprintf(log_file,
+                     sizeof(log_file),
+                     "%s/%s",
+                     _config.logs_dir.c_str(),
                      filename.c_str())
             >= (int)sizeof(log_file)) {
-            log_error("Directory + filename %s is longer than PATH_MAX of %d", filename.c_str(),
+            log_error("Directory + filename %s is longer than PATH_MAX of %d",
+                      filename.c_str(),
                       PATH_MAX);
             continue;
         }
@@ -290,9 +302,17 @@ int LogEndpoint::_get_file(const char *extension)
     dir_fd = dirfd(dir);
 
     for (j = 0; j <= MAX_RETRIES; j++) {
-        r = snprintf(_filename, sizeof(_filename), "%05u-%i-%02i-%02i_%02i-%02i-%02i.%s", i + j,
-                     timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday,
-                     timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec, extension);
+        r = snprintf(_filename,
+                     sizeof(_filename),
+                     "%05u-%i-%02i-%02i_%02i-%02i-%02i.%s",
+                     i + j,
+                     timeinfo->tm_year + 1900,
+                     timeinfo->tm_mon + 1,
+                     timeinfo->tm_mday,
+                     timeinfo->tm_hour,
+                     timeinfo->tm_min,
+                     timeinfo->tm_sec,
+                     extension);
 
         if (r < 1 || (size_t)r >= sizeof(_filename)) {
             log_error("Error formatting Log file name: (%m)");
@@ -368,15 +388,18 @@ bool LogEndpoint::start()
     }
 
     _timeout.logging_start = Mainloop::get_instance().add_timeout(
-        MSEC_PER_SEC, std::bind(&LogEndpoint::_logging_start_timeout, this), this);
+        MSEC_PER_SEC,
+        std::bind(&LogEndpoint::_logging_start_timeout, this),
+        this);
     if (!_timeout.logging_start) {
         log_error("Unable to add timeout");
         goto logging_timeout_error;
     }
 
     // Call fsync once per second
-    _timeout.fsync = Mainloop::get_instance().add_timeout(
-        MSEC_PER_SEC, std::bind(&LogEndpoint::_fsync, this), this);
+    _timeout.fsync = Mainloop::get_instance().add_timeout(MSEC_PER_SEC,
+                                                          std::bind(&LogEndpoint::_fsync, this),
+                                                          this);
     if (!_timeout.fsync) {
         log_error("Unable to add timeout");
         goto fsync_timeout_error;
@@ -433,8 +456,10 @@ void LogEndpoint::_remove_logging_start_timeout()
 
 bool LogEndpoint::_start_alive_timeout()
 {
-    _timeout.alive = Mainloop::get_instance().add_timeout(
-        MSEC_PER_SEC * ALIVE_TIMEOUT, std::bind(&LogEndpoint::_alive_timeout, this), this);
+    _timeout.alive
+        = Mainloop::get_instance().add_timeout(MSEC_PER_SEC * ALIVE_TIMEOUT,
+                                               std::bind(&LogEndpoint::_alive_timeout, this),
+                                               this);
     return !!_timeout.alive;
 }
 

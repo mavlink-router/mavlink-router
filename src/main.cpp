@@ -417,14 +417,18 @@ static int parse_confs(ConfFile &conffile, Configuration &config)
     };
     // clang-format on
 
-    ret = conffile.extract_options("General", global_option_table, ARRAY_SIZE(global_option_table),
+    ret = conffile.extract_options("General",
+                                   global_option_table,
+                                   ARRAY_SIZE(global_option_table),
                                    &config);
     if (ret < 0) {
         return ret;
     }
 
-    ret = conffile.extract_options("General", LogEndpoint::option_table,
-                                   ARRAY_SIZE(LogEndpoint::option_table), &config.log_config);
+    ret = conffile.extract_options("General",
+                                   LogEndpoint::option_table,
+                                   ARRAY_SIZE(LogEndpoint::option_table),
+                                   &config.log_config);
     if (ret < 0) {
         return ret;
     }
@@ -435,8 +439,10 @@ static int parse_confs(ConfFile &conffile, Configuration &config)
         UartEndpointConfig opt_uart{};
         opt_uart.name = std::string(iter.name + offset, iter.name_len - offset);
 
-        ret = conffile.extract_options(&iter, UartEndpoint::option_table,
-                                       ARRAY_SIZE(UartEndpoint::option_table), &opt_uart);
+        ret = conffile.extract_options(&iter,
+                                       UartEndpoint::option_table,
+                                       ARRAY_SIZE(UartEndpoint::option_table),
+                                       &opt_uart);
         if (ret != 0) {
             return ret;
         }
@@ -453,8 +459,10 @@ static int parse_confs(ConfFile &conffile, Configuration &config)
         opt_udp.name = std::string(iter.name + offset, iter.name_len - offset);
         opt_udp.port = ULONG_MAX; // unset port value to be checked later on
 
-        ret = conffile.extract_options(&iter, UdpEndpoint::option_table,
-                                       ARRAY_SIZE(UdpEndpoint::option_table), &opt_udp);
+        ret = conffile.extract_options(&iter,
+                                       UdpEndpoint::option_table,
+                                       ARRAY_SIZE(UdpEndpoint::option_table),
+                                       &opt_udp);
         if (ret != 0) {
             return ret;
         }
@@ -476,8 +484,10 @@ static int parse_confs(ConfFile &conffile, Configuration &config)
         opt_tcp.name = std::string(iter.name + offset, iter.name_len - offset);
         opt_tcp.port = ULONG_MAX; // unset port value to be checked later on
         opt_tcp.retry_timeout = DEFAULT_RETRY_TCP_TIMEOUT;
-        ret = conffile.extract_options(&iter, TcpEndpoint::option_table,
-                                       ARRAY_SIZE(TcpEndpoint::option_table), &opt_tcp);
+        ret = conffile.extract_options(&iter,
+                                       TcpEndpoint::option_table,
+                                       ARRAY_SIZE(TcpEndpoint::option_table),
+                                       &opt_tcp);
         if (ret != 0) {
             return ret;
         }

@@ -355,7 +355,8 @@ bool ULog::_logging_flush()
             _buffer_partial_len = 0;
             log_error("Partial buffer is not big enough to store the "
                       "ULog entry(type=%c len=%u), ULog file is now corrupt.",
-                      header->msg_type, full_msg_size);
+                      header->msg_type,
+                      full_msg_size);
             break;
         }
 

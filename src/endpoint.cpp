@@ -125,8 +125,13 @@ static unsigned int ipv6_get_scope_id(const char *ip)
     /* search for our address in all interface addresses */
     for (ifaddrs *addr = addrs; addr; addr = addr->ifa_next) {
         if (addr->ifa_addr && addr->ifa_addr->sa_family == AF_INET6) {
-            getnameinfo(addr->ifa_addr, sizeof(struct sockaddr_in6), ipAddress, sizeof(ipAddress),
-                        nullptr, 0, NI_NUMERICHOST);
+            getnameinfo(addr->ifa_addr,
+                        sizeof(struct sockaddr_in6),
+                        ipAddress,
+                        sizeof(ipAddress),
+                        nullptr,
+                        0,
+                        NI_NUMERICHOST);
 
             /* cut the interface name from the end of a link-local address */
             auto *search = strrchr(ipAddress, '%');
@@ -431,9 +436,14 @@ bool Endpoint::has_sys_comp_id(unsigned sys_comp_id) const
 Endpoint::AcceptState Endpoint::accept_msg(const struct buffer *pbuf) const
 {
     if (Log::get_max_level() >= Log::Level::DEBUG) {
-        log_debug("Endpoint [%d]%s: got message %u to %d/%d from %u/%u", fd, _name.c_str(),
-                  pbuf->curr.msg_id, pbuf->curr.target_sysid, pbuf->curr.target_compid,
-                  pbuf->curr.src_sysid, pbuf->curr.src_compid);
+        log_debug("Endpoint [%d]%s: got message %u to %d/%d from %u/%u",
+                  fd,
+                  _name.c_str(),
+                  pbuf->curr.msg_id,
+                  pbuf->curr.target_sysid,
+                  pbuf->curr.target_compid,
+                  pbuf->curr.src_sysid,
+                  pbuf->curr.src_compid);
         log_debug("\tKnown components:");
         for (const auto &id : _sys_comp_ids) {
             log_debug("\t\t%u/%u", (id >> 8), id & 0xff);
@@ -504,9 +514,12 @@ void Endpoint::print_statistics()
 
     printf("%s Endpoint [%d]%s {", _type.c_str(), fd, _name.c_str());
     printf("\n\tReceived messages {");
-    printf("\n\t\tCRC error: %u %u%% %luKBytes", _stat.read.crc_error,
-           (_stat.read.crc_error * 100) / read_total, _stat.read.crc_error_bytes / 1000);
-    printf("\n\t\tSequence lost: %u %u%%", _stat.read.drop_seq_total,
+    printf("\n\t\tCRC error: %u %u%% %luKBytes",
+           _stat.read.crc_error,
+           (_stat.read.crc_error * 100) / read_total,
+           _stat.read.crc_error_bytes / 1000);
+    printf("\n\t\tSequence lost: %u %u%%",
+           _stat.read.drop_seq_total,
            (_stat.read.drop_seq_total * 100) / read_total);
     printf("\n\t\tHandled: %u %luKBytes", _stat.read.handled, _stat.read.handled_bytes / 1000);
     printf("\n\t\tTotal: %u", _stat.read.total);
@@ -539,7 +552,11 @@ void Endpoint::log_aggregate(unsigned int interval_sec)
 {
     if (_incomplete_msgs > 0) {
         log_warning("%s Endpoint [%d]%s: %u incomplete messages in the last %d seconds",
-                    _type.c_str(), fd, _name.c_str(), _incomplete_msgs, interval_sec);
+                    _type.c_str(),
+                    fd,
+                    _name.c_str(),
+                    _incomplete_msgs,
+                    interval_sec);
         _incomplete_msgs = 0;
     }
 }
@@ -749,7 +766,9 @@ bool UartEndpoint::_change_baud_cb(void *data)
 {
     _current_baud_idx = (_current_baud_idx + 1) % _baudrates.size();
 
-    log_info("Retrying UART [%d]%s on new baudrate: %u", fd, _name.c_str(),
+    log_info("Retrying UART [%d]%s on new baudrate: %u",
+             fd,
+             _name.c_str(),
              _baudrates[_current_baud_idx]);
 
     set_speed(_baudrates[_current_baud_idx]);
@@ -762,7 +781,10 @@ int UartEndpoint::read_msg(struct buffer *pbuf)
     int ret = Endpoint::read_msg(pbuf);
 
     if (_change_baud_timeout != nullptr && ret == ReadOk) {
-        log_info("%s [%d]%s: Baudrate %u responded, keeping it", _type.c_str(), fd, _name.c_str(),
+        log_info("%s [%d]%s: Baudrate %u responded, keeping it",
+                 _type.c_str(),
+                 fd,
+                 _name.c_str(),
                  _baudrates[_current_baud_idx]);
         Mainloop::get_instance().del_timeout(_change_baud_timeout);
         _change_baud_timeout = nullptr;
@@ -807,7 +829,9 @@ int UartEndpoint::write_msg(const struct buffer *pbuf)
     /* Incomplete packet, we warn and discard the rest */
     if (r != (ssize_t)pbuf->len) {
         _incomplete_msgs++;
-        log_debug("UART %s: Discarding packet, incomplete write %zd but len=%u", _name.c_str(), r,
+        log_debug("UART %s: Discarding packet, incomplete write %zd but len=%u",
+                  _name.c_str(),
+                  r,
                   pbuf->len);
     }
 
@@ -828,7 +852,8 @@ int UartEndpoint::add_speeds(const std::vector<speed_t> &bauds)
 
     _change_baud_timeout = Mainloop::get_instance().add_timeout(
         MSEC_PER_SEC * UART_BAUD_RETRY_SEC,
-        std::bind(&UartEndpoint::_change_baud_cb, this, std::placeholders::_1), this);
+        std::bind(&UartEndpoint::_change_baud_cb, this, std::placeholders::_1),
+        this);
 
     return 0;
 }
@@ -1093,7 +1118,9 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
     /* Incomplete packet, we warn and discard the rest */
     if (r != (ssize_t)pbuf->len) {
         _incomplete_msgs++;
-        log_debug("UDP %s: Discarding packet, incomplete write %zd but len=%u", _name.c_str(), r,
+        log_debug("UDP %s: Discarding packet, incomplete write %zd but len=%u",
+                  _name.c_str(),
+                  r,
                   pbuf->len);
     }
 
@@ -1139,7 +1166,8 @@ bool UdpEndpoint::validate_config(const UdpEndpointConfig &config)
     }
 
     if (!validate_ip(config.address)) {
-        log_error("UdpEndpoint %s: Invalid IP address %s", config.name.c_str(),
+        log_error("UdpEndpoint %s: Invalid IP address %s",
+                  config.name.c_str(),
                   config.address.c_str());
         return false;
     }
@@ -1150,7 +1178,8 @@ bool UdpEndpoint::validate_config(const UdpEndpointConfig &config)
     }
 
     if (config.port == 0 || config.port == ULONG_MAX) {
-        log_error("UdpEndpoint %s: Invalid or unset UDP port %lu", config.name.c_str(),
+        log_error("UdpEndpoint %s: Invalid or unset UDP port %lu",
+                  config.name.c_str(),
                   config.port);
         return false;
     }
@@ -1185,8 +1214,10 @@ bool TcpEndpoint::setup(TcpEndpointConfig conf)
     }
 
     if (!this->open(conf.address, conf.port)) {
-        log_warning("Could not open %s:%ld, re-trying every %d sec", conf.address.c_str(),
-                    conf.port, retry_timeout);
+        log_warning("Could not open %s:%ld, re-trying every %d sec",
+                    conf.address.c_str(),
+                    conf.port,
+                    retry_timeout);
         if (this->retry_timeout > 0) {
             _schedule_reconnect();
         }
@@ -1407,7 +1438,9 @@ int TcpEndpoint::write_msg(const struct buffer *pbuf)
     /* Incomplete packet, we warn and discard the rest */
     if (r != (ssize_t)pbuf->len) {
         _incomplete_msgs++;
-        log_debug("TCP %s: Discarding packet, incomplete write %zd but len=%u", _name.c_str(), r,
+        log_debug("TCP %s: Discarding packet, incomplete write %zd but len=%u",
+                  _name.c_str(),
+                  r,
                   pbuf->len);
     }
 
@@ -1436,13 +1469,15 @@ bool TcpEndpoint::validate_config(const TcpEndpointConfig &config)
     }
 
     if (!validate_ip(config.address)) {
-        log_error("TcpEndpoint %s: Invalid IP address %s", config.name.c_str(),
+        log_error("TcpEndpoint %s: Invalid IP address %s",
+                  config.name.c_str(),
                   config.address.c_str());
         return false;
     }
 
     if (config.port == 0 || config.port == ULONG_MAX) {
-        log_error("TcpEndpoint %s: Invalid or unset TCP port %lu", config.name.c_str(),
+        log_error("TcpEndpoint %s: Invalid or unset TCP port %lu",
+                  config.name.c_str(),
                   config.port);
         return false;
     }
@@ -1461,12 +1496,14 @@ void TcpEndpoint::_schedule_reconnect()
 
     t = Mainloop::get_instance().add_timeout(
         MSEC_PER_SEC * retry_timeout,
-        std::bind(&TcpEndpoint::_retry_timeout_cb, this, std::placeholders::_1), this);
+        std::bind(&TcpEndpoint::_retry_timeout_cb, this, std::placeholders::_1),
+        this);
 
     if (t == nullptr) {
         log_warning("Could not create retry timeout for TCP endpoint %s:%lu\n"
                     "No attempts to reconnect will be made",
-                    _ip.c_str(), _port);
+                    _ip.c_str(),
+                    _port);
     }
 }
 
