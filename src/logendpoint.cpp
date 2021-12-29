@@ -75,12 +75,19 @@ LogEndpoint::LogEndpoint(std::string name, LogOptions conf)
 
 void LogEndpoint::_send_msg(const mavlink_message_t *msg, int target_sysid)
 {
-    uint8_t data[MAVLINK_MAX_PACKET_LEN];
-    struct buffer buffer {
-        0, data
-    };
+    uint8_t data[MAVLINK_MAX_PACKET_LEN] = {};
+    struct buffer buffer = {};
 
+    buffer.data = data;
     buffer.len = mavlink_msg_to_send_buffer(data, msg);
+    buffer.curr.msg_id = msg->msgid;
+    buffer.curr.target_sysid = target_sysid;
+    buffer.curr.target_compid = MAV_COMP_ID_ALL;
+    buffer.curr.src_sysid = msg->sysid;
+    buffer.curr.src_compid = msg->compid;
+    /* don't bother with it as it's only used by Log backends */
+    buffer.curr.payload_len = 0;
+
     Mainloop::get_instance().route_msg(&buffer, target_sysid, MAV_COMP_ID_ALL, msg->sysid,
                                        msg->compid);
 
