@@ -377,6 +377,9 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
         *msg_id = msg_entry->msgid;
     }
 
+    pbuf->curr
+        = {*msg_id, *target_sysid, *target_compid, *src_sysid, *src_compid, payload_len, payload};
+
     // Check for sequence drops
     if (_stat.read.expected_seq != seq) {
         if (_stat.read.total > 1) {
