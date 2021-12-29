@@ -61,7 +61,7 @@ LogEndpoint::LogEndpoint(std::string name, LogOptions conf)
     , _config{conf}
 {
     assert(!_config.logs_dir.empty());
-    _add_sys_comp_id(LOG_ENDPOINT_SYSTEM_ID << 8);
+    _add_sys_comp_id(LOG_ENDPOINT_SYSTEM_ID, 0);
     _fsync_cb.aio_fildes = -1;
 
 #if HAVE_DECL_AIO_INIT
