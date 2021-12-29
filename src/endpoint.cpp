@@ -52,41 +52,32 @@
 
 #define UART_BAUD_RETRY_SEC 5
 
+// clang-format off
 const char *UartEndpoint::section_pattern = "uartendpoint *";
 const ConfFile::OptionsTable UartEndpoint::option_table[] = {
-    {"baud", false, UartEndpoint::parse_baudrates,
-     OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, baudrates)},
-    {"device", true, ConfFile::parse_stdstring,
-     OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, device)},
-    {"FlowControl", false, ConfFile::parse_bool,
-     OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, flowcontrol)},
-    {"AllowMsgIdOut", false, ConfFile::parse_uint8_vector,
-     OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, allow_msg_id_out)},
+    {"baud",            false, UartEndpoint::parse_baudrates,   OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, baudrates)},
+    {"device",          true,  ConfFile::parse_stdstring,       OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, device)},
+    {"FlowControl",     false, ConfFile::parse_bool,            OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, flowcontrol)},
+    {"AllowMsgIdOut",   false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, allow_msg_id_out)},
 };
 
 const char *UdpEndpoint::section_pattern = "udpendpoint *";
 const ConfFile::OptionsTable UdpEndpoint::option_table[] = {
-    {"address", true, ConfFile::parse_stdstring,
-     OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, address)},
-    {"mode", true, UdpEndpoint::parse_udp_mode,
-     OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, mode)},
-    {"port", false, ConfFile::parse_ul, OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, port)},
-    {"filter", false, ConfFile::parse_uint8_vector,
-     OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_msg_id_out)}, // legacy AllowMsgIdOut
-    {"AllowMsgIdOut", false, ConfFile::parse_uint8_vector,
-     OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_msg_id_out)},
+    {"address",         true,   ConfFile::parse_stdstring,      OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, address)},
+    {"mode",            true,   UdpEndpoint::parse_udp_mode,    OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, mode)},
+    {"port",            false,  ConfFile::parse_ul,             OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, port)},
+    {"filter",          false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_msg_id_out)}, // legacy AllowMsgIdOut
+    {"AllowMsgIdOut",   false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_msg_id_out)},
 };
 
 const char *TcpEndpoint::section_pattern = "tcpendpoint *";
 const ConfFile::OptionsTable TcpEndpoint::option_table[] = {
-    {"address", true, ConfFile::parse_stdstring,
-     OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, address)},
-    {"port", true, ConfFile::parse_ul, OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, port)},
-    {"RetryTimeout", false, ConfFile::parse_i,
-     OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, retry_timeout)},
-    {"AllowMsgIdOut", false, ConfFile::parse_uint8_vector,
-     OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_msg_id_out)},
+    {"address",         true,   ConfFile::parse_stdstring,      OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, address)},
+    {"port",            true,   ConfFile::parse_ul,             OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, port)},
+    {"RetryTimeout",    false,  ConfFile::parse_i,              OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, retry_timeout)},
+    {"AllowMsgIdOut",   false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_msg_id_out)},
 };
+// clang-format on
 
 static bool is_ipv6(const char *ip)
 {

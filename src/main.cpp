@@ -409,15 +409,13 @@ static int parse_confs(ConfFile &conffile, Configuration &config)
     int ret;
     size_t offset;
     struct ConfFile::section_iter iter;
-
+    // clang-format off
     static const ConfFile::OptionsTable global_option_table[] = {
-        {"TcpServerPort", false, ConfFile::parse_ul,
-         OPTIONS_TABLE_STRUCT_FIELD(Configuration, tcp_port)},
-        {"ReportStats", false, ConfFile::parse_bool,
-         OPTIONS_TABLE_STRUCT_FIELD(Configuration, report_msg_statistics)},
-        {"DebugLogLevel", false, parse_log_level,
-         OPTIONS_TABLE_STRUCT_FIELD(Configuration, debug_log_level)},
+        {"TcpServerPort",   false, ConfFile::parse_ul,      OPTIONS_TABLE_STRUCT_FIELD(Configuration, tcp_port)},
+        {"ReportStats",     false, ConfFile::parse_bool,    OPTIONS_TABLE_STRUCT_FIELD(Configuration, report_msg_statistics)},
+        {"DebugLogLevel",   false, parse_log_level,         OPTIONS_TABLE_STRUCT_FIELD(Configuration, debug_log_level)},
     };
+    // clang-format on
 
     ret = conffile.extract_options("General", global_option_table, ARRAY_SIZE(global_option_table),
                                    &config);
