@@ -441,23 +441,29 @@ bool LogEndpoint::_start_alive_timeout()
     return !!_timeout.alive;
 }
 
-void LogEndpoint::_handle_auto_start_stop(uint32_t msg_id, uint8_t source_system_id,
-                                          uint8_t source_component_id, const uint8_t *payload)
+void LogEndpoint::_handle_auto_start_stop(const struct buffer *pbuf)
 {
-    if (_target_system_id == -1) { // wait until initialized
+    // wait until initialized
+    if (_target_system_id == -1) {
         return;
     }
+
     if (_config.log_mode == LogMode::always) {
         if (_file == -1) {
             if (!start()) {
                 _config.log_mode = LogMode::disabled;
             }
         }
-    } else if (_config.log_mode == LogMode::while_armed) {
-        if (msg_id == MAVLINK_MSG_ID_HEARTBEAT && source_system_id == _target_system_id
-            && source_component_id == MAV_COMP_ID_AUTOPILOT1) {
 
-            const mavlink_heartbeat_t *heartbeat = (mavlink_heartbeat_t *)payload;
+        return;
+    }
+
+    if (_config.log_mode == LogMode::while_armed) {
+        if (pbuf->curr.msg_id == MAVLINK_MSG_ID_HEARTBEAT
+            && pbuf->curr.src_sysid == _target_system_id
+            && pbuf->curr.src_compid == MAV_COMP_ID_AUTOPILOT1) {
+
+            const mavlink_heartbeat_t *heartbeat = (mavlink_heartbeat_t *)pbuf->curr.payload;
             const bool is_armed = heartbeat->base_mode & MAV_MODE_FLAG_SAFETY_ARMED;
 
             if (_file == -1 && is_armed) {

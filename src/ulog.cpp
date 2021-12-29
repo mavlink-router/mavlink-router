@@ -133,7 +133,7 @@ int ULog::write_msg(const struct buffer *buffer)
     }
 
     /* Check if we should start or stop logging */
-    _handle_auto_start_stop(msg_id, source_system_id, source_component_id, payload);
+    _handle_auto_start_stop(buffer);
 
     /* Check if we are interested in this msg_id */
     if (msg_id != MAVLINK_MSG_ID_COMMAND_ACK && msg_id != MAVLINK_MSG_ID_LOGGING_DATA_ACKED
