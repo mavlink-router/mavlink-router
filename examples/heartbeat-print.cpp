@@ -37,7 +37,7 @@ static void exit_signal_handler(int signum)
 
 static void setup_signal_handlers()
 {
-    struct sigaction sa = { };
+    struct sigaction sa = {};
 
     sa.sa_flags = SA_NOCLDSTOP;
     sa.sa_handler = exit_signal_handler;
@@ -53,8 +53,7 @@ static void handle_new_message(const mavlink_message_t *msg)
         printf("HEARTBEAT:\n"
                "\tmavlink_version: %u\n"
                "\ttype: %u\n",
-               heartbeat.mavlink_version,
-               heartbeat.type);
+               heartbeat.mavlink_version, heartbeat.type);
     }
 }
 
@@ -115,7 +114,6 @@ int main(int argc, char *argv[])
                 handle_new_message(&msg);
             }
         }
-
     }
 
     free(ip);
