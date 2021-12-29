@@ -141,8 +141,7 @@ public:
         return has_sys_comp_id(sys_comp_id);
     }
 
-    AcceptState accept_msg(int target_sysid, int target_compid, uint8_t src_sysid,
-                           uint8_t src_compid, uint32_t msg_id) const;
+    AcceptState accept_msg(const struct buffer *pbuf) const;
 
     void filter_add_allowed_msg_id(uint32_t msg_id) { _allowed_msg_ids.push_back(msg_id); }
 

@@ -156,8 +156,8 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid
     bool unknown = true;
 
     for (const auto &e : this->g_endpoints) {
-        auto acceptState
-            = e->accept_msg(target_sysid, target_compid, sender_sysid, sender_compid, msg_id);
+        auto acceptState = e->accept_msg(buf);
+
         switch (acceptState) {
         case Endpoint::AcceptState::Accepted:
             log_debug("Endpoint [%d] accepted message %u to %d/%d from %u/%u", e->fd, msg_id,

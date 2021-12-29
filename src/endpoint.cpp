@@ -434,12 +434,12 @@ bool Endpoint::has_sys_comp_id(unsigned sys_comp_id) const
     return false;
 }
 
-Endpoint::AcceptState Endpoint::accept_msg(int target_sysid, int target_compid, uint8_t src_sysid,
-                                           uint8_t src_compid, uint32_t msg_id) const
+Endpoint::AcceptState Endpoint::accept_msg(const struct buffer *pbuf) const
 {
     if (Log::get_max_level() >= Log::Level::DEBUG) {
-        log_debug("Endpoint [%d]%s: got message %u to %d/%d from %u/%u", fd, _name.c_str(), msg_id,
-                  target_sysid, target_compid, src_sysid, src_compid);
+        log_debug("Endpoint [%d]%s: got message %u to %d/%d from %u/%u", fd, _name.c_str(),
+                  pbuf->curr.msg_id, pbuf->curr.target_sysid, pbuf->curr.target_compid,
+                  pbuf->curr.src_sysid, pbuf->curr.src_compid);
         log_debug("\tKnown components:");
         for (const auto &id : _sys_comp_ids) {
             log_debug("\t\t%u/%u", (id >> 8), id & 0xff);
@@ -448,29 +448,31 @@ Endpoint::AcceptState Endpoint::accept_msg(int target_sysid, int target_compid, 
 
     // This endpoint sent the message, we don't want to send it back over the
     // same channel to avoid loops: reject
-    if (has_sys_comp_id(src_sysid, src_compid)) {
+    if (has_sys_comp_id(pbuf->curr.src_sysid, pbuf->curr.src_compid)) {
         return Endpoint::AcceptState::Rejected;
     }
 
     // If filter is defined and message is not in the set: discard it
-    if (msg_id != UINT32_MAX && !_allowed_msg_ids.empty()
-        && !vector_contains(_allowed_msg_ids, msg_id)) {
+    if (pbuf->curr.msg_id != UINT32_MAX && !_allowed_msg_ids.empty()
+        && !vector_contains(_allowed_msg_ids, pbuf->curr.msg_id)) {
         return Endpoint::AcceptState::Filtered;
     }
 
     // Message is broadcast on sysid or sysid is non-existent: accept msg
-    if (target_sysid == 0 || target_sysid == -1) {
+    if (pbuf->curr.target_sysid == 0 || pbuf->curr.target_sysid == -1) {
         return Endpoint::AcceptState::Accepted;
     }
 
     // This endpoint has the target of message (sys and comp id): accept
-    if (target_compid > 0 && has_sys_comp_id(target_sysid, target_compid)) {
+    if (pbuf->curr.target_compid > 0
+        && has_sys_comp_id(pbuf->curr.target_sysid, pbuf->curr.target_compid)) {
         return Endpoint::AcceptState::Accepted;
     }
 
     // This endpoint has the target of message (sysid, but compid is broadcast or non-existent):
     // accept
-    if ((target_compid == 0 || target_compid == -1) && has_sys_id(target_sysid)) {
+    if ((pbuf->curr.target_compid == 0 || pbuf->curr.target_compid == -1)
+        && has_sys_id(pbuf->curr.target_sysid)) {
         return Endpoint::AcceptState::Accepted;
     }
 
