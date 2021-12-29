@@ -77,49 +77,29 @@ void BinLog::_send_stop()
 int BinLog::write_msg(const struct buffer *buffer)
 {
     const bool mavlink2 = buffer->data[0] == MAVLINK_STX;
-    uint32_t msg_id;
-    uint8_t *payload;
-    uint16_t payload_len;
     uint8_t trimmed_zeros;
-    uint8_t source_system_id;
-    uint8_t source_component_id;
     mavlink_remote_log_data_block_t *binlog_data;
 
-    if (mavlink2) {
-        auto *msg = (struct mavlink_router_mavlink2_header *)buffer->data;
-        msg_id = msg->msgid;
-        payload = buffer->data + sizeof(struct mavlink_router_mavlink2_header);
-        payload_len = msg->payload_len;
-        source_system_id = msg->sysid;
-        source_component_id = msg->compid;
-    } else {
-        auto *msg = (struct mavlink_router_mavlink1_header *)buffer->data;
-        msg_id = msg->msgid;
-        payload = buffer->data + sizeof(struct mavlink_router_mavlink1_header);
-        payload_len = msg->payload_len;
-        source_system_id = msg->sysid;
-        source_component_id = msg->compid;
-    }
-
     /* set the expected system id to the first autopilot that we get a heartbeat from */
-    if (_target_system_id == -1 && msg_id == MAVLINK_MSG_ID_HEARTBEAT
-        && source_component_id == MAV_COMP_ID_AUTOPILOT1) {
-        _target_system_id = source_system_id;
+    if (_target_system_id == -1 && buffer->curr.msg_id == MAVLINK_MSG_ID_HEARTBEAT
+        && buffer->curr.src_compid == MAV_COMP_ID_AUTOPILOT1) {
+        _target_system_id = buffer->curr.src_sysid;
     }
 
     /* Check if we should start or stop logging */
     _handle_auto_start_stop(buffer);
 
     /* Check if we are interested in this msg_id */
-    if (msg_id != MAVLINK_MSG_ID_REMOTE_LOG_DATA_BLOCK) {
+    if (buffer->curr.msg_id != MAVLINK_MSG_ID_REMOTE_LOG_DATA_BLOCK) {
         return buffer->len;
     }
 
-    const mavlink_msg_entry_t *msg_entry = mavlink_get_msg_entry(msg_id);
+    const mavlink_msg_entry_t *msg_entry = mavlink_get_msg_entry(buffer->curr.msg_id);
     if (!msg_entry) {
         return buffer->len;
     }
 
+    uint16_t payload_len = buffer->curr.payload_len;
     if (payload_len > msg_entry->max_msg_len) {
         payload_len = msg_entry->max_msg_len;
     }
@@ -133,10 +113,10 @@ int BinLog::write_msg(const struct buffer *buffer)
     if (trimmed_zeros) {
         binlog_data
             = (mavlink_remote_log_data_block_t *)alloca(sizeof(mavlink_remote_log_data_block_t));
-        memcpy(binlog_data, payload, payload_len);
+        memcpy(binlog_data, buffer->curr.payload, payload_len);
         memset((uint8_t *)binlog_data + payload_len, 0, trimmed_zeros);
     } else {
-        binlog_data = (mavlink_remote_log_data_block_t *)payload;
+        binlog_data = (mavlink_remote_log_data_block_t *)buffer->curr.payload;
     }
 
     if (_timeout.logging_start) {
