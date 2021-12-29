@@ -54,8 +54,7 @@ public:
     int mod_fd(int fd, void *data, int events) const;
     int remove_fd(int fd) const;
     int loop();
-    void route_msg(struct buffer *buf, int target_sysid, int target_compid, int sender_sysid,
-                   int sender_compid, uint32_t msg_id = UINT32_MAX);
+    void route_msg(struct buffer *buf);
     void handle_tcp_connection();
     int write_msg(const std::shared_ptr<Endpoint> &e, const struct buffer *buf) const;
     void process_tcp_hangups();

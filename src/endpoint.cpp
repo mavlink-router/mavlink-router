@@ -191,11 +191,7 @@ int Endpoint::handle_read()
             break;
         }
 
-        Mainloop::get_instance().route_msg(&buf, buf.curr.target_sysid,
-                                           buf.curr.target_compid,
-                                           buf.curr.src_sysid,
-                                           buf.curr.src_compid,
-                                           buf.curr.msg_id);
+        Mainloop::get_instance().route_msg(&buf);
     }
 
     return r;
