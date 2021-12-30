@@ -76,7 +76,6 @@ Mainloop &Mainloop::instance()
 void Mainloop::request_exit(int retcode)
 {
     _retcode = retcode;
-    _initialized = false;
     should_exit.store(true, std::memory_order_relaxed);
 }
 
