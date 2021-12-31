@@ -92,6 +92,7 @@ protected:
     void _handle_auto_start_stop(uint32_t msg_id, uint8_t source_system_id,
                                  uint8_t source_component_id, const uint8_t *payload);
 
+    void _delete_last_log();
 private:
     int _get_file(const char *extension);
     static uint32_t _get_prefix(DIR *dir);
