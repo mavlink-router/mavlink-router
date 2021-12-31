@@ -41,7 +41,6 @@
 
 #include "mainloop.h"
 
-#define ALIVE_TIMEOUT 5
 #define MAX_RETRIES   10
 
 const ConfFile::OptionsTable LogEndpoint::option_table[] = {
