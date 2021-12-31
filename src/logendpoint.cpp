@@ -127,6 +127,13 @@ void LogEndpoint::mark_unfinished_logs()
 
 void LogEndpoint::_delete_old_logs()
 {
+    // check first the directory exist before looking for space to prevent failure
+    DIR *dir = opendir(_config.logs_dir.c_str());
+
+    // Assume the directory does not exist if opendir failed
+    if (!dir) {
+        return;
+    }
 
     struct statvfs buf;
     uint64_t free_space;
@@ -141,13 +148,7 @@ void LogEndpoint::_delete_old_logs()
 
     // This check is not necessary, it just saves on some file IO.
     if (free_space > _config.min_free_space && _config.max_log_files == 0) {
-        return;
-    }
-
-    DIR *dir = opendir(_config.logs_dir.c_str());
-
-    // Assume the directory does not exist if opendir failed
-    if (!dir) {
+        closedir(dir);
         return;
     }
 
