@@ -28,37 +28,18 @@ int AutoLog::write_msg(const struct buffer *buffer)
         return _logger->write_msg(buffer);
     }
 
-    const bool mavlink2 = buffer->data[0] == MAVLINK_STX;
-    uint32_t msg_id;
-    uint8_t *payload;
-    uint8_t source_system_id;
-    uint8_t source_component_id;
-
-    if (mavlink2) {
-        auto *hdr = (struct mavlink_router_mavlink2_header *)buffer->data;
-        msg_id = hdr->msgid;
-        payload = buffer->data + sizeof(*hdr);
-        source_system_id = hdr->sysid;
-        source_component_id = hdr->compid;
-    } else {
-        auto *hdr = (struct mavlink_router_mavlink1_header *)buffer->data;
-        msg_id = hdr->msgid;
-        payload = buffer->data + sizeof(*hdr);
-        source_system_id = hdr->sysid;
-        source_component_id = hdr->compid;
-    }
-
     /* set the expected system id to the first autopilot that we get a heartbeat from */
-    if (_target_system_id == -1 && msg_id == MAVLINK_MSG_ID_HEARTBEAT
-        && source_component_id == MAV_COMP_ID_AUTOPILOT1) {
-        _target_system_id = source_system_id;
+    if (_target_system_id == -1 && buffer->curr.msg_id == MAVLINK_MSG_ID_HEARTBEAT
+        && buffer->curr.src_compid == MAV_COMP_ID_AUTOPILOT1) {
+        _target_system_id = buffer->curr.src_sysid;
     }
 
-    if (msg_id != MAVLINK_MSG_ID_HEARTBEAT || source_system_id != _target_system_id) {
+    if (buffer->curr.msg_id != MAVLINK_MSG_ID_HEARTBEAT
+        || buffer->curr.src_sysid != _target_system_id) {
         return buffer->len;
     }
 
-    const mavlink_heartbeat_t *heartbeat = (mavlink_heartbeat_t *)payload;
+    const mavlink_heartbeat_t *heartbeat = (mavlink_heartbeat_t *)buffer->curr.payload;
 
     /* We check autopilot on heartbeat */
     log_debug("Got autopilot %u from heartbeat", heartbeat->autopilot);

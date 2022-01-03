@@ -141,8 +141,7 @@ public:
         return has_sys_comp_id(sys_comp_id);
     }
 
-    AcceptState accept_msg(int target_sysid, int target_compid, uint8_t src_sysid,
-                           uint8_t src_compid, uint32_t msg_id) const;
+    AcceptState accept_msg(const struct buffer *pbuf) const;
 
     void filter_add_allowed_msg_id(uint32_t msg_id) { _allowed_msg_ids.push_back(msg_id); }
 
@@ -152,11 +151,10 @@ public:
     struct buffer tx_buf;
 
 protected:
-    virtual int read_msg(struct buffer *pbuf, int *target_sysid, int *target_compid,
-                         uint8_t *src_sysid, uint8_t *src_compid, uint32_t *msg_id);
+    virtual int read_msg(struct buffer *pbuf);
     virtual ssize_t _read_msg(uint8_t *buf, size_t len) = 0;
     bool _check_crc(const mavlink_msg_entry_t *msg_entry) const;
-    void _add_sys_comp_id(uint16_t sys_comp_id);
+    void _add_sys_comp_id(uint8_t sysid, uint8_t compid);
 
     const std::string _type; ///< UART, UDP, TCP, Log
     std::string _name;       ///< Endpoint name from config file
@@ -206,8 +204,7 @@ protected:
     int set_flow_control(bool enabled);
     int add_speeds(const std::vector<speed_t> &bauds);
 
-    int read_msg(struct buffer *pbuf, int *target_sysid, int *target_compid, uint8_t *src_sysid,
-                 uint8_t *src_compid, uint32_t *msg_id) override;
+    int read_msg(struct buffer *pbuf) override;
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
 
 private:

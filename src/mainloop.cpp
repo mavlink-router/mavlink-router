@@ -150,26 +150,27 @@ int Mainloop::write_msg(const std::shared_ptr<Endpoint> &e, const struct buffer 
     return r;
 }
 
-void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid, int sender_sysid,
-                         int sender_compid, uint32_t msg_id)
+void Mainloop::route_msg(struct buffer *buf)
 {
     bool unknown = true;
 
     for (const auto &e : this->g_endpoints) {
-        auto acceptState
-            = e->accept_msg(target_sysid, target_compid, sender_sysid, sender_compid, msg_id);
+        auto acceptState = e->accept_msg(buf);
+
         switch (acceptState) {
         case Endpoint::AcceptState::Accepted:
-            log_debug("Endpoint [%d] accepted message %u to %d/%d from %u/%u", e->fd, msg_id,
-                      target_sysid, target_compid, sender_sysid, sender_compid);
+            log_debug("Endpoint [%d] accepted message %u to %d/%d from %u/%u", e->fd,
+                      buf->curr.msg_id, buf->curr.target_sysid, buf->curr.target_compid,
+                      buf->curr.src_sysid, buf->curr.src_compid);
             if (write_msg(e, buf) == -EPIPE) { // only TCP endpoints should return -EPIPE
                 should_process_tcp_hangups = true;
             }
             unknown = false;
             break;
         case Endpoint::AcceptState::Filtered:
-            log_debug("Endpoint [%d] filtered out message %u to %d/%d from %u/%u", e->fd, msg_id,
-                      target_sysid, target_compid, sender_sysid, sender_compid);
+            log_debug("Endpoint [%d] filtered out message %u to %d/%d from %u/%u", e->fd,
+                      buf->curr.msg_id, buf->curr.target_sysid, buf->curr.target_compid,
+                      buf->curr.src_sysid, buf->curr.src_compid);
             unknown = false;
             break;
         case Endpoint::AcceptState::Rejected:
@@ -181,7 +182,8 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid
 
     if (unknown) {
         _errors_aggregate.msg_to_unknown++;
-        log_debug("Message %u to unknown sysid/compid: %u/%u", msg_id, target_sysid, target_compid);
+        log_debug("Message %u to unknown sysid/compid: %u/%u", buf->curr.msg_id,
+                  buf->curr.target_sysid, buf->curr.target_compid);
     }
 }
 
