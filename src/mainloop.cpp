@@ -63,6 +63,11 @@ Mainloop &Mainloop::init()
     return _instance;
 }
 
+void Mainloop::teardown()
+{
+    _initialized = false;
+}
+
 Mainloop &Mainloop::instance()
 {
     return _instance;

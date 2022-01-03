@@ -9,6 +9,7 @@ TEST(MainLoopTest, termination)
     mainloop.request_exit(0);
     int ret = mainloop.loop();
     EXPECT_EQ(0, ret);
+    mainloop.teardown();
 }
 
 TEST(MainLoopTest, wrong_termination)
@@ -18,4 +19,5 @@ TEST(MainLoopTest, wrong_termination)
     mainloop.request_exit(-1);
     int ret = mainloop.loop();
     EXPECT_EQ(-1, ret);
+    mainloop.teardown();
 }
