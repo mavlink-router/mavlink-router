@@ -37,6 +37,11 @@
 #       If set to while-armed, a new log file is created whenever the vehicle is
 #       armed, and closed when disarmed.
 #
+#   LogSystemId
+#       Set the FCU Mavlink Id for logging. The Id should be between 0 and 255.
+#       No default value.
+#       If absent, the FCU Id is settled to the first autopilot that we get a heartbeat from.
+#
 #   MinFreeSpace
 #       The Log Endpoint will delete old log files until there are MinFreeSpace bytes
 #       available on the storage device of the logs. Set to 0 to ignore this limit.

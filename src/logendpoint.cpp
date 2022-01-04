@@ -51,6 +51,7 @@ const ConfFile::OptionsTable LogEndpoint::option_table[] = {
     {"MavlinkDialect",  false, LogEndpoint::parse_mavlink_dialect,  OPTIONS_TABLE_STRUCT_FIELD(LogOptions, mavlink_dialect)},
     {"MinFreeSpace",    false, ConfFile::parse_ul,                  OPTIONS_TABLE_STRUCT_FIELD(LogOptions, min_free_space)},
     {"MaxLogFiles",     false, ConfFile::parse_ul,                  OPTIONS_TABLE_STRUCT_FIELD(LogOptions, max_log_files)},
+    {"LogSystemId",     false, LogEndpoint::parse_fcu_id,           OPTIONS_TABLE_STRUCT_FIELD(LogOptions, fcu_id)},
 };
 // clang-format on
 
@@ -69,6 +70,11 @@ LogEndpoint::LogEndpoint(std::string name, LogOptions conf)
     aio_init_data.aio_idle_time = 3; // make sure to keep the thread running
     aio_init(&aio_init_data);
 #endif
+    if (_config.fcu_id != -1) {
+        _target_system_id = _config.fcu_id;
+    } else {
+        _target_system_id = -1;
+    }
 }
 
 void LogEndpoint::_send_msg(const mavlink_message_t *msg, int target_sysid)
@@ -558,3 +564,18 @@ int LogEndpoint::parse_log_mode(const char *val, size_t val_len, void *storage, 
     return 0;
 }
 #undef MAX_LOG_MODE_SIZE
+
+int LogEndpoint::parse_fcu_id(const char *val, size_t val_len, void *storage, size_t storage_len)
+{
+    const int i_ret = ConfFile::parse_i(val, val_len, storage, storage_len);
+    if (i_ret != 0) {
+        return i_ret;
+    }
+
+    if (*(int *)storage > 255 || *(int *)storage <= 0) {
+        log_error("Invalid argument for FcuId = %.*s, should be in [0, 255]", (int)val_len, val);
+        return -EINVAL;
+    }
+
+    return 0;
+}
