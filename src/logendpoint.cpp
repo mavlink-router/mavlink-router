@@ -19,6 +19,7 @@
 
 #include <dirent.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -137,16 +138,16 @@ void LogEndpoint::mark_unfinished_logs()
 
 void LogEndpoint::_delete_old_logs()
 {
-
     struct statvfs buf;
     uint64_t free_space;
+
     if (statvfs(_config.logs_dir.c_str(), &buf) == 0) {
         free_space = (uint64_t)buf.f_bsize * buf.f_bavail;
     } else {
         free_space = UINT64_MAX;
         log_error("[Log Deletion] Error when measuring free disk space: %m");
     }
-    log_debug("[Log Deletion]  Total free space: %lumb. Min free space: %lumb",
+    log_debug("[Log Deletion]  Total free space: %" PRIu64 "MB. Min free space: %luMB",
               free_space / (1ul << 20),
               _config.min_free_space / (1ul << 20));
 
