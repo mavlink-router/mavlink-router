@@ -44,6 +44,7 @@ struct LogOptions {
     MavDialect mavlink_dialect{MavDialect::Auto}; // conf "MavlinkDialect"
     unsigned long min_free_space;                 // conf "MinFreeSpace"
     unsigned long max_log_files;                  // conf "MaxLogFiles"
+    int fcu_id{-1};                               // conf "LogSystemId"
 };
 
 class LogEndpoint : public Endpoint {
@@ -60,14 +61,15 @@ public:
      */
     void mark_unfinished_logs();
 
-    static const ConfFile::OptionsTable option_table[5];
+    static const ConfFile::OptionsTable option_table[6];
     static int parse_mavlink_dialect(const char *val, size_t val_len, void *storage,
                                      size_t storage_len);
     static int parse_log_mode(const char *val, size_t val_len, void *storage, size_t storage_len);
+    static int parse_fcu_id(const char *val, size_t val_len, void *storage, size_t storage_len);
 
 protected:
     LogOptions _config;
-    int _target_system_id = -1;
+    int _target_system_id;
     int _file = -1;
 
     struct {
