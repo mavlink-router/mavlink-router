@@ -163,18 +163,26 @@ void Mainloop::route_msg(struct buffer *buf)
 
         switch (acceptState) {
         case Endpoint::AcceptState::Accepted:
-            log_debug("Endpoint [%d] accepted message %u to %d/%d from %u/%u", e->fd,
-                      buf->curr.msg_id, buf->curr.target_sysid, buf->curr.target_compid,
-                      buf->curr.src_sysid, buf->curr.src_compid);
+            log_debug("Endpoint [%d] accepted message %u to %d/%d from %u/%u",
+                      e->fd,
+                      buf->curr.msg_id,
+                      buf->curr.target_sysid,
+                      buf->curr.target_compid,
+                      buf->curr.src_sysid,
+                      buf->curr.src_compid);
             if (write_msg(e, buf) == -EPIPE) { // only TCP endpoints should return -EPIPE
                 should_process_tcp_hangups = true;
             }
             unknown = false;
             break;
         case Endpoint::AcceptState::Filtered:
-            log_debug("Endpoint [%d] filtered out message %u to %d/%d from %u/%u", e->fd,
-                      buf->curr.msg_id, buf->curr.target_sysid, buf->curr.target_compid,
-                      buf->curr.src_sysid, buf->curr.src_compid);
+            log_debug("Endpoint [%d] filtered out message %u to %d/%d from %u/%u",
+                      e->fd,
+                      buf->curr.msg_id,
+                      buf->curr.target_sysid,
+                      buf->curr.target_compid,
+                      buf->curr.src_sysid,
+                      buf->curr.src_compid);
             unknown = false;
             break;
         case Endpoint::AcceptState::Rejected:
@@ -186,8 +194,10 @@ void Mainloop::route_msg(struct buffer *buf)
 
     if (unknown) {
         _errors_aggregate.msg_to_unknown++;
-        log_debug("Message %u to unknown sysid/compid: %u/%u", buf->curr.msg_id,
-                  buf->curr.target_sysid, buf->curr.target_compid);
+        log_debug("Message %u to unknown sysid/compid: %u/%u",
+                  buf->curr.msg_id,
+                  buf->curr.target_sysid,
+                  buf->curr.target_compid);
     }
 }
 
@@ -245,7 +255,8 @@ int Mainloop::loop()
     setup_signal_handlers();
 
     add_timeout(LOG_AGGREGATE_INTERVAL_SEC * MSEC_PER_SEC,
-                std::bind(&Mainloop::_log_aggregate_timeout, this, std::placeholders::_1), this);
+                std::bind(&Mainloop::_log_aggregate_timeout, this, std::placeholders::_1),
+                this);
 
     while (!should_exit.load(std::memory_order_relaxed)) {
         int i;
@@ -315,7 +326,8 @@ bool Mainloop::_log_aggregate_timeout(void *data)
 {
     if (_errors_aggregate.msg_to_unknown > 0) {
         log_warning("%u messages to unknown endpoints in the last %d seconds",
-                    _errors_aggregate.msg_to_unknown, LOG_AGGREGATE_INTERVAL_SEC);
+                    _errors_aggregate.msg_to_unknown,
+                    LOG_AGGREGATE_INTERVAL_SEC);
         _errors_aggregate.msg_to_unknown = 0;
     }
 

@@ -20,6 +20,11 @@ AllowShortFunctionsOnASingleLine: Inline
 AlignConsecutiveDeclarations: false
 AlignConsecutiveAssignments: false
 AlignConsecutiveMacros: Consecutive
+
+BinPackArguments: false
+AllowAllParametersOfDeclarationOnNextLine: false
+AllowAllArgumentsOnNextLine: false
+
 Cpp11BracedListStyle: true
 SpaceBeforeCpp11BracedList: false
 IndentCaseLabels: false

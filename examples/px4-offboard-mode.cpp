@@ -314,7 +314,9 @@ static void position_set_send(float x, float y, float z, float yaw)
     set_position.z = z;
     set_position.yaw = yaw;
 
-    mavlink_msg_set_position_target_local_ned_encode(SYSTEM_ID, MAV_COMP_ID_ALL, &msg,
+    mavlink_msg_set_position_target_local_ned_encode(SYSTEM_ID,
+                                                     MAV_COMP_ID_ALL,
+                                                     &msg,
                                                      &set_position);
     msg_send(&msg);
 }
