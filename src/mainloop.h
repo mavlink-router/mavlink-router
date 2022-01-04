@@ -83,6 +83,12 @@ public:
      */
     static Mainloop &init();
 
+    /*
+     * De-initialize singleton so we can start a fresh on the same
+     * thread
+     */
+    static void teardown();
+
     static Mainloop &instance();
 
     /*

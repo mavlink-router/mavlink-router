@@ -63,6 +63,11 @@ Mainloop &Mainloop::init()
     return _instance;
 }
 
+void Mainloop::teardown()
+{
+    _initialized = false;
+}
+
 Mainloop &Mainloop::instance()
 {
     return _instance;
@@ -71,7 +76,6 @@ Mainloop &Mainloop::instance()
 void Mainloop::request_exit(int retcode)
 {
     _retcode = retcode;
-    _initialized = false;
     should_exit.store(true, std::memory_order_relaxed);
 }
 
