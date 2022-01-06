@@ -194,7 +194,7 @@ void Mainloop::route_msg(struct buffer *buf)
 
     if (unknown) {
         _errors_aggregate.msg_to_unknown++;
-        log_debug("Message %u to unknown sysid/compid: %u/%u",
+        log_debug("Message %u to unknown sysid/compid: %d/%d",
                   buf->curr.msg_id,
                   buf->curr.target_sysid,
                   buf->curr.target_compid);

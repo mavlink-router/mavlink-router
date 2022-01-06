@@ -210,7 +210,7 @@ void BinLog::_logging_data_process(mavlink_remote_log_data_block_t *msg)
     if (r != MAVLINK_MSG_REMOTE_LOG_DATA_BLOCK_FIELD_DATA_LEN) {
         // partial writes are handled by not sending ack. Flight stack should resend
         // msg. We hope that partial writes are rare enough
-        log_error("Log partial write %ld", r);
+        log_error("Log partial write %zd", r);
         return;
     }
 
