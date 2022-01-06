@@ -14,6 +14,8 @@ jobs:
             arch: aarch64-linux-gnu
           - name: native
             arch: native
+          - name: m32
+            arch: native
     steps:
       - uses: actions/checkout@v2
         with:
@@ -22,6 +24,11 @@ jobs:
       - name: install dependencies (native)
         if: ${{ matrix.arch == 'native' }}
         run: |
+          if [ "${{ matrix.name }}" == "m32" ]; then
+              sudo dpkg --add-architecture i386
+              sudo apt-get update
+              sudo apt-get install --yes pkg-config gcc-multilib g++-multilib libgtest-dev:i386
+          fi
           sudo apt-get install --yes ninja-build python3-pip libgtest-dev
           pip3 install meson pymavlink
       - name: install dependencies (cross)
@@ -40,7 +47,15 @@ jobs:
 
       - name: configure (native)
         if: ${{ matrix.arch == 'native' }}
-        run: meson setup build-${{ matrix.name }} .
+        run: |
+          if [ "${{ matrix.name }}" == "m32" ]; then
+              export PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig
+              export CXXFLAGS=-m32
+              export CFLAGS=-m32
+              meson setup --libdir i386-linux-gnu -Dsystemdsystemunitdir=/usr/lib/systemd/system build-${{ matrix.name }} .
+          else
+              meson setup build-${{ matrix.name }} .
+          fi
       - name: configure (cross)
         if: ${{ matrix.arch != 'native' }}
         run: meson setup -Dsystemdsystemunitdir=/usr/lib/systemd/system --cross-file meson-cross-${{ matrix.name }}.ini --cross-file meson-cross-sysroot.ini build-${{ matrix.name }} .
