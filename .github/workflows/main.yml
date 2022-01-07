@@ -52,13 +52,13 @@ jobs:
               export PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig
               export CXXFLAGS=-m32
               export CFLAGS=-m32
-              meson setup --libdir i386-linux-gnu -Dsystemdsystemunitdir=/usr/lib/systemd/system build-${{ matrix.name }} .
+              meson setup --werror --libdir i386-linux-gnu -Dsystemdsystemunitdir=/usr/lib/systemd/system build-${{ matrix.name }} .
           else
-              meson setup build-${{ matrix.name }} .
+              meson setup --werror build-${{ matrix.name }} .
           fi
       - name: configure (cross)
         if: ${{ matrix.arch != 'native' }}
-        run: meson setup -Dsystemdsystemunitdir=/usr/lib/systemd/system --cross-file meson-cross-${{ matrix.name }}.ini --cross-file meson-cross-sysroot.ini build-${{ matrix.name }} .
+        run: meson setup --werror -Dsystemdsystemunitdir=/usr/lib/systemd/system --cross-file meson-cross-${{ matrix.name }}.ini --cross-file meson-cross-sysroot.ini build-${{ matrix.name }} .
 
       - name: build
         run: ninja -C build-${{ matrix.name }}
@@ -87,7 +87,7 @@ jobs:
           submodules: recursive
 
       - name: configure
-        run: meson setup -Dsystemdsystemunitdir=/usr/lib/systemd/system build .
+        run: meson setup --werror -Dsystemdsystemunitdir=/usr/lib/systemd/system build .
 
       - name: build
         run: ninja -C build
