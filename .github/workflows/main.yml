@@ -14,7 +14,7 @@ jobs:
             arch: aarch64-linux-gnu
           - name: native
             arch: native
-          - name: m32
+          - name: i686
             arch: native
     steps:
       - uses: actions/checkout@v2
@@ -24,7 +24,7 @@ jobs:
       - name: install dependencies (native)
         if: ${{ matrix.arch == 'native' }}
         run: |
-          if [ "${{ matrix.name }}" == "m32" ]; then
+          if [ "${{ matrix.name }}" == "i686" ]; then
               sudo dpkg --add-architecture i386
               sudo apt-get update
               sudo apt-get install --yes pkg-config gcc-multilib g++-multilib libgtest-dev:i386
@@ -48,11 +48,10 @@ jobs:
       - name: configure (native)
         if: ${{ matrix.arch == 'native' }}
         run: |
-          if [ "${{ matrix.name }}" == "m32" ]; then
-              export PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig
-              export CXXFLAGS=-m32
-              export CFLAGS=-m32
-              meson setup --werror --libdir i386-linux-gnu -Dsystemdsystemunitdir=/usr/lib/systemd/system build-${{ matrix.name }} .
+          export PKG_CONFIG=$PWD/tools/meson-native-ubuntu-pkg-config
+          if [ "${{ matrix.name }}" == "i686" ]; then
+              export PATH="$PWD/tools:$PATH"
+              meson setup --werror --cross-file meson-cross-i686.ini  -Dsystemdsystemunitdir=/usr/lib/systemd/system build-${{ matrix.name }} .
           else
               meson setup --werror build-${{ matrix.name }} .
           fi

@@ -1,0 +1,3 @@
+#!/bin/bash
+
+exec pkg-config --define-variable=prefix=/usr "$@"
