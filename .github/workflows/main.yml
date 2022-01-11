@@ -27,9 +27,9 @@ jobs:
           if [ "${{ matrix.name }}" == "i686" ]; then
               sudo dpkg --add-architecture i386
               sudo apt-get update
-              sudo apt-get install --yes pkg-config gcc-multilib g++-multilib libgtest-dev:i386
+              sudo apt-get install --yes libgtest-dev:i386
           fi
-          sudo apt-get install --yes ninja-build python3-pip libgtest-dev
+          sudo apt-get install --yes pkg-config gcc-multilib g++-multilib ninja-build python3-pip libgtest-dev
           pip3 install meson pymavlink
       - name: install dependencies (cross)
         if: ${{ matrix.arch != 'native' }}
