@@ -41,7 +41,7 @@ struct UartEndpointConfig {
     std::string device;
     std::vector<speed_t> baudrates;
     bool flowcontrol{false};
-    std::vector<uint8_t> allow_msg_id_out;
+    std::vector<uint32_t> allow_msg_id_out;
 };
 
 struct UdpEndpointConfig {
@@ -51,7 +51,7 @@ struct UdpEndpointConfig {
     std::string address;
     unsigned long port;
     Mode mode;
-    std::vector<uint8_t> allow_msg_id_out;
+    std::vector<uint32_t> allow_msg_id_out;
 };
 
 struct TcpEndpointConfig {
@@ -59,7 +59,7 @@ struct TcpEndpointConfig {
     std::string address;
     unsigned long port;
     int retry_timeout{5};
-    std::vector<uint8_t> allow_msg_id_out;
+    std::vector<uint32_t> allow_msg_id_out;
 };
 
 /*
