@@ -964,6 +964,8 @@ int UdpEndpoint::open_ipv6(const char *ip, unsigned long port, UdpEndpointConfig
         sockaddr6.sin6_port = 0;
     }
 
+    config_sock.v6 = sockaddr6;
+
     free(ip_str);
     return fd;
 
@@ -993,6 +995,8 @@ int UdpEndpoint::open_ipv4(const char *ip, unsigned long port, UdpEndpointConfig
         }
         sockaddr.sin_port = 0;
     }
+
+    config_sock.v4 = sockaddr;
 
     return fd;
 

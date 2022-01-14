@@ -242,6 +242,11 @@ protected:
     int open_ipv6(const char *ip, unsigned long port, UdpEndpointConfig::Mode mode);
 
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
+
+    union {
+        struct sockaddr_in v4;
+        struct sockaddr_in6 v6;
+    } config_sock;
 };
 
 class TcpEndpoint : public Endpoint {
