@@ -36,12 +36,8 @@
 #include "logendpoint.h"
 #include "mainloop.h"
 
-#define MAVLINK_TCP_PORT              5760
-#define DEFAULT_REPORT_MSG_STATISTICS false
-#define DEFAULT_DEBUG_LOG_LEVEL       Log::Level::INFO
-#define DEFAULT_CONFFILE              "/etc/mavlink-router/main.conf"
-#define DEFAULT_CONF_DIR              "/etc/mavlink-router/config.d"
-#define DEFAULT_RETRY_TCP_TIMEOUT     5
+#define DEFAULT_CONFFILE "/etc/mavlink-router/main.conf"
+#define DEFAULT_CONF_DIR "/etc/mavlink-router/config.d"
 
 extern const char *BUILD_VERSION;
 
@@ -251,7 +247,6 @@ static int parse_argv(int argc, char *argv[], Configuration &config)
 
             TcpEndpointConfig opt_tcp{};
             opt_tcp.name = "CLI";
-            opt_tcp.retry_timeout = DEFAULT_RETRY_TCP_TIMEOUT;
 
             if (split_on_last_colon(optarg, &ip, &port) < 0) {
                 log_error("Invalid port in argument: %s", optarg);
@@ -446,6 +441,11 @@ static int parse_confs(ConfFile &conffile, Configuration &config)
         if (ret != 0) {
             return ret;
         }
+
+        if (opt_uart.baudrates.empty()) {
+            opt_uart.baudrates.push_back(DEFAULT_BAUDRATE);
+        }
+
         if (!UartEndpoint::validate_config(opt_uart)) {
             return -EINVAL; // error message was already logged by validate_config()
         }
@@ -483,7 +483,6 @@ static int parse_confs(ConfFile &conffile, Configuration &config)
         TcpEndpointConfig opt_tcp{};
         opt_tcp.name = std::string(iter.name + offset, iter.name_len - offset);
         opt_tcp.port = ULONG_MAX; // unset port value to be checked later on
-        opt_tcp.retry_timeout = DEFAULT_RETRY_TCP_TIMEOUT;
         ret = conffile.extract_options(&iter,
                                        TcpEndpoint::option_table,
                                        ARRAY_SIZE(TcpEndpoint::option_table),
@@ -587,9 +586,6 @@ int main(int argc, char *argv[])
     Mainloop &mainloop = Mainloop::init();
     int retcode;
     Configuration config{};
-    config.tcp_port = MAVLINK_TCP_PORT;
-    config.report_msg_statistics = DEFAULT_REPORT_MSG_STATISTICS;
-    config.debug_log_level = DEFAULT_DEBUG_LOG_LEVEL;
 
     Log::open();
     log_info(PACKAGE " version %s", BUILD_VERSION);

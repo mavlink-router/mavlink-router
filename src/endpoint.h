@@ -58,7 +58,7 @@ struct TcpEndpointConfig {
     std::string name;
     std::string address;
     unsigned long port;
-    int retry_timeout;
+    int retry_timeout{5};
     std::vector<uint8_t> allow_msg_id_out;
 };
 
