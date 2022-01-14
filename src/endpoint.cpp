@@ -904,6 +904,13 @@ UdpEndpoint::UdpEndpoint(std::string name)
     bzero(&sockaddr6, sizeof(sockaddr6));
 }
 
+UdpEndpoint::~UdpEndpoint()
+{
+    if (nomessage_timeout) {
+        Mainloop::get_instance().del_timeout(nomessage_timeout);
+    }
+}
+
 bool UdpEndpoint::setup(UdpEndpointConfig conf)
 {
     if (!this->validate_config(conf)) {
@@ -1029,6 +1036,12 @@ bool UdpEndpoint::open(const char *ip, unsigned long port, UdpEndpointConfig::Mo
             log_error("Error enabling broadcast in socket for %s:%lu (%m)", ip, port);
             goto fail;
         }
+
+        // Disarmed timeout: we will arm it when we receive a message
+        nomessage_timeout = Mainloop::get_instance().add_timeout(
+            0,
+            std::bind(&UdpEndpoint::_nomessage_timeout_cb, this, std::placeholders::_1),
+            nullptr);
     }
 
     if (fcntl(fd, F_SETFL, O_NONBLOCK | FASYNC) < 0) {
@@ -1052,6 +1065,26 @@ fail:
     return false;
 }
 
+bool UdpEndpoint::_nomessage_timeout_cb(void *data)
+{
+    Mainloop::get_instance().mod_timeout(nomessage_timeout, 0);
+    bool change = false;
+
+    if (this->ipv6) {
+        change = memcmp(&sockaddr6, &config_sock.v6, sizeof(sockaddr6)) != 0;
+        sockaddr6 = config_sock.v6;
+    } else {
+        change = memcmp(&sockaddr, &config_sock.v4, sizeof(sockaddr)) != 0;
+        sockaddr = config_sock.v4;
+    }
+
+    if (change) {
+        log_error("No messages on [%d]%s: switching back to broadcast", fd, _name.c_str());
+    }
+
+    return true;
+}
+
 ssize_t UdpEndpoint::_read_msg(uint8_t *buf, size_t len)
 {
     socklen_t addrlen;
@@ -1072,6 +1105,11 @@ ssize_t UdpEndpoint::_read_msg(uint8_t *buf, size_t len)
     }
     if (r == -1) {
         return -errno;
+    }
+
+    // Update timeout
+    if (nomessage_timeout) {
+        Mainloop::get_instance().mod_timeout(nomessage_timeout, 5 * MSEC_PER_SEC);
     }
 
     return r;
