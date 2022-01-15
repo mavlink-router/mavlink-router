@@ -415,7 +415,7 @@ void Endpoint::_add_sys_comp_id(uint8_t sysid, uint8_t compid)
 bool Endpoint::has_sys_id(unsigned sysid) const
 {
     for (const auto &id : _sys_comp_ids) {
-        if (((id >> 8) | (sysid & 0xff)) == sysid) {
+        if (uint16_t(id >> 8) == (sysid & 0x00ff)) {
             return true;
         }
     }
