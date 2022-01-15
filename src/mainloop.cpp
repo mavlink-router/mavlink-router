@@ -464,7 +464,6 @@ int Mainloop::tcp_open(unsigned long tcp_port)
 Timeout *Mainloop::add_timeout(uint32_t timeout_msec, std::function<bool(void *)> cb,
                                const void *data)
 {
-    struct itimerspec ts;
     auto *t = new Timeout(cb, data);
 
     assert_or_return(t, nullptr);
@@ -475,11 +474,7 @@ Timeout *Mainloop::add_timeout(uint32_t timeout_msec, std::function<bool(void *)
         goto error;
     }
 
-    ts.it_interval.tv_sec = timeout_msec / MSEC_PER_SEC;
-    ts.it_interval.tv_nsec = (timeout_msec % MSEC_PER_SEC) * NSEC_PER_MSEC;
-    ts.it_value.tv_sec = ts.it_interval.tv_sec;
-    ts.it_value.tv_nsec = ts.it_interval.tv_nsec;
-    timerfd_settime(t->fd, 0, &ts, nullptr);
+    mod_timeout(t, timeout_msec);
 
     if (add_fd(t->fd, t, EPOLLIN) < 0) {
         goto error;
@@ -498,6 +493,18 @@ error:
 void Mainloop::del_timeout(Timeout *t)
 {
     t->remove_me = true;
+}
+
+void Mainloop::mod_timeout(Timeout *t, uint32_t timeout_msec)
+{
+    struct itimerspec ts;
+
+    ts.it_interval.tv_sec = timeout_msec / MSEC_PER_SEC;
+    ts.it_interval.tv_nsec = (timeout_msec % MSEC_PER_SEC) * NSEC_PER_MSEC;
+    ts.it_value.tv_sec = ts.it_interval.tv_sec;
+    ts.it_value.tv_nsec = ts.it_interval.tv_nsec;
+
+    timerfd_settime(t->fd, 0, &ts, nullptr);
 }
 
 void Mainloop::_del_timeouts()

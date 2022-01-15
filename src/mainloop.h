@@ -60,6 +60,7 @@ public:
     void process_tcp_hangups();
     Timeout *add_timeout(uint32_t timeout_msec, std::function<bool(void *)> cb, const void *data);
     void del_timeout(Timeout *t);
+    void mod_timeout(Timeout *t, uint32_t timeout_msec);
 
     bool add_endpoints(const Configuration &config);
 
