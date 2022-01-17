@@ -234,6 +234,14 @@ Message filters:
   - AllowSrcCompOut: If set, only allow messages from the listed MAVLink source
     compoent IDs to be sent via this endpoint
 
+Endpoint groups:
+
+  - Multiple endpoints can be configured to be in the same endpoin group.
+    Endpoints in the same group will share the same list of connected systems.  
+    When using two (or more) **parallel data links**, e.g. LTE and telemetry
+    radio, the endpoint **must** be grouped on both sides. Otherwise one link
+    will not be used any more because of routing rule 1.
+
 ### Flight Stack Logging
 
 Mavlink router can also collect flight stack logs. It supports collecting both

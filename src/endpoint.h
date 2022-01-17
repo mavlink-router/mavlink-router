@@ -43,6 +43,7 @@ struct UartEndpointConfig {
     bool flowcontrol{false};
     std::vector<uint32_t> allow_msg_id_out;
     std::vector<uint8_t> allow_src_comp_out;
+    std::string group;
 };
 
 struct UdpEndpointConfig {
@@ -54,6 +55,7 @@ struct UdpEndpointConfig {
     Mode mode;
     std::vector<uint32_t> allow_msg_id_out;
     std::vector<uint8_t> allow_src_comp_out;
+    std::string group;
 };
 
 struct TcpEndpointConfig {
@@ -63,6 +65,7 @@ struct TcpEndpointConfig {
     int retry_timeout{5};
     std::vector<uint32_t> allow_msg_id_out;
     std::vector<uint8_t> allow_src_comp_out;
+    std::string group;
 };
 
 /*
@@ -149,7 +152,10 @@ public:
     void filter_add_allowed_msg_id(uint32_t msg_id) { _allowed_msg_ids.push_back(msg_id); }
     void filter_add_allowed_src_comp(uint8_t src_comp) { _allowed_src_comps.push_back(src_comp); }
 
+    void link_group_member(std::shared_ptr<Endpoint> other);
+
     std::string get_type() const { return this->_type; }
+    std::string get_group_name() const { return this->_group_name; };
 
     struct buffer rx_buf;
     struct buffer tx_buf;
@@ -163,6 +169,9 @@ protected:
     const std::string _type; ///< UART, UDP, TCP, Log
     std::string _name;       ///< Endpoint name from config file
     size_t _last_packet_len = 0;
+
+    std::string _group_name{}; // empty name to disable endpoint groups
+    std::vector<std::shared_ptr<Endpoint>> _group_members{};
 
     // Statistics
     struct {

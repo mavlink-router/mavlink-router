@@ -390,6 +390,19 @@ bool Mainloop::add_endpoints(const Configuration &config)
         g_endpoints.emplace_back(tcp);
     }
 
+    // Link grouped endpoints together
+    for (auto e : g_endpoints) {
+        if (e->get_group_name().empty()) {
+            continue;
+        }
+
+        for (auto other : g_endpoints) { // find other endpoints in group
+            if (other != e && e->get_group_name() == e->get_group_name()) {
+                e->link_group_member(other);
+            }
+        }
+    }
+
     // Create TCP server
     if (config.tcp_port != 0u) {
         g_tcp_fd = tcp_open(config.tcp_port);
