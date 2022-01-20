@@ -143,10 +143,15 @@ void LogEndpoint::_delete_old_logs()
 
     if (statvfs(_config.logs_dir.c_str(), &buf) == 0) {
         free_space = (uint64_t)buf.f_bsize * buf.f_bavail;
+    } else if (errno == ENOENT) {
+        // Ignore error - we don't have any logs to delete if directory
+        // doesn't exist
+        return;
     } else {
         free_space = UINT64_MAX;
         log_error("[Log Deletion] Error when measuring free disk space: %m");
     }
+
     log_debug("[Log Deletion]  Total free space: %" PRIu64 "MB. Min free space: %luMB",
               free_space / (1ul << 20),
               _config.min_free_space / (1ul << 20));
