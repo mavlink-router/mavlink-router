@@ -58,7 +58,7 @@ struct TcpEndpointConfig {
     std::string name;
     std::string address;
     unsigned long port;
-    int retry_timeout;
+    int retry_timeout{5};
     std::vector<uint8_t> allow_msg_id_out;
 };
 
@@ -188,6 +188,7 @@ class UartEndpoint : public Endpoint {
 public:
     UartEndpoint(std::string name);
     ~UartEndpoint() override;
+
     int write_msg(const struct buffer *pbuf) override;
     int flush_pending_msgs() override { return -ENOSYS; }
 
@@ -225,11 +226,6 @@ public:
 
     bool setup(UdpEndpointConfig config); ///< open socket and apply config
 
-    struct sockaddr_in sockaddr;
-    struct sockaddr_in6 sockaddr6;
-
-    bool ipv6;
-
     static const ConfFile::OptionsTable option_table[5];
     static const char *section_pattern;
     static int parse_udp_mode(const char *val, size_t val_len, void *storage, size_t storage_len);
@@ -250,6 +246,11 @@ protected:
 
     Timeout *nomessage_timeout = nullptr;
     bool _nomessage_timeout_cb(void *data);
+
+private:
+    bool is_ipv6;
+    struct sockaddr_in sockaddr;
+    struct sockaddr_in6 sockaddr6;
 };
 
 class TcpEndpoint : public Endpoint {
@@ -257,23 +258,15 @@ public:
     TcpEndpoint(std::string name);
     ~TcpEndpoint() override;
 
+    int write_msg(const struct buffer *pbuf) override;
+    int flush_pending_msgs() override { return -ENOSYS; }
+    bool is_valid() override { return _valid; };
+    bool is_critical() override { return false; };
+
     int accept(int listener_fd);        ///< accept incoming connection
     bool setup(TcpEndpointConfig conf); ///< open connection and apply config
     bool reopen();                      ///< re-try connecting to the server
     void close();
-
-    int write_msg(const struct buffer *pbuf) override;
-    int flush_pending_msgs() override { return -ENOSYS; }
-
-    struct sockaddr_in sockaddr;
-    struct sockaddr_in6 sockaddr6;
-    bool ipv6;
-    int retry_timeout = 0; // disable retry by default
-
-    inline std::string get_ip() { return _ip; }
-    inline unsigned long get_port() const { return _port; }
-    bool is_valid() override { return _valid; };
-    bool is_critical() override { return false; };
 
     static const ConfFile::OptionsTable option_table[4];
     static const char *section_pattern;
@@ -293,4 +286,9 @@ private:
     std::string _ip{};
     unsigned long _port = 0;
     bool _valid = true;
+
+    bool is_ipv6;
+    int _retry_timeout = 0; // disable retry by default
+    struct sockaddr_in sockaddr;
+    struct sockaddr_in6 sockaddr6;
 };

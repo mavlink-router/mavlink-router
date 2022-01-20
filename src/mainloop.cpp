@@ -225,7 +225,6 @@ void Mainloop::handle_tcp_connection()
     log_debug("TCP Server: New client");
 
     auto *tcp = new TcpEndpoint{"dynamic"};
-    tcp->retry_timeout = 0; // disable retry on dynamic endpoints by the TCP server
 
     int fd = tcp->accept(g_tcp_fd);
     if (fd == -1) {

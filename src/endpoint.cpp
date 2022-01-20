@@ -79,7 +79,7 @@ const ConfFile::OptionsTable TcpEndpoint::option_table[] = {
 };
 // clang-format on
 
-static bool is_ipv6(const char *ip)
+static bool ip_str_is_ipv6(const char *ip)
 {
     /* Square brackets always exist on IPv6 addresses b/c of input validation */
     return strchr(ip, '[') != nullptr;
@@ -87,13 +87,13 @@ static bool is_ipv6(const char *ip)
 
 static bool ipv6_is_linklocal(const char *ip)
 {
-    /* link-local addresses start with fe80 */
-    return strncmp(ip, "fe80", 4) == 0;
+    /* link-local addresses start with fe80, ULA addresses are in fc::/7 range */
+    return (strncmp(ip, "fe80", 4) == 0 || strncmp(ip, "fc", 2) == 0 || strncmp(ip, "fd", 2) == 0);
 }
 
 static bool ipv6_is_multicast(const char *ip)
 {
-    /* link-local addresses start with ff0x */
+    /* multicast addresses start with ff0x (most of the time) */
     return strncmp(ip, "ff0", 3) == 0;
 }
 
@@ -941,6 +941,11 @@ int UdpEndpoint::open_ipv6(const char *ip, unsigned long port, UdpEndpointConfig
     char *ip_str = strdup(&ip[1]);
     ip_str[strlen(ip_str) - 1] = '\0';
 
+    /* remove omittable zeros from IPv6 address */
+    sockaddr_in6 ip_addr;
+    inet_pton(AF_INET6, ip_str, &ip_addr.sin6_addr);
+    inet_ntop(AF_INET6, &(ip_addr.sin6_addr), ip_str, strlen(ip));
+
     sockaddr6.sin6_family = AF_INET6;
     sockaddr6.sin6_port = htons(port);
 
@@ -951,7 +956,9 @@ int UdpEndpoint::open_ipv6(const char *ip, unsigned long port, UdpEndpointConfig
         struct ipv6_mreq group;
         inet_pton(AF_INET6, ip_str, &group.ipv6mr_multiaddr);
         if (setsockopt(fd, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, &group, sizeof(group)) < 0) {
-            log_error("Error setting IPv6 multicast socket options for %s:%lu (%m)", ip, port);
+            log_error("Error setting IPv6 multicast socket options for [%s]:%lu (%m)",
+                      ip_str,
+                      port);
             goto fail;
         }
     } else {
@@ -965,7 +972,7 @@ int UdpEndpoint::open_ipv6(const char *ip, unsigned long port, UdpEndpointConfig
 
     if (mode == UdpEndpointConfig::Mode::Server) {
         if (bind(fd, (struct sockaddr *)&sockaddr6, sizeof(sockaddr6)) < 0) {
-            log_error("Error binding IPv6 socket for %s:%lu (%m)", ip, port);
+            log_error("Error binding IPv6 socket for [%s]:%lu (%m)", ip_str, port);
             goto fail;
         }
         sockaddr6.sin6_port = 0;
@@ -1017,10 +1024,10 @@ bool UdpEndpoint::open(const char *ip, unsigned long port, UdpEndpointConfig::Mo
 {
     const int broadcast_val = 1;
 
-    this->ipv6 = is_ipv6(ip);
+    this->is_ipv6 = ip_str_is_ipv6(ip);
 
-    // setup the special ipv6/ipv4 part
-    if (this->ipv6) {
+    // setup the special IPv6/IPv4 part
+    if (this->is_ipv6) {
         open_ipv6(ip, port, mode);
     } else {
         open_ipv4(ip, port, mode);
@@ -1070,7 +1077,7 @@ bool UdpEndpoint::_nomessage_timeout_cb(void *data)
     Mainloop::get_instance().mod_timeout(nomessage_timeout, 0);
     bool change = false;
 
-    if (this->ipv6) {
+    if (this->is_ipv6) {
         change = memcmp(&sockaddr6, &config_sock.v6, sizeof(sockaddr6)) != 0;
         sockaddr6 = config_sock.v6;
     } else {
@@ -1091,7 +1098,7 @@ ssize_t UdpEndpoint::_read_msg(uint8_t *buf, size_t len)
     struct sockaddr *sock;
     ssize_t r = 0;
 
-    if (this->ipv6) {
+    if (this->is_ipv6) {
         addrlen = sizeof(sockaddr6);
         sock = (struct sockaddr *)&sockaddr6;
     } else {
@@ -1131,7 +1138,7 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
     }
 
     bool sock_connected = false;
-    if (this->ipv6) {
+    if (this->is_ipv6) {
         addrlen = sizeof(sockaddr6);
         sock = (struct sockaddr *)&sockaddr6;
         sock_connected = sockaddr6.sin6_port != 0;
@@ -1214,15 +1221,15 @@ bool UdpEndpoint::validate_config(const UdpEndpointConfig &config)
         return false;
     }
 
-    if (config.mode == UdpEndpointConfig::Mode::Server && config.port == ULONG_MAX) {
-        log_error("UdpEndpoint %s: Port is required in Server mode", config.name.c_str());
-        return false;
-    }
-
     if (config.port == 0 || config.port == ULONG_MAX) {
         log_error("UdpEndpoint %s: Invalid or unset UDP port %lu",
                   config.name.c_str(),
                   config.port);
+        return false;
+    }
+
+    if (config.mode != UdpEndpointConfig::Mode::Client
+        && config.mode != UdpEndpointConfig::Mode::Server) {
         return false;
     }
 
@@ -1249,7 +1256,7 @@ bool TcpEndpoint::setup(TcpEndpointConfig conf)
 
     this->_ip = conf.address;
     this->_port = conf.port;
-    this->retry_timeout = conf.retry_timeout;
+    this->_retry_timeout = conf.retry_timeout;
 
     for (auto msg_id : conf.allow_msg_id_out) {
         this->filter_add_allowed_msg_id(msg_id);
@@ -1259,8 +1266,8 @@ bool TcpEndpoint::setup(TcpEndpointConfig conf)
         log_warning("Could not open %s:%ld, re-trying every %d sec",
                     conf.address.c_str(),
                     conf.port,
-                    retry_timeout);
-        if (this->retry_timeout > 0) {
+                    this->_retry_timeout);
+        if (this->_retry_timeout > 0) {
             _schedule_reconnect();
         }
         return true;
@@ -1280,7 +1287,10 @@ int TcpEndpoint::accept(int listener_fd)
     struct sockaddr *sock;
     socklen_t addrlen;
 
-    if (this->ipv6) {
+    this->_retry_timeout = 0; // disable reconnect for incoming TCP server connections
+    this->is_ipv6 = false;    // TCP server is IPv4 only for now
+
+    if (this->is_ipv6) {
         addrlen = sizeof(sockaddr6);
         sock = (struct sockaddr *)&sockaddr6;
     } else {
@@ -1358,12 +1368,12 @@ int TcpEndpoint::open_ipv4(const char *ip, unsigned long port, sockaddr_in &sock
 
 bool TcpEndpoint::open(const std::string &ip, unsigned long port)
 {
-    this->ipv6 = is_ipv6(ip.c_str());
+    this->is_ipv6 = ip_str_is_ipv6(ip.c_str());
 
-    // setup the special ipv6/ipv4 part
+    // setup the special IPv6/IPv4 part
     struct sockaddr *sock;
     socklen_t addrlen;
-    if (this->ipv6) {
+    if (this->is_ipv6) {
         fd = open_ipv6(ip.c_str(), port, this->sockaddr6);
         sock = (struct sockaddr *)&this->sockaddr6;
         addrlen = sizeof(sockaddr6);
@@ -1405,7 +1415,7 @@ ssize_t TcpEndpoint::_read_msg(uint8_t *buf, size_t len)
     socklen_t addrlen;
     ssize_t r;
 
-    if (this->ipv6) {
+    if (this->is_ipv6) {
         sock = (struct sockaddr *)&sockaddr6;
         addrlen = sizeof(sockaddr6);
     } else {
@@ -1423,7 +1433,7 @@ ssize_t TcpEndpoint::_read_msg(uint8_t *buf, size_t len)
 
     // a read of zero on a stream socket means that other side shut down
     if (r == 0 && len != 0) {
-        if (retry_timeout > 0) {
+        if (_retry_timeout > 0) {
             this->_schedule_reconnect();
             _valid = true; // still valid, b/c endpoint handles reconnect internally
         } else {
@@ -1450,7 +1460,7 @@ int TcpEndpoint::write_msg(const struct buffer *pbuf)
         ;
     }
 
-    if (this->ipv6) {
+    if (this->is_ipv6) {
         sock = (struct sockaddr *)&sockaddr6;
         addrlen = sizeof(sockaddr6);
     } else {
@@ -1464,7 +1474,7 @@ int TcpEndpoint::write_msg(const struct buffer *pbuf)
             log_error("TCP %s: Error sending tcp packet (%m)", _name.c_str());
         }
         if (errno == EPIPE) {
-            if (retry_timeout > 0) {
+            if (_retry_timeout > 0) {
                 this->_schedule_reconnect();
                 _valid = true; // still valid, b/c endpoint handles reconnect internally
             } else {
@@ -1530,14 +1540,14 @@ bool TcpEndpoint::validate_config(const TcpEndpointConfig &config)
 void TcpEndpoint::_schedule_reconnect()
 {
     Timeout *t;
-    if (retry_timeout <= 0) {
+    if (_retry_timeout <= 0) {
         return;
     }
 
     this->close();
 
     t = Mainloop::get_instance().add_timeout(
-        MSEC_PER_SEC * retry_timeout,
+        MSEC_PER_SEC * _retry_timeout,
         std::bind(&TcpEndpoint::_retry_timeout_cb, this, std::placeholders::_1),
         this);
 
