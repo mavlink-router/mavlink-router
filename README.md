@@ -184,9 +184,11 @@ config file format):
       incoming message was received.
   - TCP Client:
     * Configuration: Target IP address and port, reconnection interval in case
-      of disconnection
-    * Behavior: Data is received and sent right after the TCP session is
-      established
+      of disconnection  
+      Alternately a unix domain socket path can be used as address, the port
+      will be ignored in that case.
+    * Behavior: Data is received and sent right after the TCP (or unix domain
+      socket) session is established 
 
 Defining endpoints:
 

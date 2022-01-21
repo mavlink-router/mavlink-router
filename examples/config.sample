@@ -156,6 +156,7 @@ Port = 11000
 
 # Server IP address to connect to.
 # IPv6 addresses must be encosed in square brackets like `[::1]`.
+# Unix domain sockets paths must begin at root (start wtih a `/`).
 # Mandatory, no default value
 #Address = 
 

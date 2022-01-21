@@ -115,6 +115,12 @@ static bool validate_ip(const std::string &ip)
     return validate_ipv4(ip) || validate_ipv6(ip);
 }
 
+static bool validate_socket(const std::string &ip)
+{
+    // all paths starting at root are considered valid
+    return ip.length() > 1 && ip.at(0) == '/';
+}
+
 static unsigned int ipv6_get_scope_id(const char *ip)
 {
     struct ifaddrs *addrs;
@@ -1263,10 +1269,16 @@ bool TcpEndpoint::setup(TcpEndpointConfig conf)
     }
 
     if (!this->open(conf.address, conf.port)) {
-        log_warning("Could not open %s:%ld, re-trying every %d sec",
-                    conf.address.c_str(),
-                    conf.port,
-                    this->_retry_timeout);
+        if (this->is_unix_socket) {
+            log_warning("Could not open %s, re-trying every %d sec",
+                        conf.address.c_str(),
+                        this->_retry_timeout);
+        } else {
+            log_warning("Could not open %s:%ld, re-trying every %d sec",
+                        conf.address.c_str(),
+                        conf.port,
+                        this->_retry_timeout);
+        }
         if (this->_retry_timeout > 0) {
             _schedule_reconnect();
         }
@@ -1287,8 +1299,9 @@ int TcpEndpoint::accept(int listener_fd)
     struct sockaddr *sock;
     socklen_t addrlen;
 
-    this->_retry_timeout = 0; // disable reconnect for incoming TCP server connections
-    this->is_ipv6 = false;    // TCP server is IPv4 only for now
+    this->_retry_timeout = 0;     // disable reconnect for incoming TCP server connections
+    this->is_ipv6 = false;        // TCP server is IPv4 only for now
+    this->is_unix_socket = false; // TCP server is IPv4 only for now
 
     if (this->is_ipv6) {
         addrlen = sizeof(sockaddr6);
@@ -1366,21 +1379,42 @@ int TcpEndpoint::open_ipv4(const char *ip, unsigned long port, sockaddr_in &sock
     return fd;
 }
 
+int TcpEndpoint::open_socket(const char *ip, struct sockaddr_un &sockaddr)
+{
+    auto fd = socket(PF_UNIX, SOCK_STREAM, 0);
+    if (fd == -1) {
+        log_error("Could not create unix domain socket for %s (%m)", ip);
+        return -1;
+    }
+
+    sockaddr.sun_family = AF_UNIX;
+    strcpy(sockaddr.sun_path, ip);
+
+    return fd;
+}
+
 bool TcpEndpoint::open(const std::string &ip, unsigned long port)
 {
+    this->is_unix_socket = validate_socket(ip);
     this->is_ipv6 = ip_str_is_ipv6(ip.c_str());
 
     // setup the special IPv6/IPv4 part
     struct sockaddr *sock;
     socklen_t addrlen;
-    if (this->is_ipv6) {
-        fd = open_ipv6(ip.c_str(), port, this->sockaddr6);
-        sock = (struct sockaddr *)&this->sockaddr6;
-        addrlen = sizeof(sockaddr6);
+    if (this->is_unix_socket) {
+        fd = open_socket(ip.c_str(), this->sockaddr_un);
+        sock = (struct sockaddr *)&this->sockaddr_un;
+        addrlen = sizeof(sockaddr_un);
     } else {
-        fd = open_ipv4(ip.c_str(), port, this->sockaddr);
-        sock = (struct sockaddr *)&this->sockaddr;
-        addrlen = sizeof(sockaddr);
+        if (this->is_ipv6) {
+            fd = open_ipv6(ip.c_str(), port, this->sockaddr6);
+            sock = (struct sockaddr *)&this->sockaddr6;
+            addrlen = sizeof(sockaddr6);
+        } else {
+            fd = open_ipv4(ip.c_str(), port, this->sockaddr);
+            sock = (struct sockaddr *)&this->sockaddr;
+            addrlen = sizeof(sockaddr);
+        }
     }
 
     if (fd < 0) {
@@ -1389,16 +1423,28 @@ bool TcpEndpoint::open(const std::string &ip, unsigned long port)
 
     // common setup
     if (connect(fd, sock, addrlen) < 0) {
-        log_error("%d Error connecting to %s:%lu (%m)", fd, ip.c_str(), port);
+        if (this->is_unix_socket) {
+            log_error("%d Error connecting to %s (%m)", fd, ip.c_str());
+        } else {
+            log_error("%d Error connecting to %s:%lu (%m)", fd, ip.c_str(), port);
+        }
         goto fail;
     }
 
     if (fcntl(fd, F_SETFL, O_NONBLOCK | FASYNC) < 0) {
-        log_error("Error setting socket fd as non-blocking for %s:%lu (%m)", ip.c_str(), port);
+        if (this->is_unix_socket) {
+            log_error("Error setting socket fd as non-blocking for %s (%m)", ip.c_str());
+        } else {
+            log_error("Error setting socket fd as non-blocking for %s:%lu (%m)", ip.c_str(), port);
+        }
         goto fail;
     }
 
-    log_info("Opened TCP Client [%d]%s: %s:%lu", fd, _name.c_str(), ip.c_str(), port);
+    if (this->is_unix_socket) {
+        log_info("Opened TCP Client [%d]%s: %s", fd, _name.c_str(), ip.c_str());
+    } else {
+        log_info("Opened TCP Client [%d]%s: %s:%lu", fd, _name.c_str(), ip.c_str(), port);
+    }
 
     _valid = true;
     return true;
@@ -1415,12 +1461,17 @@ ssize_t TcpEndpoint::_read_msg(uint8_t *buf, size_t len)
     socklen_t addrlen;
     ssize_t r;
 
-    if (this->is_ipv6) {
-        sock = (struct sockaddr *)&sockaddr6;
-        addrlen = sizeof(sockaddr6);
+    if (this->is_unix_socket) {
+        sock = (struct sockaddr *)&sockaddr_un;
+        addrlen = sizeof(sockaddr_un);
     } else {
-        sock = (struct sockaddr *)&sockaddr;
-        addrlen = sizeof(sockaddr);
+        if (this->is_ipv6) {
+            sock = (struct sockaddr *)&sockaddr6;
+            addrlen = sizeof(sockaddr6);
+        } else {
+            sock = (struct sockaddr *)&sockaddr;
+            addrlen = sizeof(sockaddr);
+        }
     }
 
     r = ::recvfrom(fd, buf, len, 0, sock, &addrlen);
@@ -1460,15 +1511,25 @@ int TcpEndpoint::write_msg(const struct buffer *pbuf)
         ;
     }
 
-    if (this->is_ipv6) {
-        sock = (struct sockaddr *)&sockaddr6;
-        addrlen = sizeof(sockaddr6);
+    if (this->is_unix_socket) {
+        sock = (struct sockaddr *)&sockaddr_un;
+        addrlen = sizeof(sockaddr_un);
     } else {
-        sock = (struct sockaddr *)&sockaddr;
-        addrlen = sizeof(sockaddr);
+        if (this->is_ipv6) {
+            sock = (struct sockaddr *)&sockaddr6;
+            addrlen = sizeof(sockaddr6);
+        } else {
+            sock = (struct sockaddr *)&sockaddr;
+            addrlen = sizeof(sockaddr);
+        }
     }
 
-    ssize_t r = ::sendto(fd, pbuf->data, pbuf->len, 0, sock, addrlen);
+    ssize_t r;
+    if (this->is_unix_socket) {
+        r = ::send(fd, pbuf->data, pbuf->len, 0);
+    } else {
+        r = ::sendto(fd, pbuf->data, pbuf->len, 0, sock, addrlen);
+    }
     if (r == -1) {
         if (errno != EAGAIN && errno != ECONNREFUSED) {
             log_error("TCP %s: Error sending tcp packet (%m)", _name.c_str());
@@ -1520,7 +1581,7 @@ bool TcpEndpoint::validate_config(const TcpEndpointConfig &config)
         return false;
     }
 
-    if (!validate_ip(config.address)) {
+    if (!validate_ip(config.address) && !validate_socket(config.address)) {
         log_error("TcpEndpoint %s: Invalid IP address %s",
                   config.name.c_str(),
                   config.address.c_str());
