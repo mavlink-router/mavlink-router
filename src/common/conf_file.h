@@ -79,27 +79,24 @@ public:
      * Extract options set in @a table from section @a section_name
      *
      * @param section_name Name of the section to extract options.
-     * @param table Array of TableOption with information on which fields are going to be
-     * extracted and how to extract them.
+     * @param table Array of OptionsTable with information on which fields are going to be
+     * extracted and how to extract them. Last element must be a zero'ed sentinel.
      * @param table_len The number of elements in @a table.
      * @param data A pointer to the struct that will be used to hold the extracted data.
      */
-    int extract_options(const char *section_name, const OptionsTable table[], size_t table_len,
-                        void *data);
+    int extract_options(const char *section_name, const OptionsTable table[], void *data);
 
     /**
      * Extract options set in @a table from section @a iter
      *
      * @param iter An section_iter filled by get_sections()
-     * @param table Array of TableOption with information on which fields are going to be
-     * extracted and how to extract them.
-     * @param table_len The number of elements in @a table.
+     * @param table Array of OptionsTable with information on which fields are going to be
+     * extracted and how to extract them. Last element must be a zero'ed sentinel.
      * @param data A pointer to the struct that will be used to hold the extracted data.
      *
      * @see get_sections()
      */
-    int extract_options(struct section_iter *iter, const OptionsTable table[], size_t table_len,
-                        void *data);
+    int extract_options(struct section_iter *iter, const OptionsTable table[], void *data);
 
     /**
      * Get next section name from iterator that matches the shell wildcard @a pattern.
@@ -148,7 +145,7 @@ private:
                            const char *filename, int line);
     static void _trim(const char **str, size_t *len);
     static int _extract_options_from_section(struct section *s, const OptionsTable table[],
-                                             size_t table_len, void *data);
+                                             void *data);
 };
 
 /*

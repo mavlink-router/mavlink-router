@@ -60,6 +60,7 @@ const ConfFile::OptionsTable UartEndpoint::option_table[] = {
     {"FlowControl",     false, ConfFile::parse_bool,            OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, flowcontrol)},
     {"AllowMsgIdOut",   false, ConfFile::parse_uint32_vector,   OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, allow_msg_id_out)},
     {"AllowSrcCompOut", false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, allow_src_comp_out)},
+    {}
 };
 
 const char *UdpEndpoint::section_pattern = "udpendpoint *";
@@ -70,6 +71,7 @@ const ConfFile::OptionsTable UdpEndpoint::option_table[] = {
     {"filter",          false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_msg_id_out)}, // legacy AllowMsgIdOut
     {"AllowMsgIdOut",   false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_msg_id_out)},
     {"AllowSrcCompOut", false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_src_comp_out)},
+    {}
 };
 
 const char *TcpEndpoint::section_pattern = "tcpendpoint *";
@@ -79,6 +81,7 @@ const ConfFile::OptionsTable TcpEndpoint::option_table[] = {
     {"RetryTimeout",    false,  ConfFile::parse_i,              OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, retry_timeout)},
     {"AllowMsgIdOut",   false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_msg_id_out)},
     {"AllowSrcCompOut", false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_src_comp_out)},
+    {}
 };
 // clang-format on
 

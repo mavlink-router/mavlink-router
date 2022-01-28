@@ -61,7 +61,7 @@ public:
      */
     void mark_unfinished_logs();
 
-    static const ConfFile::OptionsTable option_table[6];
+    static const ConfFile::OptionsTable option_table[];
     static int parse_mavlink_dialect(const char *val, size_t val_len, void *storage,
                                      size_t storage_len);
     static int parse_log_mode(const char *val, size_t val_len, void *storage, size_t storage_len);

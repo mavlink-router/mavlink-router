@@ -338,19 +338,18 @@ static void print_filenames(struct section *s)
 }
 
 int ConfFile::_extract_options_from_section(struct section *s, const OptionsTable table[],
-                                            size_t table_len, void *data)
+                                            void *data)
 {
     struct config *c;
     int ret;
-    size_t i;
     void *storage;
 
-    for (i = 0; i < table_len; i++) {
-        c = _find_config(s, table[i].key, strlen(table[i].key));
+    for (const OptionsTable *t = table; t->key; t++) {
+        c = _find_config(s, t->key, strlen(t->key));
         if (!c) {
-            if (table[i].required) {
+            if (t->required) {
                 log_error("Required field '%s' not found in section '%.*s', defined in:",
-                          table[i].key,
+                          t->key,
                           (int)s->len,
                           s->name);
                 print_filenames(s);
@@ -358,15 +357,15 @@ int ConfFile::_extract_options_from_section(struct section *s, const OptionsTabl
             }
             continue;
         }
-        storage = (void *)((char *)data + table[i].storage.offset);
-        ret = table[i].parser_func(c->value, c->value_len, storage, table[i].storage.len);
+        storage = (void *)((char *)data + t->storage.offset);
+        ret = t->parser_func(c->value, c->value_len, storage, t->storage.len);
         if (ret < 0) {
             log_error("On file %s: Line %d: Invalid value '%.*s' for field '%s'",
                       c->filename,
                       c->line,
                       (int)c->value_len,
                       c->value,
-                      table[i].key);
+                      t->key);
             return ret;
         }
     }
@@ -374,8 +373,7 @@ int ConfFile::_extract_options_from_section(struct section *s, const OptionsTabl
     return 0;
 }
 
-int ConfFile::extract_options(const char *section_name, const OptionsTable table[],
-                              size_t table_len, void *data)
+int ConfFile::extract_options(const char *section_name, const OptionsTable table[], void *data)
 {
     struct section *s;
 
@@ -385,11 +383,11 @@ int ConfFile::extract_options(const char *section_name, const OptionsTable table
     s = _find_section(section_name, strlen(section_name));
     if (!s) {
         // It is only a problem when there is are required fields
-        for (size_t i = 0; i < table_len; i++) {
-            if (table[i].required) {
+        for (const OptionsTable *t = table; t->key; t++) {
+            if (t->required) {
                 log_error("Section '%s' not found and field '%s' is required.",
                           section_name,
-                          table[i].key);
+                          t->key);
                 return -ENOENT;
             }
         }
@@ -397,16 +395,15 @@ int ConfFile::extract_options(const char *section_name, const OptionsTable table
         return 0;
     }
 
-    return _extract_options_from_section(s, table, table_len, data);
+    return _extract_options_from_section(s, table, data);
 }
 
-int ConfFile::extract_options(struct section_iter *iter, const OptionsTable table[],
-                              size_t table_len, void *data)
+int ConfFile::extract_options(struct section_iter *iter, const OptionsTable table[], void *data)
 {
     assert(iter);
     assert(table);
 
-    return _extract_options_from_section((struct section *)iter->ptr, table, table_len, data);
+    return _extract_options_from_section((struct section *)iter->ptr, table, data);
 }
 
 struct config *ConfFile::_find_config(struct section *s, const char *key, size_t key_len)
