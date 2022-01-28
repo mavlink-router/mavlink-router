@@ -58,7 +58,8 @@ const ConfFile::OptionsTable UartEndpoint::option_table[] = {
     {"baud",            false, UartEndpoint::parse_baudrates,   OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, baudrates)},
     {"device",          true,  ConfFile::parse_stdstring,       OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, device)},
     {"FlowControl",     false, ConfFile::parse_bool,            OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, flowcontrol)},
-    {"AllowMsgIdOut",   false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, allow_msg_id_out)},
+    {"AllowMsgIdOut",   false, ConfFile::parse_uint32_vector,   OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, allow_msg_id_out)},
+    {"AllowSrcCompOut", false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, allow_src_comp_out)},
 };
 
 const char *UdpEndpoint::section_pattern = "udpendpoint *";
@@ -66,8 +67,9 @@ const ConfFile::OptionsTable UdpEndpoint::option_table[] = {
     {"address",         true,   ConfFile::parse_stdstring,      OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, address)},
     {"mode",            true,   UdpEndpoint::parse_udp_mode,    OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, mode)},
     {"port",            false,  ConfFile::parse_ul,             OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, port)},
-    {"filter",          false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_msg_id_out)}, // legacy AllowMsgIdOut
-    {"AllowMsgIdOut",   false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_msg_id_out)},
+    {"filter",          false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_msg_id_out)}, // legacy AllowMsgIdOut
+    {"AllowMsgIdOut",   false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_msg_id_out)},
+    {"AllowSrcCompOut", false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_src_comp_out)},
 };
 
 const char *TcpEndpoint::section_pattern = "tcpendpoint *";
@@ -75,7 +77,8 @@ const ConfFile::OptionsTable TcpEndpoint::option_table[] = {
     {"address",         true,   ConfFile::parse_stdstring,      OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, address)},
     {"port",            true,   ConfFile::parse_ul,             OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, port)},
     {"RetryTimeout",    false,  ConfFile::parse_i,              OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, retry_timeout)},
-    {"AllowMsgIdOut",   false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_msg_id_out)},
+    {"AllowMsgIdOut",   false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_msg_id_out)},
+    {"AllowSrcCompOut", false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_src_comp_out)},
 };
 // clang-format on
 
@@ -462,6 +465,12 @@ Endpoint::AcceptState Endpoint::accept_msg(const struct buffer *pbuf) const
         return Endpoint::AcceptState::Filtered;
     }
 
+    // If filter is defined and message is not in the set: discard it
+    if (pbuf->curr.msg_id != UINT32_MAX && !_allowed_src_comps.empty()
+        && !vector_contains(_allowed_src_comps, pbuf->curr.src_compid)) {
+        return Endpoint::AcceptState::Filtered;
+    }
+
     // Message is broadcast on sysid or sysid is non-existent: accept msg
     if (pbuf->curr.target_sysid == 0 || pbuf->curr.target_sysid == -1) {
         return Endpoint::AcceptState::Accepted;
@@ -602,6 +611,10 @@ bool UartEndpoint::setup(UartEndpointConfig conf)
 
     for (auto msg_id : conf.allow_msg_id_out) {
         this->filter_add_allowed_msg_id(msg_id);
+    }
+
+    for (auto src_comp : conf.allow_src_comp_out) {
+        this->filter_add_allowed_src_comp(src_comp);
     }
 
     return true;
@@ -924,6 +937,10 @@ bool UdpEndpoint::setup(UdpEndpointConfig conf)
 
     for (auto msg_id : conf.allow_msg_id_out) {
         this->filter_add_allowed_msg_id(msg_id);
+    }
+
+    for (auto src_comp : conf.allow_src_comp_out) {
+        this->filter_add_allowed_src_comp(src_comp);
     }
 
     return true;
@@ -1260,6 +1277,10 @@ bool TcpEndpoint::setup(TcpEndpointConfig conf)
 
     for (auto msg_id : conf.allow_msg_id_out) {
         this->filter_add_allowed_msg_id(msg_id);
+    }
+
+    for (auto src_comp : conf.allow_src_comp_out) {
+        this->filter_add_allowed_src_comp(src_comp);
     }
 
     if (!this->open(conf.address, conf.port)) {

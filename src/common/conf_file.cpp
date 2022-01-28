@@ -504,17 +504,18 @@ int ConfFile::parse_str_buf(const char *val, size_t val_len, void *storage, size
 
 int ConfFile::parse_stdstring(const char *val, size_t val_len, void *storage, size_t storage_len)
 {
-    auto *ptr = (std::string *)storage;
-
     assert(val);
     assert(storage);
     assert(val_len);
 
-    if (storage_len < sizeof(char *)) {
+    std::string *target;
+    if (storage_len < sizeof(*target)) {
         return -ENOBUFS;
     }
 
-    ptr->assign(val, val_len);
+    target = static_cast<std::string *>(storage);
+
+    target->assign(val, val_len);
     return 0;
 }
 
@@ -524,12 +525,13 @@ int ConfFile::parse_uint8_vector(const char *val, size_t val_len, void *storage,
     assert(storage);
     assert(val_len);
 
-    if (storage_len < sizeof(bool)) {
+    std::vector<uint8_t> *target;
+    if (storage_len < sizeof(*target)) {
         return -ENOBUFS;
     }
 
     char *filter_string = strndupa(val, val_len);
-    auto *target = (std::vector<uint8_t> *)storage;
+    target = static_cast<std::vector<uint8_t> *>(storage);
 
     char *token = strtok(filter_string, ",");
     while (token != nullptr) {
@@ -540,29 +542,55 @@ int ConfFile::parse_uint8_vector(const char *val, size_t val_len, void *storage,
     return 0;
 }
 
+int ConfFile::parse_uint32_vector(const char *val, size_t val_len, void *storage,
+                                  size_t storage_len)
+{
+    assert(val);
+    assert(storage);
+    assert(val_len);
+
+    std::vector<uint32_t> *target;
+    if (storage_len < sizeof(*target)) {
+        return -ENOBUFS;
+    }
+
+    char *filter_string = strndupa(val, val_len);
+    target = static_cast<std::vector<uint32_t> *>(storage);
+
+    char *token = strtok(filter_string, ",");
+    while (token != nullptr) {
+        target->push_back(atol(token)); // we need 32 bit unsigned int, but atoi is signed
+        token = strtok(nullptr, ",");
+    }
+
+    return 0;
+}
+
 int ConfFile::parse_bool(const char *val, size_t val_len, void *storage, size_t storage_len)
 {
-    bool *b = (bool *)storage;
     int ival, ret;
 
     assert(val);
     assert(storage);
     assert(val_len);
 
-    if (storage_len < sizeof(bool)) {
+    bool *target;
+    if (storage_len < sizeof(*target)) {
         return -ENOBUFS;
     }
 
+    target = static_cast<bool *>(storage);
+
     if (memcaseeq("true", 4, val, val_len)) {
-        *b = true;
+        *target = true;
     } else if (memcaseeq("false", 5, val, val_len)) {
-        *b = false;
+        *target = false;
     } else {
         ret = parse_i(val, val_len, &ival, sizeof(ival));
         if (ret < 0) {
             return ret;
         }
-        *b = !!ival;
+        *target = !!ival;
     }
 
     return 0;

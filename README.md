@@ -231,6 +231,8 @@ Message filters:
 
   - AllowMsgIdOut: If set, only allow messages with the listed message IDs to
     be sent via this endpoint
+  - AllowSrcCompOut: If set, only allow messages from the listed MAVLink source
+    compoent IDs to be sent via this endpoint
 
 ### Flight Stack Logging
 

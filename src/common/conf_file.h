@@ -125,6 +125,8 @@ public:
     static int parse_stdstring(const char *val, size_t val_len, void *storage, size_t storage_len);
     static int parse_uint8_vector(const char *val, size_t val_len, void *storage,
                                   size_t storage_len);
+    static int parse_uint32_vector(const char *val, size_t val_len, void *storage,
+                                   size_t storage_len);
 
 #define DECLARE_PARSE_INT(_type) \
     static int parse_##_type(const char *val, size_t val_len, void *storage, size_t storage_len)
