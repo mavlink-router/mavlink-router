@@ -199,7 +199,7 @@ public:
 
     bool setup(UartEndpointConfig config); ///< open UART device and apply config
 
-    static const ConfFile::OptionsTable option_table[5];
+    static const ConfFile::OptionsTable option_table[];
     static const char *section_pattern;
     static int parse_baudrates(const char *val, size_t val_len, void *storage, size_t storage_len);
     static bool validate_config(const UartEndpointConfig &config);
@@ -231,7 +231,7 @@ public:
 
     bool setup(UdpEndpointConfig config); ///< open socket and apply config
 
-    static const ConfFile::OptionsTable option_table[6];
+    static const ConfFile::OptionsTable option_table[];
     static const char *section_pattern;
     static int parse_udp_mode(const char *val, size_t val_len, void *storage, size_t storage_len);
     static bool validate_config(const UdpEndpointConfig &config);
@@ -273,7 +273,7 @@ public:
     bool reopen();                      ///< re-try connecting to the server
     void close();
 
-    static const ConfFile::OptionsTable option_table[5];
+    static const ConfFile::OptionsTable option_table[];
     static const char *section_pattern;
     static bool validate_config(const TcpEndpointConfig &config);
 
