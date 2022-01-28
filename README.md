@@ -252,16 +252,30 @@ is an increasing number.
 
 ## Contributing
 
-Pull-requests are accepted on GitHub.
-Make sure to check coding style with the provided script in `tools/checkpatch`
-and `tools/checkpython`, check for memory leaks with valgrind and test on real
-hardware.
+Pull-requests are accepted on GitHub. Some guidelines to help:
 
-To test the software, run the unit tests using `ninja -C build test` (the
-googletest library must be installed using your package manager first).
+1) When making changes, please follow the coding style defined by the file
+   .clang-format in this repository. Coding style changes can be done automatically
+   by running `ninja -C build clang-format`. Note however that there shouldn't be
+   a commit on top of your changes fixing the coding style: every **commit**
+   should be correct by itself.
 
-To check the compiled binary, the `tests/routing_test.py` script runs the
-actual mavlink-routerd binary and checks some basic routing rules.
+2) Every commit should only do one thing. That is, if your work requires some
+   cleaning up of code or additional fix, do that as a separate commit and not
+   with your functional changes.  Find ways to take "steps" in modifying code. If
+   you can break up your changes in a series of steps, do so. There may be
+   exceptions to this rule, in which case it must be mentioned in the commit
+   message.
+
+3) Commit message is the best place to document your change - more than "what"
+   is being done, it's important to emphasize "why" it's done. The PR description
+   can describe the entire change, but the commit message is important to describe
+   each step taken.
+
+4) Communicate the state of the change: is it tested? Should it be considered
+   ready to review and apply?  A few scenarios are covered by our testsuite
+   by running `ninja -C build test` (the googletest library must be installed
+   using your package manager first), but that doesn't replace real-world testing.
 
 
 ## Samples
