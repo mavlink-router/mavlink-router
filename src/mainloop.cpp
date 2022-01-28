@@ -310,6 +310,8 @@ int Mainloop::loop()
         _log_endpoint->stop();
     }
 
+    clear_endpoints();
+
     // free all remaning Timeouts
     while (_timeouts != nullptr) {
         Timeout *current = _timeouts;
@@ -421,6 +423,11 @@ bool Mainloop::add_endpoints(const Configuration &config)
     }
 
     return true;
+}
+
+void Mainloop::clear_endpoints()
+{
+    g_endpoints.clear();
 }
 
 int Mainloop::tcp_open(unsigned long tcp_port)
