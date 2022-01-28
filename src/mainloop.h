@@ -63,6 +63,7 @@ public:
     void mod_timeout(Timeout *t, uint32_t timeout_msec);
 
     bool add_endpoints(const Configuration &config);
+    void clear_endpoints();
 
     void print_statistics();
 
