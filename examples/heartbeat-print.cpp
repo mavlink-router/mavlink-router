@@ -53,7 +53,8 @@ static void handle_new_message(const mavlink_message_t *msg)
         printf("HEARTBEAT:\n"
                "\tmavlink_version: %u\n"
                "\ttype: %u\n",
-               heartbeat.mavlink_version, heartbeat.type);
+               heartbeat.mavlink_version,
+               heartbeat.type);
     }
 }
 

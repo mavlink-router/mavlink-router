@@ -22,7 +22,8 @@
 ## General Configuration
 ##
 
-[General] # this section only has one instance and therefore no name
+[General]
+# this section only has one instance and therefore no name
 
 # Print traffic statistics to stdout
 # Default: <false>
@@ -78,6 +79,12 @@
 # disable this functionality.
 # Default: 0 (disabled)
 #MaxLogFiles = 0
+
+# SnifferSysid
+# Forward all traffic to endpoints on which this MAVLink system ID is connected.
+# This can be used to log or view all messages flowing though mavlink-router.
+# Default: 0 (disabled)
+#SnifferSysid=254
 
 
 ##
