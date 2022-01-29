@@ -1525,6 +1525,17 @@ int TcpEndpoint::write_msg(const struct buffer *pbuf)
     return r;
 }
 
+Endpoint::AcceptState TcpEndpoint::accept_msg(const struct buffer *pbuf) const
+{
+    // reject when TCP endpoint is not connected (but trying to re-connect)
+    if (this->fd == -1) {
+        return Endpoint::AcceptState::Rejected;
+    }
+
+    // otherwise: refer to standard accept rules
+    return Endpoint::accept_msg(pbuf);
+}
+
 void TcpEndpoint::close()
 {
     if (fd > -1) {

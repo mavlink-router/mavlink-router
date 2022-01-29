@@ -268,6 +268,8 @@ public:
     bool is_valid() override { return _valid; };
     bool is_critical() override { return false; };
 
+    Endpoint::AcceptState accept_msg(const struct buffer *pbuf) const;
+
     int accept(int listener_fd);        ///< accept incoming connection
     bool setup(TcpEndpointConfig conf); ///< open connection and apply config
     bool reopen();                      ///< re-try connecting to the server
