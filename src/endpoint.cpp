@@ -247,7 +247,7 @@ int Endpoint::read_msg(struct buffer *pbuf)
             return r;
         }
 
-        log_debug("%s [%d]%s: got %zd bytes", _type.c_str(), fd, _name.c_str(), r);
+        log_debug("> %s [%d]%s: Got %zd bytes", _type.c_str(), fd, _name.c_str(), r);
         rx_buf.len += r;
     }
 
