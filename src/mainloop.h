@@ -25,6 +25,7 @@
 
 #include "binlog.h"
 #include "comm.h"
+#include "dedup.h"
 #include "endpoint.h"
 #include "timeout.h"
 #include "ulog.h"
@@ -35,6 +36,7 @@ struct Configuration {
     unsigned long tcp_port{5760};      ///< conf "TcpServerPort" or CLI "tcp-port"
     bool report_msg_statistics{false}; ///< conf "ReportStats" or CLI "report_msg_statistics"
     Log::Level debug_log_level{Log::Level::INFO}; ///< conf "DebugLogLevel" or CLI "debug-log-level"
+    unsigned long dedup_period_ms;                ///< conf "DeduplicationPeriod"
 
     LogOptions log_config; ///< logging is in General config section, but internally an endpoint
     std::vector<UartEndpointConfig> uart_configs;
@@ -64,6 +66,11 @@ public:
 
     bool add_endpoints(const Configuration &config);
     void clear_endpoints();
+
+    /*
+     * Returns true, if the message was already received earlier
+     */
+    bool dedup_check_msg(const buffer *buf);
 
     void print_statistics();
 
@@ -106,6 +113,8 @@ private:
     std::shared_ptr<LogEndpoint> _log_endpoint{nullptr};
 
     Timeout *_timeouts = nullptr;
+
+    Dedup _msg_dedup{0}; // disabled by default
 
     struct {
         uint32_t msg_to_unknown = 0;

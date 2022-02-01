@@ -4,6 +4,7 @@ exe_mavlink_router = executable('mavlink-routerd',
         [
          'autolog.cpp',
          'binlog.cpp',
+         'dedup.cpp',
          'endpoint.cpp',
          'git_version.cpp',
          'logendpoint.cpp',
@@ -29,6 +30,7 @@ if dep_gtest.found()
           [
             'autolog.cpp',
             'binlog.cpp',
+            'dedup.cpp',
             'endpoint.cpp',
             'logendpoint.cpp',
             'mainloop.cpp',
@@ -52,6 +54,7 @@ if dep_gtest.found()
           [
             'autolog.cpp',
             'binlog.cpp',
+            'dedup.cpp',
             'endpoint.cpp',
             'endpoints_test.cpp',
             'logendpoint.cpp',
