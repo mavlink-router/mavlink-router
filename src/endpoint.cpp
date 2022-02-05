@@ -52,6 +52,8 @@
 
 #define UART_BAUD_RETRY_SEC 5
 
+uint16_t Endpoint::sniffer_sysid = 0;
+
 // clang-format off
 const char *UartEndpoint::section_pattern = "uartendpoint *";
 const ConfFile::OptionsTable UartEndpoint::option_table[] = {
@@ -421,6 +423,11 @@ void Endpoint::_add_sys_comp_id(uint8_t sysid, uint8_t compid)
         return;
     }
 
+    if ((sniffer_sysid != 0) && ((sys_comp_id >> 8) == sniffer_sysid)) {
+        log_info("Sniffer sysid %u identified. [%d] is now sniffing all messages",
+                 sniffer_sysid,
+                 fd);
+    }
     _sys_comp_ids.push_back(sys_comp_id);
 }
 
@@ -495,6 +502,10 @@ Endpoint::AcceptState Endpoint::accept_msg(const struct buffer *pbuf) const
     // accept
     if ((pbuf->curr.target_compid == 0 || pbuf->curr.target_compid == -1)
         && has_sys_id(pbuf->curr.target_sysid)) {
+        return Endpoint::AcceptState::Accepted;
+    }
+    // This endpoint has the sniffer_sysid: accept
+    if ((sniffer_sysid != 0) && has_sys_id(sniffer_sysid)) {
         return Endpoint::AcceptState::Accepted;
     }
 

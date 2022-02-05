@@ -156,6 +156,10 @@ public:
     struct buffer rx_buf;
     struct buffer tx_buf;
 
+    // An endpoint with this system id becomes a "sniffer" and all
+    // messages are accepted.
+    static uint16_t sniffer_sysid;
+
 protected:
     virtual int read_msg(struct buffer *pbuf);
     virtual ssize_t _read_msg(uint8_t *buf, size_t len) = 0;

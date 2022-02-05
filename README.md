@@ -242,6 +242,12 @@ Message de-duplication:
     timeout counter for that message will be reset. Messages are identified via
     their `std::hash` value.
 
+Message Sniffing:
+
+  - A Sniffer can be defined by setting SnifferSysID. This will forward all traffic
+    to endpoints on which this MAVLink system ID is connected. This can be used to
+    log or view all messages flowing though mavlink-router.
+
 ### Flight Stack Logging
 
 Mavlink router can also collect flight stack logs. It supports collecting both

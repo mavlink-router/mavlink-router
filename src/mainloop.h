@@ -42,6 +42,7 @@ struct Configuration {
     std::vector<UartEndpointConfig> uart_configs;
     std::vector<UdpEndpointConfig> udp_configs;
     std::vector<TcpEndpointConfig> tcp_configs;
+    unsigned long sniffer_sysid;
 };
 
 struct endpoint_entry {
