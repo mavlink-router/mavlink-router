@@ -242,6 +242,14 @@ Message de-duplication:
     timeout counter for that message will be reset. Messages are identified via
     their `std::hash` value.
 
+Endpoint groups:
+
+  - Multiple endpoints can be configured to be in the same endpoin group.
+    Endpoints in the same group will share the same list of connected systems.  
+    When using two (or more) **parallel data links**, e.g. LTE and telemetry
+    radio, the endpoint **must** be grouped on both sides. Otherwise one link
+    will not be used any more because of routing rule 1.
+
 Message Sniffing:
 
   - A Sniffer can be defined by setting SnifferSysID. This will forward all traffic

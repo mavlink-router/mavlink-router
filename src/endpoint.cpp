@@ -62,6 +62,7 @@ const ConfFile::OptionsTable UartEndpoint::option_table[] = {
     {"FlowControl",     false, ConfFile::parse_bool,            OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, flowcontrol)},
     {"AllowMsgIdOut",   false, ConfFile::parse_uint32_vector,   OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, allow_msg_id_out)},
     {"AllowSrcCompOut", false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, allow_src_comp_out)},
+    {"group",           false, ConfFile::parse_stdstring,       OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, group)},
     {}
 };
 
@@ -73,6 +74,7 @@ const ConfFile::OptionsTable UdpEndpoint::option_table[] = {
     {"filter",          false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_msg_id_out)}, // legacy AllowMsgIdOut
     {"AllowMsgIdOut",   false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_msg_id_out)},
     {"AllowSrcCompOut", false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_src_comp_out)},
+    {"group",           false,  ConfFile::parse_stdstring,      OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, group)},
     {}
 };
 
@@ -83,6 +85,7 @@ const ConfFile::OptionsTable TcpEndpoint::option_table[] = {
     {"RetryTimeout",    false,  ConfFile::parse_i,              OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, retry_timeout)},
     {"AllowMsgIdOut",   false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_msg_id_out)},
     {"AllowSrcCompOut", false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_src_comp_out)},
+    {"group",           false,  ConfFile::parse_stdstring,      OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, group)},
     {}
 };
 // clang-format on
@@ -429,6 +432,11 @@ void Endpoint::_add_sys_comp_id(uint8_t sysid, uint8_t compid)
                  fd);
     }
     _sys_comp_ids.push_back(sys_comp_id);
+
+    // add to grouped endpoints as well
+    for (auto e : _group_members) {
+        e->_add_sys_comp_id(sysid, compid);
+    }
 }
 
 bool Endpoint::has_sys_id(unsigned sysid) const
@@ -516,6 +524,17 @@ Endpoint::AcceptState Endpoint::accept_msg(const struct buffer *pbuf) const
 bool Endpoint::allowed_by_dedup(const buffer *buf) const
 {
     return Mainloop::get_instance().dedup_check_msg(buf);
+}
+
+void Endpoint::link_group_member(std::shared_ptr<Endpoint> other)
+{
+    if (_group_name.empty() || other->get_group_name() != _group_name) {
+        return;
+    }
+
+    _group_members.push_back(other);
+
+    log_info("Grouped %s with %s", other->_name.c_str(), _name.c_str());
 }
 
 bool Endpoint::_check_crc(const mavlink_msg_entry_t *msg_entry) const
@@ -641,6 +660,8 @@ bool UartEndpoint::setup(UartEndpointConfig conf)
     for (auto src_comp : conf.allow_src_comp_out) {
         this->filter_add_allowed_src_comp(src_comp);
     }
+
+    this->_group_name = conf.group;
 
     return true;
 }
@@ -967,6 +988,8 @@ bool UdpEndpoint::setup(UdpEndpointConfig conf)
     for (auto src_comp : conf.allow_src_comp_out) {
         this->filter_add_allowed_src_comp(src_comp);
     }
+
+    this->_group_name = conf.group;
 
     return true;
 }
@@ -1307,6 +1330,8 @@ bool TcpEndpoint::setup(TcpEndpointConfig conf)
     for (auto src_comp : conf.allow_src_comp_out) {
         this->filter_add_allowed_src_comp(src_comp);
     }
+
+    this->_group_name = conf.group;
 
     if (!this->open(conf.address, conf.port)) {
         log_warning("Could not open %s:%ld, re-trying every %d sec",

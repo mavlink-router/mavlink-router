@@ -118,6 +118,13 @@
 # Default: Empty list (disabled)
 #AllowSrcCompOut = 
 
+# Group parallel/ redundant data links to use the same list of connected
+# systems. This is needed to prevent messages from one of the parallel links
+# being send back on the other one right away.
+# Set the same name (arbitrary string) on multiple endpoints to group them.
+# Default: Empty (no group)
+#Group = 
+
 ## Example
 [UartEndpoint alpha]
 Device = /dev/ttyS0
