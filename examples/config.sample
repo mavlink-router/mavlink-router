@@ -37,6 +37,8 @@
 # Enable de-duplication of incoming messages. If a message is received another
 # time in the configured time period (in milliseconds), it will be dropped. The
 # second message will reset the timer.
+# It should be a bit higher, than the latency of the slowest link. More than
+# 1000 ms might drop packets unintentionally though.
 # Default: 0 (de-duplication disabled)
 #DeDuplicationPeriod = 0
 
