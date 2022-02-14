@@ -1,0 +1,86 @@
+name: Build and Test (legacy ubuntu)
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-18.04
+    strategy:
+      matrix:
+        include:
+          - name: armhf
+            arch: arm-linux-gnueabihf
+          - name: aarch64
+            arch: aarch64-linux-gnu
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+          fetch-depth: 0  # otherwise the version header just contains the commit hash
+
+      - name: install dependencies (native)
+        if: ${{ matrix.arch == 'native' }}
+        run: |
+          if [ "${{ matrix.name }}" == "i686" ]; then
+              sudo dpkg --add-architecture i386
+              sudo apt-get update
+              sudo apt-get install --yes libgtest-dev:i386
+          fi
+          sudo apt-get install --yes pkg-config gcc-multilib g++-multilib ninja-build python3-pip python3-setuptools libgtest-dev
+          pip3 install meson pymavlink
+      - name: install dependencies (cross)
+        if: ${{ matrix.arch != 'native' }}
+        run: |
+          sudo apt-get install --yes ninja-build gcc-${{ matrix.arch }} g++-${{ matrix.arch }} podman python3-pip python3-setuptools
+          pip3 install meson pymavlink
+
+      - name: prepare sysroot
+        if: ${{ matrix.arch != 'native' }}
+        run: |
+          mkdir rootfs
+          tools/ci-create-rootfs.sh ${{ matrix.name }} > rootfs.tar
+          tar -xf rootfs.tar --directory=rootfs
+          sed -e "s#@sysroot@#$PWD/rootfs#g" meson-cross-sysroot.ini.in > meson-cross-sysroot.ini
+
+      - name: configure (native)
+        if: ${{ matrix.arch == 'native' }}
+        run: |
+          export PKG_CONFIG=$PWD/tools/meson-native-ubuntu-pkg-config
+          if [ "${{ matrix.name }}" == "i686" ]; then
+              export PATH="$PWD/tools:$PATH"
+              meson setup --werror --cross-file meson-cross-i686.ini  -Dsystemdsystemunitdir=/usr/lib/systemd/system build-${{ matrix.name }} .
+          else
+              meson setup --werror build-${{ matrix.name }} .
+          fi
+      - name: configure (cross)
+        if: ${{ matrix.arch != 'native' }}
+        run: meson setup --werror -Dsystemdsystemunitdir=/usr/lib/systemd/system --cross-file meson-cross-${{ matrix.name }}.ini --cross-file meson-cross-sysroot.ini build-${{ matrix.name }} .
+
+      - name: build
+        run: ninja -C build-${{ matrix.name }}
+
+      - name: test
+        if: ${{ matrix.arch == 'native' }}
+        run: ninja -C build-${{ matrix.name }} test
+
+      - name: install
+        run: DESTDIR=./.debpkg ninja -C build-${{ matrix.name }} install
+
+      - name: run routing_test.py
+        if: ${{ matrix.arch == 'native' }}
+        run: ./tests/routing_test.py -b ./build-${{ matrix.name }}/src/mavlink-routerd
+
+      - uses: actions/upload-artifact@master
+        with:
+          path: build-${{ matrix.name }}/src/mavlink-routerd
+          name: mavlink-routerd-glibc_ubuntu18-${{ matrix.name }}
+      - uses: svenstaro/upload-release-action@v2
+        name: Upload binaries to release
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: build-${{ matrix.name }}/src/mavlink-routerd
+          asset_name: mavlink-routerd-glibc_ubuntu18-${{ matrix.name }}-$tag
+          tag: ${{ github.ref }}
+          prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+          overwrite: true
