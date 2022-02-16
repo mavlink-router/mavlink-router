@@ -98,9 +98,11 @@
 # Mandatory, no default value
 #Device = 
 
-# Baudrate of the device
+# List of baudrates to try to connect with the device. A default baud rate of
+# 115200 baud will always be added to the end of the list.
+# Format: Comma separated list of integers
 # Default: 115200
-#Baud = 115200
+#Baud = 57600
 
 # Enable flow control on device
 # Default: <false>
