@@ -830,9 +830,11 @@ bool UartEndpoint::_change_baud_cb(void *data)
              _name.c_str(),
              _baudrates[_current_baud_idx]);
 
-    set_speed(_baudrates[_current_baud_idx]);
+    if (0 == set_speed(_baudrates[_current_baud_idx])) {
+        return false; // connection is fine now, no retry
+    }
 
-    return true;
+    return true; // try again
 }
 
 int UartEndpoint::read_msg(struct buffer *pbuf)
@@ -907,7 +909,9 @@ int UartEndpoint::add_speeds(const std::vector<speed_t> &bauds)
 
     _baudrates = bauds;
 
-    set_speed(_baudrates[0]);
+    if (set_speed(_baudrates[0]) == 0) {
+        return 0; // first baud rate worked, exit early
+    }
 
     _change_baud_timeout = Mainloop::get_instance().add_timeout(
         MSEC_PER_SEC * UART_BAUD_RETRY_SEC,
