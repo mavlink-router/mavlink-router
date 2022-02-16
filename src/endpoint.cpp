@@ -1522,8 +1522,8 @@ int TcpEndpoint::write_msg(const struct buffer *pbuf)
     socklen_t addrlen;
 
     if (fd < 0) {
-        log_error("TCP %s: Trying to write invalid fd", _name.c_str());
-        return -EINVAL;
+        // skip this endpoint if not connected (e.g. during reconnect)
+        return 0;
     }
 
     /* TODO: send any pending data */
