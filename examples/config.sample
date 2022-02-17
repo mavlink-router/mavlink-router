@@ -98,7 +98,9 @@
 # Mandatory, no default value
 #Device = 
 
-# Baudrate of the device
+# List of baudrates to use for the UART connection. The values will be cycled
+# through until valid MAVLink packets are received.
+# Format: Comma separated list of integers
 # Default: 115200
 #Baud = 115200
 
