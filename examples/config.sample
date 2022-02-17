@@ -37,6 +37,8 @@
 # Enable de-duplication of incoming messages. If a message is received another
 # time in the configured time period (in milliseconds), it will be dropped. The
 # second message will reset the timer.
+# It should be a bit higher, than the latency of the slowest link. More than
+# 1000 ms might drop packets unintentionally though.
 # Default: 0 (de-duplication disabled)
 #DeDuplicationPeriod = 0
 
@@ -98,7 +100,9 @@
 # Mandatory, no default value
 #Device = 
 
-# Baudrate of the device
+# List of baudrates to use for the UART connection. The values will be cycled
+# through until valid MAVLink packets are received.
+# Format: Comma separated list of integers
 # Default: 115200
 #Baud = 115200
 

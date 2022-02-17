@@ -39,7 +39,7 @@
 struct UartEndpointConfig {
     std::string name;
     std::string device;
-    std::vector<speed_t> baudrates;
+    std::vector<uint32_t> baudrates;
     bool flowcontrol{false};
     std::vector<uint32_t> allow_msg_id_out;
     std::vector<uint8_t> allow_src_comp_out;
@@ -216,7 +216,6 @@ public:
 
     static const ConfFile::OptionsTable option_table[];
     static const char *section_pattern;
-    static int parse_baudrates(const char *val, size_t val_len, void *storage, size_t storage_len);
     static bool validate_config(const UartEndpointConfig &config);
 
 protected:

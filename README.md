@@ -240,7 +240,12 @@ Message de-duplication:
     already received the last `DeduplicationPeriod` milliseconds ago. If it's
     already known, the message will be dropped as it was never received and the
     timeout counter for that message will be reset. Messages are identified via
-    their `std::hash` value.
+    their `std::hash` value of the full MAVLink message including it's header.  
+    As long as no message with exactly the same header sequence number and
+    content is received during the configured period, everything is fine. The
+    most critical message is the heartbeat since it mostly contains static
+    data. So a period shorter than the update period of the fastest static
+    message is fine in any case (less than 1000 ms for 1 Hz heartbeats).
 
 Endpoint groups:
 

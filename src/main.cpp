@@ -340,8 +340,9 @@ static int parse_argv(int argc, char *argv[], Configuration &config)
             const char *bauds = number != ULONG_MAX ? base + strlen(base) + 1 : nullptr;
             if (bauds != nullptr) {
                 opt_uart.baudrates.push_back(atoi(bauds));
+            } else {
+                opt_uart.baudrates.push_back(DEFAULT_BAUDRATE);
             }
-            opt_uart.baudrates.push_back(DEFAULT_BAUDRATE);
 
             config.uart_configs.push_back(opt_uart);
         }

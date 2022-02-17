@@ -57,7 +57,7 @@ uint16_t Endpoint::sniffer_sysid = 0;
 // clang-format off
 const char *UartEndpoint::section_pattern = "uartendpoint *";
 const ConfFile::OptionsTable UartEndpoint::option_table[] = {
-    {"baud",            false, UartEndpoint::parse_baudrates,   OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, baudrates)},
+    {"baud",            false, ConfFile::parse_uint32_vector,   OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, baudrates)},
     {"device",          true,  ConfFile::parse_stdstring,       OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, device)},
     {"FlowControl",     false, ConfFile::parse_bool,            OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, flowcontrol)},
     {"AllowMsgIdOut",   false, ConfFile::parse_uint32_vector,   OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, allow_msg_id_out)},
@@ -913,30 +913,6 @@ int UartEndpoint::add_speeds(const std::vector<speed_t> &bauds)
         MSEC_PER_SEC * UART_BAUD_RETRY_SEC,
         std::bind(&UartEndpoint::_change_baud_cb, this, std::placeholders::_1),
         this);
-
-    return 0;
-}
-
-int UartEndpoint::parse_baudrates(const char *val, size_t val_len, void *storage,
-                                  size_t storage_len)
-{
-    assert(val);
-    assert(storage);
-    assert(val_len);
-
-    if (storage_len < sizeof(bool)) {
-        return -ENOBUFS;
-    }
-
-    char *filter_string = strndupa(val, val_len);
-    auto *target = (std::vector<speed_t> *)storage;
-
-    char *token = strtok(filter_string, ",");
-    while (token != nullptr) {
-        target->push_back(atoi(token));
-        token = strtok(nullptr, ",");
-    }
-    target->push_back(DEFAULT_BAUDRATE);
 
     return 0;
 }
