@@ -231,6 +231,31 @@ TEST(EndpointTest, AcceptMsg_OutMsgIdFilter)
     EXPECT_EQ(endpoint.accept_msg(&test_msg), Endpoint::AcceptState::Filtered);
 }
 
+TEST(EndpointTest, AcceptMsg_OutCompFilter)
+{
+    TestEndpoint endpoint;
+    buffer test_msg;
+
+    // broadcast message should normally be accepted
+    test_msg.curr.msg_id = 1;
+    test_msg.curr.src_sysid = 1;
+    test_msg.curr.target_sysid = -1;
+    test_msg.curr.target_compid = -1;
+
+    // only allow heartbeat messages
+    endpoint.filter_add_allowed_out_src_comp(1);
+
+    // accept message with allowed source component ID
+    test_msg.curr.src_compid = 1;
+    EXPECT_EQ(endpoint.accept_msg(&test_msg), Endpoint::AcceptState::Accepted);
+
+    // reject message with other source component IDs
+    test_msg.curr.src_compid = 2;
+    EXPECT_EQ(endpoint.accept_msg(&test_msg), Endpoint::AcceptState::Filtered);
+    test_msg.curr.src_compid = 255;
+    EXPECT_EQ(endpoint.accept_msg(&test_msg), Endpoint::AcceptState::Filtered);
+}
+
 /**
  * UART Endpoint
  */
