@@ -484,14 +484,14 @@ Endpoint::AcceptState Endpoint::accept_msg(const struct buffer *pbuf) const
     }
 
     // If filter is defined and message is not in the set: discard it
-    if (pbuf->curr.msg_id != UINT32_MAX && !_allowed_msg_ids.empty()
-        && !vector_contains(_allowed_msg_ids, pbuf->curr.msg_id)) {
+    if (pbuf->curr.msg_id != UINT32_MAX && !_allowed_outgoing_msg_ids.empty()
+        && !vector_contains(_allowed_outgoing_msg_ids, pbuf->curr.msg_id)) {
         return Endpoint::AcceptState::Filtered;
     }
 
     // If filter is defined and message is not in the set: discard it
-    if (pbuf->curr.msg_id != UINT32_MAX && !_allowed_src_comps.empty()
-        && !vector_contains(_allowed_src_comps, pbuf->curr.src_compid)) {
+    if (pbuf->curr.msg_id != UINT32_MAX && !_allowed_outgoing_src_comps.empty()
+        && !vector_contains(_allowed_outgoing_src_comps, pbuf->curr.src_compid)) {
         return Endpoint::AcceptState::Filtered;
     }
 
@@ -654,11 +654,11 @@ bool UartEndpoint::setup(UartEndpointConfig conf)
     }
 
     for (auto msg_id : conf.allow_msg_id_out) {
-        this->filter_add_allowed_msg_id(msg_id);
+        this->filter_add_allowed_out_msg_id(msg_id);
     }
 
     for (auto src_comp : conf.allow_src_comp_out) {
-        this->filter_add_allowed_src_comp(src_comp);
+        this->filter_add_allowed_out_src_comp(src_comp);
     }
 
     this->_group_name = conf.group;
@@ -958,11 +958,11 @@ bool UdpEndpoint::setup(UdpEndpointConfig conf)
     }
 
     for (auto msg_id : conf.allow_msg_id_out) {
-        this->filter_add_allowed_msg_id(msg_id);
+        this->filter_add_allowed_out_msg_id(msg_id);
     }
 
     for (auto src_comp : conf.allow_src_comp_out) {
-        this->filter_add_allowed_src_comp(src_comp);
+        this->filter_add_allowed_out_src_comp(src_comp);
     }
 
     this->_group_name = conf.group;
@@ -1300,11 +1300,11 @@ bool TcpEndpoint::setup(TcpEndpointConfig conf)
     this->_retry_timeout = conf.retry_timeout;
 
     for (auto msg_id : conf.allow_msg_id_out) {
-        this->filter_add_allowed_msg_id(msg_id);
+        this->filter_add_allowed_out_msg_id(msg_id);
     }
 
     for (auto src_comp : conf.allow_src_comp_out) {
-        this->filter_add_allowed_src_comp(src_comp);
+        this->filter_add_allowed_out_src_comp(src_comp);
     }
 
     this->_group_name = conf.group;

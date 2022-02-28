@@ -149,8 +149,14 @@ public:
 
     AcceptState accept_msg(const struct buffer *pbuf) const;
 
-    void filter_add_allowed_msg_id(uint32_t msg_id) { _allowed_msg_ids.push_back(msg_id); }
-    void filter_add_allowed_src_comp(uint8_t src_comp) { _allowed_src_comps.push_back(src_comp); }
+    void filter_add_allowed_out_msg_id(uint32_t msg_id)
+    {
+        _allowed_outgoing_msg_ids.push_back(msg_id);
+    }
+    void filter_add_allowed_out_src_comp(uint8_t src_comp)
+    {
+        _allowed_outgoing_src_comps.push_back(src_comp);
+    }
 
     bool allowed_by_dedup(const buffer *pbuf) const;
 
@@ -200,8 +206,8 @@ protected:
     std::vector<uint16_t> _sys_comp_ids;
 
 private:
-    std::vector<uint32_t> _allowed_msg_ids;
-    std::vector<uint8_t> _allowed_src_comps;
+    std::vector<uint32_t> _allowed_outgoing_msg_ids;
+    std::vector<uint8_t> _allowed_outgoing_src_comps;
 };
 
 class UartEndpoint : public Endpoint {

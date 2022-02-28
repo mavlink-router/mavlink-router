@@ -117,7 +117,7 @@ TEST(EndpointTest, HasSysCompId)
     EXPECT_FALSE(endpoint.has_sys_comp_id(255, 1));
 }
 
-TEST(EndpointTest, AcceptMsgEmptyKnownSystems)
+TEST(EndpointTest, AcceptMsg_EmptyKnownSystems)
 {
     TestEndpoint endpoint;
     buffer test_msg;
@@ -151,7 +151,7 @@ TEST(EndpointTest, AcceptMsgEmptyKnownSystems)
     EXPECT_EQ(endpoint.accept_msg(&test_msg), Endpoint::AcceptState::Rejected);
 }
 
-TEST(EndpointTest, AcceptMsgWithKnownSystems)
+TEST(EndpointTest, AcceptMsg_WithKnownSystems)
 {
     TestEndpoint endpoint;
     buffer test_msg;
@@ -204,7 +204,7 @@ TEST(EndpointTest, AcceptMsgWithKnownSystems)
     EXPECT_EQ(endpoint.accept_msg(&test_msg), Endpoint::AcceptState::Rejected);
 }
 
-TEST(EndpointTest, AcceptMsgMsgIdFilter)
+TEST(EndpointTest, AcceptMsg_OutMsgIdFilter)
 {
     TestEndpoint endpoint;
     buffer test_msg;
@@ -216,7 +216,7 @@ TEST(EndpointTest, AcceptMsgMsgIdFilter)
     test_msg.curr.target_compid = -1;
 
     // only allow heartbeat messages
-    endpoint.filter_add_allowed_msg_id(1);
+    endpoint.filter_add_allowed_out_msg_id(1);
 
     // accept message with allowed message ID
     test_msg.curr.msg_id = 1;
