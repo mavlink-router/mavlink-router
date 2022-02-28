@@ -62,8 +62,10 @@ const ConfFile::OptionsTable UartEndpoint::option_table[] = {
     {"FlowControl",     false, ConfFile::parse_bool,            OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, flowcontrol)},
     {"AllowMsgIdOut",   false, ConfFile::parse_uint32_vector,   OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, allow_msg_id_out)},
     {"AllowSrcCompOut", false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, allow_src_comp_out)},
+    {"AllowSrcSysOut",  false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, allow_src_sys_out)},
     {"AllowMsgIdIn",    false, ConfFile::parse_uint32_vector,   OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, allow_msg_id_in)},
     {"AllowSrcCompIn",  false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, allow_src_comp_in)},
+    {"AllowSrcSysIn",   false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, allow_src_sys_in)},
     {"group",           false, ConfFile::parse_stdstring,       OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, group)},
     {}
 };
@@ -76,8 +78,10 @@ const ConfFile::OptionsTable UdpEndpoint::option_table[] = {
     {"filter",          false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_msg_id_out)}, // legacy AllowMsgIdOut
     {"AllowMsgIdOut",   false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_msg_id_out)},
     {"AllowSrcCompOut", false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_src_comp_out)},
+    {"AllowSrcSysOut",  false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_src_sys_out)},
     {"AllowMsgIdIn",    false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_msg_id_in)},
     {"AllowSrcCompIn",  false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_src_comp_in)},
+    {"AllowSrcSysIn",   false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_src_sys_in)},
     {"group",           false,  ConfFile::parse_stdstring,      OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, group)},
     {}
 };
@@ -89,8 +93,10 @@ const ConfFile::OptionsTable TcpEndpoint::option_table[] = {
     {"RetryTimeout",    false,  ConfFile::parse_i,              OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, retry_timeout)},
     {"AllowMsgIdOut",   false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_msg_id_out)},
     {"AllowSrcCompOut", false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_src_comp_out)},
+    {"AllowSrcSysOut",  false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_src_sys_out)},
     {"AllowMsgIdIn",    false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_msg_id_in)},
     {"AllowSrcCompIn",  false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_src_comp_in)},
+    {"AllowSrcSysIn",   false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_src_sys_in)},
     {"group",           false,  ConfFile::parse_stdstring,      OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, group)},
     {}
 };
@@ -511,6 +517,12 @@ Endpoint::AcceptState Endpoint::accept_msg(const struct buffer *pbuf) const
         return Endpoint::AcceptState::Filtered;
     }
 
+    // If filter is defined and message is not in the set: discard it
+    if (pbuf->curr.msg_id != UINT32_MAX && !_allowed_outgoing_src_systems.empty()
+        && !vector_contains(_allowed_outgoing_src_systems, pbuf->curr.src_sysid)) {
+        return Endpoint::AcceptState::Filtered;
+    }
+
     // Message is broadcast on sysid or sysid is non-existent: accept msg
     if (pbuf->curr.target_sysid == 0 || pbuf->curr.target_sysid == -1) {
         return Endpoint::AcceptState::Accepted;
@@ -553,6 +565,12 @@ bool Endpoint::allowed_by_incoming_filters(const buffer *buf) const
     // If filter is defined and message is not in the set: discard it
     if (!_allowed_incoming_src_comps.empty()
         && !vector_contains(_allowed_incoming_src_comps, buf->curr.src_compid)) {
+        return false;
+    }
+
+    // If filter is defined and message is not in the set: discard it
+    if (!_allowed_incoming_src_systems.empty()
+        && !vector_contains(_allowed_incoming_src_systems, buf->curr.src_sysid)) {
         return false;
     }
 
@@ -690,17 +708,21 @@ bool UartEndpoint::setup(UartEndpointConfig conf)
     for (auto msg_id : conf.allow_msg_id_out) {
         this->filter_add_allowed_out_msg_id(msg_id);
     }
-
     for (auto src_comp : conf.allow_src_comp_out) {
         this->filter_add_allowed_out_src_comp(src_comp);
+    }
+    for (auto src_sys : conf.allow_src_sys_out) {
+        this->filter_add_allowed_out_src_sys(src_sys);
     }
 
     for (auto msg_id : conf.allow_msg_id_in) {
         this->filter_add_allowed_in_msg_id(msg_id);
     }
-
     for (auto src_comp : conf.allow_src_comp_in) {
         this->filter_add_allowed_in_src_comp(src_comp);
+    }
+    for (auto src_sys : conf.allow_src_sys_out) {
+        this->filter_add_allowed_in_src_sys(src_sys);
     }
 
     this->_group_name = conf.group;
@@ -1002,17 +1024,21 @@ bool UdpEndpoint::setup(UdpEndpointConfig conf)
     for (auto msg_id : conf.allow_msg_id_out) {
         this->filter_add_allowed_out_msg_id(msg_id);
     }
-
     for (auto src_comp : conf.allow_src_comp_out) {
         this->filter_add_allowed_out_src_comp(src_comp);
+    }
+    for (auto src_sys : conf.allow_src_sys_out) {
+        this->filter_add_allowed_out_src_sys(src_sys);
     }
 
     for (auto msg_id : conf.allow_msg_id_in) {
         this->filter_add_allowed_in_msg_id(msg_id);
     }
-
     for (auto src_comp : conf.allow_src_comp_in) {
         this->filter_add_allowed_in_src_comp(src_comp);
+    }
+    for (auto src_sys : conf.allow_src_sys_out) {
+        this->filter_add_allowed_in_src_sys(src_sys);
     }
 
     this->_group_name = conf.group;
@@ -1352,17 +1378,21 @@ bool TcpEndpoint::setup(TcpEndpointConfig conf)
     for (auto msg_id : conf.allow_msg_id_out) {
         this->filter_add_allowed_out_msg_id(msg_id);
     }
-
     for (auto src_comp : conf.allow_src_comp_out) {
         this->filter_add_allowed_out_src_comp(src_comp);
+    }
+    for (auto src_sys : conf.allow_src_sys_out) {
+        this->filter_add_allowed_out_src_sys(src_sys);
     }
 
     for (auto msg_id : conf.allow_msg_id_in) {
         this->filter_add_allowed_in_msg_id(msg_id);
     }
-
     for (auto src_comp : conf.allow_src_comp_in) {
         this->filter_add_allowed_in_src_comp(src_comp);
+    }
+    for (auto src_sys : conf.allow_src_sys_out) {
+        this->filter_add_allowed_in_src_sys(src_sys);
     }
 
     this->_group_name = conf.group;

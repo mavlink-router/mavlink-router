@@ -43,8 +43,10 @@ struct UartEndpointConfig {
     bool flowcontrol{false};
     std::vector<uint32_t> allow_msg_id_out;
     std::vector<uint8_t> allow_src_comp_out;
+    std::vector<uint8_t> allow_src_sys_out;
     std::vector<uint32_t> allow_msg_id_in;
     std::vector<uint8_t> allow_src_comp_in;
+    std::vector<uint8_t> allow_src_sys_in;
     std::string group;
 };
 
@@ -57,8 +59,10 @@ struct UdpEndpointConfig {
     Mode mode;
     std::vector<uint32_t> allow_msg_id_out;
     std::vector<uint8_t> allow_src_comp_out;
+    std::vector<uint8_t> allow_src_sys_out;
     std::vector<uint32_t> allow_msg_id_in;
     std::vector<uint8_t> allow_src_comp_in;
+    std::vector<uint8_t> allow_src_sys_in;
     std::string group;
 };
 
@@ -69,8 +73,10 @@ struct TcpEndpointConfig {
     int retry_timeout{5};
     std::vector<uint32_t> allow_msg_id_out;
     std::vector<uint8_t> allow_src_comp_out;
+    std::vector<uint8_t> allow_src_sys_out;
     std::vector<uint32_t> allow_msg_id_in;
     std::vector<uint8_t> allow_src_comp_in;
+    std::vector<uint8_t> allow_src_sys_in;
     std::string group;
 };
 
@@ -163,6 +169,10 @@ public:
     {
         _allowed_outgoing_src_comps.push_back(src_comp);
     }
+    void filter_add_allowed_out_src_sys(uint8_t src_sys)
+    {
+        _allowed_outgoing_src_systems.push_back(src_sys);
+    }
     void filter_add_allowed_in_msg_id(uint32_t msg_id)
     {
         _allowed_incoming_msg_ids.push_back(msg_id);
@@ -170,6 +180,10 @@ public:
     void filter_add_allowed_in_src_comp(uint8_t src_comp)
     {
         _allowed_incoming_src_comps.push_back(src_comp);
+    }
+    void filter_add_allowed_in_src_sys(uint8_t src_sys)
+    {
+        _allowed_incoming_src_systems.push_back(src_sys);
     }
 
     bool allowed_by_dedup(const buffer *pbuf) const;
@@ -223,8 +237,10 @@ protected:
 private:
     std::vector<uint32_t> _allowed_outgoing_msg_ids;
     std::vector<uint8_t> _allowed_outgoing_src_comps;
+    std::vector<uint8_t> _allowed_outgoing_src_systems;
     std::vector<uint32_t> _allowed_incoming_msg_ids;
     std::vector<uint8_t> _allowed_incoming_src_comps;
+    std::vector<uint8_t> _allowed_incoming_src_systems;
 };
 
 class UartEndpoint : public Endpoint {

@@ -256,6 +256,31 @@ TEST(EndpointTest, AcceptMsg_OutCompFilter)
     EXPECT_EQ(endpoint.accept_msg(&test_msg), Endpoint::AcceptState::Filtered);
 }
 
+TEST(EndpointTest, AcceptMsg_OutSysFilter)
+{
+    TestEndpoint endpoint;
+    buffer test_msg;
+
+    // broadcast message should normally be accepted
+    test_msg.curr.msg_id = 1;
+    test_msg.curr.src_compid = 1;
+    test_msg.curr.target_sysid = -1;
+    test_msg.curr.target_compid = -1;
+
+    // only allow heartbeat messages
+    endpoint.filter_add_allowed_out_src_sys(42);
+
+    // accept message with allowed source system ID
+    test_msg.curr.src_sysid = 42;
+    EXPECT_EQ(endpoint.accept_msg(&test_msg), Endpoint::AcceptState::Accepted);
+
+    // reject message with other source system IDs
+    test_msg.curr.src_sysid = 2;
+    EXPECT_EQ(endpoint.accept_msg(&test_msg), Endpoint::AcceptState::Filtered);
+    test_msg.curr.src_sysid = 255;
+    EXPECT_EQ(endpoint.accept_msg(&test_msg), Endpoint::AcceptState::Filtered);
+}
+
 TEST(EndpointTest, AcceptMsg_InMsgIdFilter)
 {
     TestEndpoint endpoint;
@@ -305,6 +330,31 @@ TEST(EndpointTest, AcceptMsg_InCompFilter)
     test_msg.curr.src_compid = 2;
     EXPECT_EQ(endpoint.allowed_by_incoming_filters(&test_msg), false);
     test_msg.curr.src_compid = 255;
+    EXPECT_EQ(endpoint.allowed_by_incoming_filters(&test_msg), false);
+}
+
+TEST(EndpointTest, AcceptMsg_InSysFilter)
+{
+    TestEndpoint endpoint;
+    buffer test_msg;
+
+    // broadcast message should normally be accepted
+    test_msg.curr.msg_id = 1;
+    test_msg.curr.src_compid = 1;
+    test_msg.curr.target_sysid = -1;
+    test_msg.curr.target_compid = -1;
+
+    // only allow heartbeat messages
+    endpoint.filter_add_allowed_in_src_sys(23);
+
+    // accept message with allowed source component ID
+    test_msg.curr.src_sysid = 23;
+    EXPECT_EQ(endpoint.allowed_by_incoming_filters(&test_msg), true);
+
+    // reject message with other source component IDs
+    test_msg.curr.src_sysid = 2;
+    EXPECT_EQ(endpoint.allowed_by_incoming_filters(&test_msg), false);
+    test_msg.curr.src_sysid = 255;
     EXPECT_EQ(endpoint.allowed_by_incoming_filters(&test_msg), false);
 }
 
