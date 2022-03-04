@@ -462,10 +462,10 @@ void Mainloop::clear_endpoints()
 int Mainloop::tcp_open(unsigned long tcp_port)
 {
     int fd;
-    struct sockaddr_in sockaddr = {};
+    struct sockaddr_in6 sockaddr = {};
     int val = 1;
 
-    fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+    fd = socket(AF_INET6, SOCK_STREAM | SOCK_NONBLOCK, 0);
     if (fd == -1) {
         log_error("TCP Server: Could not create tcp socket (%m)");
         return -1;
@@ -473,9 +473,9 @@ int Mainloop::tcp_open(unsigned long tcp_port)
 
     setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
 
-    sockaddr.sin_family = AF_INET;
-    sockaddr.sin_port = htons(tcp_port);
-    sockaddr.sin_addr.s_addr = INADDR_ANY;
+    sockaddr.sin6_family = AF_INET6;
+    sockaddr.sin6_port = htons(tcp_port);
+    sockaddr.sin6_addr = in6addr_any;
 
     if (bind(fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) < 0) {
         log_error("TCP Server: Could not bind to tcp socket (%m)");
@@ -491,7 +491,7 @@ int Mainloop::tcp_open(unsigned long tcp_port)
 
     add_fd(fd, &g_tcp_fd, EPOLLIN);
 
-    log_info("Opened TCP Server [%d] 0.0.0.0:%lu", fd, tcp_port);
+    log_info("Opened TCP Server [%d] [::]:%lu", fd, tcp_port);
 
     return fd;
 }
