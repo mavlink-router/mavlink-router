@@ -1,6 +1,10 @@
 name: Build and Test
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
 
 jobs:
   build:
@@ -29,12 +33,15 @@ jobs:
               sudo dpkg --add-architecture i386
               sudo apt-get update
               sudo apt-get install --yes libgtest-dev:i386
+          else
+              sudo apt-get update
           fi
           sudo apt-get install --yes pkg-config gcc-multilib g++-multilib ninja-build python3-pip libgtest-dev
           pip3 install meson pymavlink
       - name: install dependencies (cross)
         if: ${{ matrix.arch != 'native' }}
         run: |
+          sudo apt-get update
           sudo apt-get install --yes ninja-build gcc-${{ matrix.arch }} g++-${{ matrix.arch }} podman python3-pip
           pip3 install meson pymavlink
 
