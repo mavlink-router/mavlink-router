@@ -633,6 +633,7 @@ void Endpoint::print_statistics()
     printf("\n\t\tTotal: %u %" PRIu64 "KB", _stat.write.total, _stat.write.bytes / 1000);
     printf("\n\t}");
     printf("\n}\n");
+    fflush(stdout);
 }
 
 uint8_t Endpoint::get_trimmed_zeros(const mavlink_msg_entry_t *msg_entry,
