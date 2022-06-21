@@ -415,9 +415,11 @@ bool Mainloop::add_endpoints(const Configuration &config)
     }
 
     // Create TCP server
+    /*
     if (config.tcp_port != 0u) {
         g_tcp_fd = tcp_open(config.tcp_port);
     }
+    */
 
     // Create Log endpoint
     auto conf = config.log_config;
