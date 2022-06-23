@@ -31,4 +31,3 @@ RUN ninja -C build install
 
 FROM ubuntu:20.04
 COPY --from=0 /usr/bin/mavlink-routerd /usr/bin/mavlink-routerd
-ENTRYPOINT /usr/bin/mavlink-routerd
