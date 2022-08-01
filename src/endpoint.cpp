@@ -722,7 +722,7 @@ bool UartEndpoint::setup(UartEndpointConfig conf)
     for (auto src_comp : conf.allow_src_comp_in) {
         this->filter_add_allowed_in_src_comp(src_comp);
     }
-    for (auto src_sys : conf.allow_src_sys_out) {
+    for (auto src_sys : conf.allow_src_sys_in) {
         this->filter_add_allowed_in_src_sys(src_sys);
     }
 
@@ -1038,7 +1038,7 @@ bool UdpEndpoint::setup(UdpEndpointConfig conf)
     for (auto src_comp : conf.allow_src_comp_in) {
         this->filter_add_allowed_in_src_comp(src_comp);
     }
-    for (auto src_sys : conf.allow_src_sys_out) {
+    for (auto src_sys : conf.allow_src_sys_in) {
         this->filter_add_allowed_in_src_sys(src_sys);
     }
 
@@ -1392,7 +1392,7 @@ bool TcpEndpoint::setup(TcpEndpointConfig conf)
     for (auto src_comp : conf.allow_src_comp_in) {
         this->filter_add_allowed_in_src_comp(src_comp);
     }
-    for (auto src_sys : conf.allow_src_sys_out) {
+    for (auto src_sys : conf.allow_src_sys_in) {
         this->filter_add_allowed_in_src_sys(src_sys);
     }
 
