@@ -6,8 +6,20 @@ on:
     branches: [master]
 
 jobs:
+  formatting-check:
+    name: Formatting Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Run clang-format style check on src directory
+        uses: jidicula/clang-format-action@v4.3.0
+        with:
+          clang-format-version: "13"
+          check-path: "src"
+
   build:
     runs-on: ubuntu-20.04
+    needs: [formatting-check]
     strategy:
       matrix:
         include:
@@ -98,6 +110,7 @@ jobs:
   alpine-linux:
     name: alpine 3.14 (musl)
     runs-on: ubuntu-20.04
+    needs: [formatting-check]
     container: alpine:3.14
     steps:
       - name: install dependencies
