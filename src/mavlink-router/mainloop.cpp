@@ -62,6 +62,13 @@ Mainloop::~Mainloop()
 {
     free_endpoints();
     _del_timeouts(); // needs to happen after endpoints are freed
+
+    if (_pipefd != -1)
+    {
+        ::close(_pipefd);
+        _pipefd = -1;
+    }
+    ::remove(pipe_path);
     instance = nullptr;
 }
 
