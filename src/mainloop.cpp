@@ -362,9 +362,9 @@ bool Mainloop::add_endpoints(const Configuration &config)
 {
     // Create UART and UDP endpoints
     if (config.sniffer_sysid != 0) {
+        Endpoint::sniffer_sysid = config.sniffer_sysid;
         log_info("An endpoint with sysid %u on it will sniff all messages",
                  Endpoint::sniffer_sysid);
-        Endpoint::sniffer_sysid = config.sniffer_sysid;
     }
     for (const auto &conf : config.uart_configs) {
         auto uart = std::make_shared<UartEndpoint>(conf.name);
