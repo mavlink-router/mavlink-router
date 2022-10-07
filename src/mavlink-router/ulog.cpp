@@ -25,6 +25,7 @@
 
 #include <common/log.h>
 #include <common/util.h>
+#include "auterion_ulog_meta_writer.h"
 
 #define ULOG_HEADER_SIZE 16
 #define ULOG_MAGIC                               \
@@ -74,7 +75,6 @@ bool ULog::start()
     if (!LogEndpoint::start()) {
         return false;
     }
-
     _waiting_header = true;
     _waiting_first_msg_offset = false;
     _expected_seq = 0;
@@ -351,12 +351,21 @@ bool ULog::_logging_flush()
         memmove(_buffer_partial, &_buffer_partial[r], _buffer_partial_len);
     }
 
+    if (!_waiting_flags && !_meta_written) {
+        write_meta_information(_file, _meta_written);
+    }
+
     while (_buffer_len >= sizeof(struct ulog_msg_header) && !_buffer_partial_len) {
         struct ulog_msg_header *header = (struct ulog_msg_header *)&_buffer[_buffer_index];
         const uint16_t full_msg_size = header->msg_size + sizeof(struct ulog_msg_header);
+        const char msg_type = header->msg_type;
 
         if (full_msg_size > _buffer_len) {
             break;
+        }
+
+        if (msg_type == 'B') {
+            _waiting_flags = false;
         }
 
         const ssize_t r = write(_file, header, full_msg_size);
