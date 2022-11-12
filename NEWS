@@ -1,3 +1,69 @@
+mavlink-router 3
+================
+
+This is a big release following new features and several bug fixes. It's recommended that
+users upgrade to this release for both ArduPilot and PX4 flight stacks.
+
+**A note on compatibility**: for ArduPilot, due to the way the log stream over mavlink is handled, it's
+recommended to set LOG_DISARMED=1 when the option to log only while armed is set
+in mavlink-router.
+
+Changes
+-------
+
+Configuration file
+~~~~~~~~~~~~~~~~~~
+
+- Rename the `Filter` option in the configuration file to `AllowMsgIdOut` to better indicate
+  what that is doing. It also extends its handling to all kind of endpoint, fix corner cases
+  and add proper documentation
+- Add `AllowSrcCompOut`, `AllowSrcSysOut`, `AllowMsgIdIn`, `AllowSrcCompIn`, `AllowSrcSysIn`
+  to allow messages based on system/component/message IDs.
+- Add proper "sniffer" functionality: this was previously thought to be covered by the "eavesdrop"
+  setting on Endpoint, but that had never been properly implemented. This is now implemented through
+  a SnifferSysid in configuration file, pointing to a system id where to forward all traffic to.
+- Add "redundant data links": the configuration section for the endpoint has a new `Group`
+  setting. Endpoints with the same `Group` are considered to be connecting the same systems,
+  thus acting as redundant data links. The routing of messages is then tweaked to avoid cycles
+  between these endpoints
+
+General
+~~~~~~~
+
+- Update mavlink module
+- Improve debug log output
+- Fix routing when sending messages to specific components
+- Improve compatibility with musl
+- Improve integration with github actions:
+  - Cover more distros and C/C++ libraries, particularly musl.
+  - Add artifacts and release binaries
+- Fix polling for events leading to not handling some of them
+- Improve installation instructions in the README, also covering more distros: Debian, Ubuntu, 
+  Fedora and Archlinux
+- Enable IPv6
+- Do not exit when client disconnects from TCP - just like new connections are accepted
+  on the fly, also allow clients to disconnect without treating this as critical event. UART
+  disconnection are still considered fatal as those should not normally happen.
+- Set TCP_NODELAY on TCP to reduce latency
+- Fix TCP reconnection logic
+- Fix warnings when platform serial ports instead of USB-serial: there is not USB-related
+  tweaks to do for those related to the latency
+- Fix ArduPilot logging: do not ack and nack the same package
+- Switch to meson as build system
+- Use pre-generated mavlink library from its repository
+- Adopt clang-format to have a uniform coding style throughout the codebase
+- Improve how configuration is handled internally by mavlink-router which should avoid
+  past mistakes
+- Do not spread mavlink headers throughout the codebase, but rather use them from one place
+- Fix crash when exiting due to log handlers needing to send info to the flight stack
+- Add LogSystemId to set what is the system id we should handle logs for. This improves
+  the handling of multiple FC connected to mavlink-router
+- UDP-client: switch back to broadcast on inactivity. When using UDP this allows to change
+  the GCS being used without worrying about IP changes due to using multiple devices.
+- Fix error when launching mavlink-router with a non-existent log directory: the error was 
+  also misleading, pointing to "no free disk space"
+- Reject messages on TCP when not connected
+
 mavlink-router 2
 ================
     - Misc bug fixes on handling error handling paths and general cleanups

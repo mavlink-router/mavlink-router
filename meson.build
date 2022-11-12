@@ -1,7 +1,7 @@
 project(
         'mavlink-router',
         'cpp', 'c',
-        version: '2',
+        version: '3',
         license: 'Apache 2.0',
         default_options: [
                 'cpp_std=gnu++11',
