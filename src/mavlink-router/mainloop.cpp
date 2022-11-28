@@ -68,7 +68,6 @@ Mainloop::~Mainloop()
         ::close(_pipefd);
         _pipefd = -1;
     }
-    ::remove(pipe_path);
     instance = nullptr;
 }
 
