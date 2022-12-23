@@ -48,6 +48,7 @@ struct UartEndpointConfig {
     std::vector<uint8_t> allow_src_comp_in;
     std::vector<uint8_t> allow_src_sys_in;
     std::string group;
+    bool ignore_comp_id;
 };
 
 struct UdpEndpointConfig {
@@ -64,6 +65,7 @@ struct UdpEndpointConfig {
     std::vector<uint8_t> allow_src_comp_in;
     std::vector<uint8_t> allow_src_sys_in;
     std::string group;
+    bool ignore_comp_id;
 };
 
 struct TcpEndpointConfig {
@@ -78,6 +80,7 @@ struct TcpEndpointConfig {
     std::vector<uint8_t> allow_src_comp_in;
     std::vector<uint8_t> allow_src_sys_in;
     std::string group;
+    bool ignore_comp_id;
 };
 
 /*
@@ -213,7 +216,7 @@ protected:
 
     std::string _group_name{}; // empty name to disable endpoint groups
     std::vector<std::shared_ptr<Endpoint>> _group_members{};
-
+    bool ignore_comp_id = false;
     // Statistics
     struct {
         struct {
