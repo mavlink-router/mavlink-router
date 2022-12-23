@@ -48,7 +48,7 @@ struct UartEndpointConfig {
     std::vector<uint8_t> allow_src_comp_in;
     std::vector<uint8_t> allow_src_sys_in;
     std::string group;
-    bool ignore_comp_id;
+    bool ignorecompid{false};
 };
 
 struct UdpEndpointConfig {
@@ -65,7 +65,7 @@ struct UdpEndpointConfig {
     std::vector<uint8_t> allow_src_comp_in;
     std::vector<uint8_t> allow_src_sys_in;
     std::string group;
-    bool ignore_comp_id;
+    bool ignorecompid{false};
 };
 
 struct TcpEndpointConfig {
@@ -80,7 +80,7 @@ struct TcpEndpointConfig {
     std::vector<uint8_t> allow_src_comp_in;
     std::vector<uint8_t> allow_src_sys_in;
     std::string group;
-    bool ignore_comp_id;
+    bool ignorecompid{false};
 };
 
 /*
@@ -199,7 +199,7 @@ public:
 
     struct buffer rx_buf;
     struct buffer tx_buf;
-
+    bool ignore_comp_id = false;
     // An endpoint with this system id becomes a "sniffer" and all
     // messages are accepted.
     static uint16_t sniffer_sysid;
@@ -216,7 +216,7 @@ protected:
 
     std::string _group_name{}; // empty name to disable endpoint groups
     std::vector<std::shared_ptr<Endpoint>> _group_members{};
-    bool ignore_comp_id = false;
+    
     // Statistics
     struct {
         struct {

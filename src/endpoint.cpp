@@ -67,7 +67,7 @@ const ConfFile::OptionsTable UartEndpoint::option_table[] = {
     {"AllowSrcCompIn",  false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, allow_src_comp_in)},
     {"AllowSrcSysIn",   false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, allow_src_sys_in)},
     {"group",           false, ConfFile::parse_stdstring,       OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, group)},
-    {"IgnoreCompId",    false, ConfFile::parse_bool,            OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, ignore_comp_id)},
+    {"IgnoreCompId",    false, ConfFile::parse_bool,            OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, ignorecompid)},
     {}
 };
 
@@ -84,7 +84,7 @@ const ConfFile::OptionsTable UdpEndpoint::option_table[] = {
     {"AllowSrcCompIn",  false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_src_comp_in)},
     {"AllowSrcSysIn",   false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_src_sys_in)},
     {"group",           false,  ConfFile::parse_stdstring,      OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, group)},
-    {"IgnoreCompId",    false,  ConfFile::parse_bool,            OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, ignore_comp_id)},
+    {"IgnoreCompId",    false,  ConfFile::parse_bool,           OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, ignorecompid)},
     {}
 };
 
@@ -100,7 +100,7 @@ const ConfFile::OptionsTable TcpEndpoint::option_table[] = {
     {"AllowSrcCompIn",  false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_src_comp_in)},
     {"AllowSrcSysIn",   false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_src_sys_in)},
     {"group",           false,  ConfFile::parse_stdstring,      OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, group)},
-    {"IgnoreCompId",    false,  ConfFile::parse_bool,            OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, ignore_comp_id)},
+    {"IgnoreCompId",    false,  ConfFile::parse_bool,            OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, ignorecompid)},
     {}
 };
 // clang-format on
@@ -545,7 +545,7 @@ Endpoint::AcceptState Endpoint::accept_msg(const struct buffer *pbuf) const
         return Endpoint::AcceptState::Accepted;
     }
 
-    if( ignore_comp_id && has_sys_id(pbuf->curr.target_sysid)) {
+    if(ignore_comp_id && has_sys_id(pbuf->curr.target_sysid)) {
         return Endpoint::AcceptState::Accepted;
     }
     // This endpoint has the sniffer_sysid: accept
@@ -714,8 +714,8 @@ bool UartEndpoint::setup(UartEndpointConfig conf)
         }
     }
 
-    if (conf.ignore_comp_id) {
-        this->ignore_comp_id = conf.ignore_comp_id;
+    if (conf.ignorecompid) {
+        this->ignore_comp_id = conf.ignorecompid;
     }
 
     for (auto msg_id : conf.allow_msg_id_out) {
@@ -1034,8 +1034,8 @@ bool UdpEndpoint::setup(UdpEndpointConfig conf)
         return false;
     }
 
-    if (conf.ignore_comp_id) {
-        this->ignore_comp_id = conf.ignore_comp_id;
+    if (conf.ignorecompid) {
+        this->ignore_comp_id = conf.ignorecompid;
     }
 
     for (auto msg_id : conf.allow_msg_id_out) {
@@ -1392,8 +1392,8 @@ bool TcpEndpoint::setup(TcpEndpointConfig conf)
     this->_port = conf.port;
     this->_retry_timeout = conf.retry_timeout;
 
-    if (conf.ignore_comp_id) {
-        this->ignore_comp_id = conf.ignore_comp_id;
+    if (conf.ignorecompid) {
+        this->ignore_comp_id = conf.ignorecompid;
     }
 
     for (auto msg_id : conf.allow_msg_id_out) {
