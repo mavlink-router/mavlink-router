@@ -33,6 +33,7 @@ The following libraries need also to be installed :
     $ sudo apt install python3-future
     $ sudo apt install libtool
     $ sudo apt install autoconf
+    $ sudo apt install pkg-config
 
 #### Build ####
 
