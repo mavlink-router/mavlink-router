@@ -364,11 +364,18 @@ int Mainloop::run_single(int timeout_msec)
             }
         }
         if (events[i].events & EPOLLERR) {
-            log_error("poll error for fd %i, closing it", p->fd);
-            remove_fd(p->fd);
-            // make poll errors fatal so that an external component can
-            // restart mavlink-router
-            request_exit();
+            if (events[i].events & EPOLLHUP) {
+                // EPOLLHUP is an expected error, in case the TCP connection
+                // drops. In this case, we'll just need to clean up the TCP
+                // connection later, no need to panic.
+                should_process_tcp_hangups = true;
+            } else {
+                log_error("poll error for fd %i, closing it", p->fd);
+                remove_fd(p->fd);
+                // make poll errors fatal so that an external component can
+                // restart mavlink-router
+                request_exit();
+            }
         }
     }
 
