@@ -98,7 +98,7 @@ public:
         return has_sys_comp_id(sys_comp_id);
     }
 
-    bool accept_msg(int target_sysid, int target_compid, uint8_t src_sysid, uint8_t src_compid, uint32_t msg_id);
+    bool accept_msg(int target_sysid, int target_compid, uint8_t src_sysid, uint8_t src_compid, bool crc_valid, uint32_t msg_id);
     void postprocess_msg(int target_sysid, int target_compid, uint8_t src_sysid, uint8_t src_compid, uint32_t msg_id);
 
     bool allowed_by_filter(uint32_t msg_id);
@@ -118,7 +118,7 @@ public:
 
 protected:
     virtual int read_msg(struct buffer *pbuf, int *target_system, int *target_compid,
-                         uint8_t *src_sysid, uint8_t *src_compid, uint32_t *msg_id);
+                         uint8_t *src_sysid, uint8_t *src_compid, bool *crc_valid, uint32_t *msg_id);
     virtual ssize_t _read_msg(uint8_t *buf, size_t len) = 0;
     bool _check_crc(const mavlink_msg_entry_t *msg_entry);
     void _add_sys_comp_id(uint16_t sys_comp_id);
@@ -180,7 +180,7 @@ public:
 
 protected:
     int read_msg(struct buffer *pbuf, int *target_system, int *target_compid, uint8_t *src_sysid,
-                 uint8_t *src_compid, uint32_t *msg_id) override;
+                 uint8_t *src_compid, bool *crc_valid, uint32_t *msg_id) override;
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
 
 private:

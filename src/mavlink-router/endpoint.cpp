@@ -78,23 +78,25 @@ int Endpoint::handle_read()
     uint8_t src_sysid, src_compid;
     uint32_t msg_id;
     struct buffer buf{};
+    bool crc_valid;
 
     while ((r = read_msg(&buf, &target_sysid, &target_compid, &src_sysid,
-                         &src_compid, &msg_id)) > 0) {
+                         &src_compid, &crc_valid, &msg_id)) > 0) {
         if (allowed_by_filter(msg_id) && allowed_by_dropout())
             Mainloop::get_instance().route_msg(&buf, target_sysid, target_compid,
-                                               src_sysid, src_compid, msg_id);
+                                               src_sysid, src_compid, crc_valid, msg_id);
     }
 
     return r;
 }
 
 int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compid,
-                       uint8_t *src_sysid, uint8_t *src_compid, uint32_t *msg_id)
+                       uint8_t *src_sysid, uint8_t *src_compid, bool *crc_valid, uint32_t *msg_id)
 {
     bool should_read_more = true;
     const mavlink_msg_entry_t *msg_entry;
     uint8_t *payload, seq, payload_len;
+    *crc_valid = false;
 
     if (fd < 0) {
         log_error("Trying to read invalid fd");
@@ -229,12 +231,20 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
          * Ground Station and Flight Stack. Although it can also be a
          * corrupted message is better forward than silent drop it.
          */
-        if (!_check_crc(msg_entry)) {
+        *crc_valid = _check_crc(msg_entry);
+        if (!*crc_valid) {
             _stat.read.crc_error++;
             _stat.read.crc_error_bytes += expected_size;
-            return 0;
+
+            /* In case of a crc error, the message is either corrupt, or the
+             * the definition of the message has been changed in a way that
+             * mavlink router is unaware of. In this case, we treat the message
+             * the same as if we didn't understand the message ID.
+             */
+            msg_entry = nullptr;
+        } else {
+            _add_sys_comp_id(((uint16_t)*src_sysid << 8) | *src_compid);
         }
-        _add_sys_comp_id(((uint16_t)*src_sysid << 8) | *src_compid);
     }
 
     _stat.read.handled++;
@@ -316,7 +326,7 @@ bool Endpoint::has_sys_comp_id(unsigned sys_comp_id)
 }
 
 bool Endpoint::accept_msg(int target_sysid, int target_compid, uint8_t src_sysid,
-                          uint8_t src_compid, uint32_t msg_id)
+                          uint8_t src_compid, bool crc_valid, uint32_t msg_id)
 {
     if (Log::get_max_level() >= Log::Level::DEBUG) {
         log_debug("Endpoint [%d] got message %u to %d/%d from %u/%u", fd, msg_id, target_sysid, target_compid,
@@ -730,9 +740,9 @@ bool UartEndpoint::_change_baud_cb(void *data)
 }
 
 int UartEndpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compid,
-                           uint8_t *src_sysid, uint8_t *src_compid, uint32_t *msg_id)
+                           uint8_t *src_sysid, uint8_t *src_compid, bool *crc_valid, uint32_t *msg_id)
 {
-    int ret = Endpoint::read_msg(pbuf, target_sysid, target_compid, src_sysid, src_compid, msg_id);
+    int ret = Endpoint::read_msg(pbuf, target_sysid, target_compid, src_sysid, src_compid, crc_valid, msg_id);
 
     if (_change_baud_timeout != nullptr && ret == ReadOk) {
         log_info("Baudrate %lu responded, keeping it", _baudrates[_current_baud_idx]);

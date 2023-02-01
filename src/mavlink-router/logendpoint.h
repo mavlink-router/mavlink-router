@@ -52,6 +52,14 @@ public:
      */
     void mark_unfinished_logs();
 
+    /**
+     * On top of the existing criteria from Endpoints,
+     * LogEndpoints have stricter criteria for accepting a mavlink message.
+     * The CRC checksum must be valid in order to avoid logging corrupt data.
+     * The usual Endpoint criteria for accepting a message are also applied.
+     */
+    bool accept_msg(int target_sysid, int target_compid, uint8_t src_sysid, uint8_t src_compid, bool crc_valid, uint32_t msg_id);
+
 protected:
     const char *_logs_dir;
     int _target_system_id = -1;

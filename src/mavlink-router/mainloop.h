@@ -70,7 +70,7 @@ public:
     int run_single(int timeout_msec);
 
     void route_msg(struct buffer *buf, int target_sysid, int target_compid, int sender_sysid,
-                   int sender_compid, uint32_t msg_id = UINT32_MAX);
+                   int sender_compid, bool crc_valid, uint32_t msg_id = UINT32_MAX);
     void handle_read(Endpoint *e);
     void handle_canwrite(Endpoint *e);
     void handle_tcp_connection();

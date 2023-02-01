@@ -91,9 +91,12 @@ void LogEndpoint::_send_msg(const mavlink_message_t *msg, int target_sysid)
         0, data
     };
 
+    // Message was created in memory. Assume it's valid.
+    const bool crc_valid = true;
+
     buffer.len = mavlink_msg_to_send_buffer(data, msg);
     Mainloop::get_instance().route_msg(&buffer, target_sysid, MAV_COMP_ID_ALL, msg->sysid,
-                                       msg->compid);
+                                       msg->compid, crc_valid);
 
     _stat.read.total++;
     _stat.read.handled++;
@@ -503,4 +506,8 @@ void LogEndpoint::_handle_auto_start_stop(uint32_t msg_id, uint8_t source_system
             }
         }
     }
+}
+
+bool LogEndpoint::accept_msg(int target_sysid, int target_compid, uint8_t src_sysid, uint8_t src_compid, bool crc_valid, uint32_t msg_id){
+    return crc_valid ? Endpoint::accept_msg(target_sysid, target_compid, src_sysid, src_compid, crc_valid, msg_id) : false;
 }
