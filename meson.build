@@ -31,7 +31,7 @@ dep_thread = dependency('threads')
 systemd_system_unit_dir = get_option('systemdsystemunitdir')
 if systemd_system_unit_dir == 'auto'
 		dep_systemd = dependency('systemd')
-		systemd_system_unit_dir = dep_systemd.get_pkgconfig_variable('systemdsystemunitdir')
+		systemd_system_unit_dir = dep_systemd.get_variable(pkgconfig: 'systemdsystemunitdir')
 endif
 
 dep_gtest = dependency('gtest', main : true, required : false)
