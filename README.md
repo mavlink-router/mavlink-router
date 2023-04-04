@@ -88,7 +88,7 @@ instead of editing the systemd file.
 ### Conf File
 
 By default, mavlink-routerd looks for the `/etc/mavlink-router/main.conf` file.
-The file location can be overriden via a `MAVLINK_ROUTER_CONF_FILE` environment
+The file location can be overriden via a `MAVLINK_ROUTERD_CONF_FILE` environment
 variable, or via the `-c` CLI switch when running mavlink-routerd. A
 description of the config file syntax and all parameters can be found in the
 [examples/config.sample](examples/config.sample) file.
@@ -101,7 +101,7 @@ alphabetical order, and can add or override configurations found in previous
 files.
 
 By default, `/etc/mavlink-router/config.d` is the directory, but it can be
-overriden via a `MAVLINK_ROUTER_CONF_DIR` environment variable, or via the `-d`
+overriden via a `MAVLINK_ROUTERD_CONF_DIR` environment variable, or via the `-d`
 switch when running mavlink-routerd.
 
 ### CLI Parameters
