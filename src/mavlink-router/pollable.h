@@ -33,4 +33,10 @@ public:
      * from poll.
      */
     virtual bool is_valid() { return true; };
+
+    /**
+     * If a pollable is critical, a poll error will result in
+     * router exit.
+     */
+    virtual bool is_critical() { return true; };
 };

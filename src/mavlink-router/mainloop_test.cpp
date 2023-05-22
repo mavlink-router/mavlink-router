@@ -63,7 +63,7 @@ TEST_F(MainLoopTest, termination)
 {
     Mainloop mainloop;
 
-    mainloop.request_exit();
+    mainloop.request_exit(EXIT_SUCCESS);
 
     mainloop.loop();
 }

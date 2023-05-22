@@ -946,7 +946,7 @@ static void free_endpoints_options_strings(struct options* opts)
 int main(int argc, char *argv[])
 {
     Mainloop mainloop;
-
+    int ret;
     Log::open();
 
     if (!pre_parse_argv(argc, argv)) {
@@ -970,7 +970,7 @@ int main(int argc, char *argv[])
     if (!mainloop.add_endpoints(mainloop, &opt))
         goto endpoint_error;
 
-    mainloop.loop();
+    ret = mainloop.loop();
 
     free_endpoints_options_strings(&opt);
 
@@ -978,7 +978,7 @@ int main(int argc, char *argv[])
 
     Log::close();
 
-    return 0;
+    return ret;
 
 endpoint_error:
     free_endpoints_options_strings(&opt);

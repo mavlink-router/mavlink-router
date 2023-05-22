@@ -59,7 +59,7 @@ public:
     int add_fd(int fd, void *data, int events);
     int mod_fd(int fd, void *data, int events);
     int remove_fd(int fd);
-    void loop();
+    int loop();
 
     /*
      * Runs single iteration of mainloop, i.e. single round of event handling.
@@ -100,7 +100,7 @@ public:
      * Request that loop exits "eventually". This (and only this!) function
      * is async-signal safe.
      */
-    void request_exit();
+    void request_exit(int retcode);
 
     /*
      * Expose list of registered endpoints (primarily for direct interaction
@@ -140,6 +140,7 @@ private:
     struct {
         uint32_t msg_to_unknown = 0;
     } _errors_aggregate;
+    int _retcode = 0;
 
     void free_endpoints();
     int tcp_open(unsigned long tcp_port);

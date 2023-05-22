@@ -90,8 +90,9 @@ Mainloop& Mainloop::get_instance()
     return *instance;
 }
 
-void Mainloop::request_exit()
+void Mainloop::request_exit(int retcode)
 {
+    _retcode = retcode;
     _should_exit.store(true, std::memory_order_relaxed);
 }
 
@@ -277,10 +278,10 @@ accept_error:
     delete tcp;
 }
 
-void Mainloop::loop()
+int Mainloop::loop()
 {
     if (epollfd < 0)
-        return;
+        return EXIT_FAILURE;
 
     MainloopSignalHandlers handlers(this);
 
@@ -315,6 +316,7 @@ void Mainloop::loop()
         remove_fd(current->fd);
         delete current;
     }
+    return _retcode;
 }
 
 int Mainloop::run_single(int timeout_msec)
@@ -341,7 +343,7 @@ int Mainloop::run_single(int timeout_msec)
         else if (events[i].data.ptr == &g_tcp_fd) {
             if (events[i].events & EPOLLERR) {
                 remove_fd(g_tcp_fd);
-                request_exit();
+                request_exit(EXIT_FAILURE);
             }
             else {
                 handle_tcp_connection();
@@ -364,7 +366,7 @@ int Mainloop::run_single(int timeout_msec)
             }
         }
         if (events[i].events & EPOLLERR) {
-            if (events[i].events & EPOLLHUP) {
+            if (events[i].events & EPOLLHUP || !p->is_critical()) {
                 // EPOLLHUP is an expected error, in case the TCP connection
                 // drops. In this case, we'll just need to clean up the TCP
                 // connection later, no need to panic.
@@ -374,7 +376,7 @@ int Mainloop::run_single(int timeout_msec)
                 remove_fd(p->fd);
                 // make poll errors fatal so that an external component can
                 // restart mavlink-router
-                request_exit();
+                request_exit(EXIT_FAILURE);
             }
         }
     }
@@ -962,7 +964,7 @@ MainloopSignalHandlers::~MainloopSignalHandlers()
 
 void MainloopSignalHandlers::signal_handler_function(int signo)
 {
-    mainloop_instance->request_exit();
+    mainloop_instance->request_exit(0);
 }
 
 Mainloop* MainloopSignalHandlers::mainloop_instance{nullptr};
