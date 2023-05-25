@@ -26,15 +26,15 @@ jobs:
           ./mainloop_test
 
   alpine-linux:
-    name: alpine 3.11.6 (musl)
-    runs-on: ubuntu-18.04
-    container: alpine:3.11.6
+    name: alpine 3.18 (musl)
+    runs-on: ubuntu-22.04
+    container: alpine:3.18
     steps:
       - uses: actions/checkout@v1
         with:
           submodules: recursive
       - name: install tools
-        run: apk update && apk add autoconf automake build-base git libtool linux-headers openssl-dev perl-extutils-pkgconfig python3 && pip3 install future
+        run: apk update && apk add autoconf automake build-base git libtool linux-headers openssl-dev perl-extutils-pkgconfig python3 py3-future
       - name: configure
         run: ./autogen.sh && ./configure CFLAGS='-g -O2' --sysconfdir=/etc --localstatedir=/var --libdir=/usr/lib --disable-systemd --prefix=/usr
       - name: build
