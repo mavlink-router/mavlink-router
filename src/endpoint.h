@@ -228,7 +228,6 @@ public:
         _blocked_incoming_src_systems.push_back(src_sys);
     }
 
-
     bool allowed_by_dedup(const buffer *pbuf) const;
     bool allowed_by_incoming_filters(const struct buffer *pbuf) const;
 

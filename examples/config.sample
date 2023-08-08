@@ -122,7 +122,6 @@
 # Default: Empty list (disabled)
 #BlockMsgIdOut = 
 
-
 # Only allow messages from the specified MAVLink source component IDs to be
 # sent via this endpoint. An empty list allows all source components.
 # Format: Comma separated list of integers
@@ -175,13 +174,13 @@
 # on this endpoint. An empty list allows all source components.
 # Format: Comma separated list of integers
 # Default: Empty list (disabled)
-#AllowSrcSysIn =
+#AllowSrcSysIn = 
 
 # Block messages from the specified MAVLink source systems to be received
 # on this endpoint. An empty list won't block any source systems.
 # Format: Comma separated list of integers
 # Default: Empty list (disabled)
-#BlockSrcSysIn =
+#BlockSrcSysIn = 
 
 # Group parallel/ redundant data links to use the same list of connected
 # systems. This is needed to prevent messages from one of the parallel links

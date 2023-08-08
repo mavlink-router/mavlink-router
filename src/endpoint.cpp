@@ -82,18 +82,18 @@ const ConfFile::OptionsTable UdpEndpoint::option_table[] = {
     {"mode",            true,   UdpEndpoint::parse_udp_mode,    OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, mode)},
     {"port",            false,  ConfFile::parse_ul,             OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, port)},
     {"filter",          false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_msg_id_out)}, // legacy AllowMsgIdOut
-    {"AllowMsgIdOut",   false, ConfFile::parse_uint32_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_msg_id_out)},
-    {"BlockMsgIdOut",   false, ConfFile::parse_uint32_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, block_msg_id_out)},
-    {"AllowSrcCompOut", false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_src_comp_out)},
-    {"BlockSrcCompOut", false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, block_src_comp_out)},
-    {"AllowSrcSysOut",  false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_src_sys_out)},
-    {"BlockSrcSysOut",  false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, block_src_sys_out)},
-    {"AllowMsgIdIn",    false, ConfFile::parse_uint32_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_msg_id_in)},
-    {"BlockMsgIdIn",    false, ConfFile::parse_uint32_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, block_msg_id_in)},
-    {"AllowSrcCompIn",  false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_src_comp_in)},
-    {"BlockSrcCompIn",  false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, block_src_comp_in)},
-    {"AllowSrcSysIn",   false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_src_sys_in)},
-    {"BlockSrcSysIn",   false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, block_src_sys_in)},
+    {"AllowMsgIdOut",   false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_msg_id_out)},
+    {"BlockMsgIdOut",   false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, block_msg_id_out)},
+    {"AllowSrcCompOut", false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_src_comp_out)},
+    {"BlockSrcCompOut", false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, block_src_comp_out)},
+    {"AllowSrcSysOut",  false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_src_sys_out)},
+    {"BlockSrcSysOut",  false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, block_src_sys_out)},
+    {"AllowMsgIdIn",    false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_msg_id_in)},
+    {"BlockMsgIdIn",    false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, block_msg_id_in)},
+    {"AllowSrcCompIn",  false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_src_comp_in)},
+    {"BlockSrcCompIn",  false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, block_src_comp_in)},
+    {"AllowSrcSysIn",   false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_src_sys_in)},
+    {"BlockSrcSysIn",   false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, block_src_sys_in)},
     {"group",           false,  ConfFile::parse_stdstring,      OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, group)},
     {}
 };
@@ -103,18 +103,18 @@ const ConfFile::OptionsTable TcpEndpoint::option_table[] = {
     {"address",         true,   ConfFile::parse_stdstring,      OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, address)},
     {"port",            true,   ConfFile::parse_ul,             OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, port)},
     {"RetryTimeout",    false,  ConfFile::parse_i,              OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, retry_timeout)},
-    {"AllowMsgIdOut",   false, ConfFile::parse_uint32_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_msg_id_out)},
-    {"BlockMsgIdOut",   false, ConfFile::parse_uint32_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, block_msg_id_out)},
-    {"AllowSrcCompOut", false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_src_comp_out)},
-    {"BlockSrcCompOut", false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, block_src_comp_out)},
-    {"AllowSrcSysOut",  false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_src_sys_out)},
-    {"BlockSrcSysOut",  false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, block_src_sys_out)},
-    {"AllowMsgIdIn",    false, ConfFile::parse_uint32_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_msg_id_in)},
-    {"BlockMsgIdIn",    false, ConfFile::parse_uint32_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, block_msg_id_in)},
-    {"AllowSrcCompIn",  false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_src_comp_in)},
-    {"BlockSrcCompIn",  false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, block_src_comp_in)},
-    {"AllowSrcSysIn",   false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_src_sys_in)},
-    {"BlockSrcSysIn",   false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, block_src_sys_in)},
+    {"AllowMsgIdOut",   false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_msg_id_out)},
+    {"BlockMsgIdOut",   false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, block_msg_id_out)},
+    {"AllowSrcCompOut", false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_src_comp_out)},
+    {"BlockSrcCompOut", false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, block_src_comp_out)},
+    {"AllowSrcSysOut",  false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_src_sys_out)},
+    {"BlockSrcSysOut",  false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, block_src_sys_out)},
+    {"AllowMsgIdIn",    false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_msg_id_in)},
+    {"BlockMsgIdIn",    false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, block_msg_id_in)},
+    {"AllowSrcCompIn",  false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_src_comp_in)},
+    {"BlockSrcCompIn",  false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, block_src_comp_in)},
+    {"AllowSrcSysIn",   false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_src_sys_in)},
+    {"BlockSrcSysIn",   false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, block_src_sys_in)},
     {"group",           false,  ConfFile::parse_stdstring,      OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, group)},
     {}
 };
@@ -778,7 +778,6 @@ bool UartEndpoint::setup(UartEndpointConfig conf)
     for (auto src_sys : conf.block_src_sys_out) {
         this->filter_add_blocked_out_src_sys(src_sys);
     }
-
 
     for (auto msg_id : conf.allow_msg_id_in) {
         this->filter_add_allowed_in_msg_id(msg_id);
@@ -1504,6 +1503,7 @@ bool TcpEndpoint::setup(TcpEndpointConfig conf)
     for (auto src_sys : conf.block_src_sys_in) {
         this->filter_add_blocked_in_src_sys(src_sys);
     }
+
     this->_group_name = conf.group;
 
     if (!this->open(conf.address, conf.port)) {
