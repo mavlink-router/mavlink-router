@@ -256,6 +256,11 @@ Message filters:
   - BlockSrcSysIn: If set, block messages from the listed MAVLink source
     systems to be received on this endpoint
 
+    Note that while using "Allow" and "Block" filters on the same identifier 
+    within an endpoint doesn't make sense, using them on different identifiers 
+    can be useful (for example, allowing only specific outgoing SysID, and
+    blocking this system from sending some unwanted message IDs).
+
 Message de-duplication:
 
   - If enabled, each incoming message is checked, whether another copy was
