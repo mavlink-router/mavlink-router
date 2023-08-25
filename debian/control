@@ -2,7 +2,7 @@ Source: mavlink-router
 Section: unknown
 Priority: optional
 Maintainer: Helge Bahmann <helge@auterion.com>
-Build-Depends: debhelper (>= 11)
+Build-Depends-Indep: debhelper (>= 11), pkg-config, libgtest-dev, systemd, python3-pip
 Standards-Version: 4.1.3
 Homepage: https://github.com/Auterion/mavlink-router
 
