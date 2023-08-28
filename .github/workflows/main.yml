@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Run clang-format style check on src directory
-        uses: jidicula/clang-format-action@v4.3.0
+        uses: jidicula/clang-format-action@v4.11.0
         with:
           clang-format-version: "13"
           check-path: "src"
@@ -46,8 +46,9 @@ jobs:
               sudo apt-get install --yes libgtest-dev:i386
           else
               sudo apt-get update
+              sudo apt-get install --yes libgtest-dev
           fi
-          sudo apt-get install --yes pkg-config gcc-multilib g++-multilib ninja-build python3-pip libgtest-dev
+          sudo apt-get install --yes pkg-config gcc-multilib g++-multilib ninja-build python3-pip
           pip3 install meson pymavlink
       - name: install dependencies (cross)
         if: ${{ matrix.arch != 'native' }}
