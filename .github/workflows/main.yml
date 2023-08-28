@@ -46,8 +46,9 @@ jobs:
               sudo apt-get install --yes libgtest-dev:i386
           else
               sudo apt-get update
+              sudo apt-get install --yes libgtest-dev
           fi
-          sudo apt-get install --yes pkg-config gcc-multilib g++-multilib ninja-build python3-pip libgtest-dev
+          sudo apt-get install --yes pkg-config gcc-multilib g++-multilib ninja-build python3-pip
           pip3 install meson pymavlink
       - name: install dependencies (cross)
         if: ${{ matrix.arch != 'native' }}
