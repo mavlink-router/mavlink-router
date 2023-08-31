@@ -48,13 +48,14 @@ static const struct option long_options[] = {{"endpoints", required_argument, nu
                                              {"tcp-port", required_argument, nullptr, 't'},
                                              {"tcp-endpoint", required_argument, nullptr, 'p'},
                                              {"log", required_argument, nullptr, 'l'},
+                                             {"telemetry-log", no_argument, nullptr, 'T'},
                                              {"debug-log-level", required_argument, nullptr, 'g'},
                                              {"verbose", no_argument, nullptr, 'v'},
                                              {"version", no_argument, nullptr, 'V'},
                                              {"sniffer-sysid", required_argument, nullptr, 's'},
                                              {}};
 
-static const char *short_options = "he:rt:c:d:l:p:g:vV:s:";
+static const char *short_options = "he:rt:c:d:l:p:g:vV:s:T:";
 
 static void help(FILE *fp)
 {
@@ -78,6 +79,8 @@ static void help(FILE *fp)
         "  -d --conf-dir <dir>          Directory where to look for .conf files overriding\n"
         "                               default conf file.\n"
         "  -l --log <directory>         Enable Flight Stack logging\n"
+        "  -T --telemetry-log           Enable Telemetry logging. Only works if Flight\n"
+        "                               logging directoy is set.\n"
         "  -g --debug-log-level <level> Set debug log level. Levels are\n"
         "                               <error|warning|info|debug>\n"
         "  -v --verbose                 Verbose. Same as --debug-log-level=debug\n"
@@ -227,6 +230,10 @@ static int parse_argv(int argc, char *argv[], Configuration &config)
         }
         case 'l': {
             config.log_config.logs_dir.assign((const char *)optarg);
+            break;
+        }
+        case 'T': {
+            config.log_config.log_telemetry = true;
             break;
         }
         case 'g': {

@@ -106,6 +106,7 @@ switch when running mavlink-routerd.
 
 ### CLI Parameters
 
+
 Please see the output of `mavlink-routerd --help` for the full list of command
 line options. The most important facts are:
 
@@ -271,7 +272,9 @@ Message Sniffing:
     to endpoints on which this MAVLink system ID is connected. This can be used to
     log or view all messages flowing though mavlink-router.
 
-### Flight Stack Logging
+### Logging
+
+#### Flight Stack Logging
 
 Mavlink router can also collect flight stack logs. It supports collecting both
 PX4 and Ardupilot flight stacks logs. To start logging, set a directory to the
@@ -287,6 +290,14 @@ logs to `/var/log/flight-stack` directory, one could add to the conf file:
 Logs are collected on `.bin` (for Ardupilot) or `.ulg` (for PX4) files in the
 specified directory. Note that they are named `XXXXX-date-time`, where `XXXXX`
 is an increasing number.
+
+#### Telemetry Logging
+
+Similar to flight stack logging its also possible to write the raw telemetry 
+data as `.tlog` file using the `LogTelemetry` key in the `General` section 
+(or use argument `-T`). Note that this only works if a path using flight
+stack logging is set! 
+All options from flightstack logging apply also here.
 
 
 ## Contributing

@@ -30,6 +30,7 @@
 #include <common/util.h>
 
 #include "autolog.h"
+#include "tlog.h"
 
 static std::atomic<bool> should_exit{false};
 
@@ -439,6 +440,12 @@ bool Mainloop::add_endpoints(const Configuration &config)
         }
         this->_log_endpoint->mark_unfinished_logs();
         g_endpoints.emplace_back(this->_log_endpoint);
+
+        if (conf.log_telemetry) {
+            auto tlog_endpoint = std::make_shared<TLog>(conf);
+            tlog_endpoint->mark_unfinished_logs();
+            g_endpoints.emplace_back(tlog_endpoint);
+        }
     }
 
     // Apply other options
