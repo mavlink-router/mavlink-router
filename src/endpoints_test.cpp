@@ -19,6 +19,7 @@
 #include "autolog.h"
 #include "binlog.h"
 #include "endpoint.h"
+#include "tlog.h"
 #include "ulog.h"
 
 #include <limits.h>
@@ -729,4 +730,7 @@ TEST(LogEndpointTest, Init)
 
     AutoLog autolog{conf};
     EXPECT_EQ(autolog.get_type(), ENDPOINT_TYPE_LOG);
+
+    TLog tlog{conf};
+    EXPECT_EQ(tlog.get_type(), ENDPOINT_TYPE_LOG);
 }

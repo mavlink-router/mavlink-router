@@ -61,8 +61,8 @@
 # No default/ disabled by default.
 #Log = /some/path
 
-# Define when to store flight stack logs. From the start of mavlink-router
-# until it's stopped or just while the vehicle is armed.
+# Define when to store flight stack or telemetry logs. From the start of
+# mavlink-router until it's stopped or just while the vehicle is armed.
 # Valid values: <always>, <while-armed>
 # Default: <always>
 #LogMode = always
@@ -87,6 +87,12 @@
 # This can be used to log or view all messages flowing though mavlink-router.
 # Default: 0 (disabled)
 #SnifferSysid=254
+
+# Log raw mavlink telemetry data as tlog files to disc. Only works if Logging path 
+# is defined. This also uses LogMode to control the recording.
+# Valid values: <true>, <false>
+# Default: <false>
+# LogTelemetry = false
 
 
 ##
