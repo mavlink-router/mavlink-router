@@ -229,20 +229,21 @@ Routing rules:
 
 Message filters:
 
-  - AllowMsgIdOut: If set, only allow messages with the listed message IDs to
-    be sent via this endpoint
-  - AllowSrcCompOut: If set, only allow messages from the listed MAVLink source
-    component IDs to be sent via this endpoint
-  - AllowSrcSysOut: If set, only allow messages from the listed MAVLink source
-    systems to be sent via this endpoint
-  - AllowMsgIdIn: If set, only allow messages with the listed message IDs to
-    be received on this endpoint. Since message ID 0 is not used, only allowing
-    this message ID can be used to block all incoming traffic on this endpoint,
-    e.g. to block interaction with the drone while still receiving telemetry.
-  - AllowSrcCompIn: If set, only allow messages from the listed MAVLink source
-    component IDs to be received on this endpoint
-  - AllowSrcSysIn: If set, only allow messages from the listed MAVLink source
-    systems to be received on this endpoint
+  - There are two points where messages can be filtered on each endpoint:
+    - **In**: Messages which are received (from the outside) on this endpoint are dropped or allowed based on the respecitive filter rules before they'll be routed to other endpoints
+    - **Out**: Messages are dropped or allowed based on the endpoint's filter rules before being transmitted. So this is after internal routing (see "routing rules" chapter above).
+  - A message filter can be based on one of these message identifiers:
+    - **MsgId**: Filter message based on it's MAVLink message ID (message type like HEARTBEAT)
+    - **SrcSys**: Filter message based on it's MAVLink source system ID
+    - **SrcComp**: Filter message based on it's MAVLink source component ID
+  - And a message filter can either be a block- or allow-list:
+    - **Block**: Discard all messages matching the respective identifier (and allow all other ones)
+    - **Allow**: Allow all messages matching the respective identifier (and discard all other ones)
+    - Note that while using "Allow" and "Block" filters on the same identifier 
+    within an endpoint doesn't make sense, using them on different identifiers 
+    can be useful (for example, allowing only specific outgoing SysID, and
+    blocking this system from sending some unwanted message IDs).
+  - So a filter might be named `AllowMsgIdOut` to only allow messages with the listed message ID to be transmitted on that endpoint. See the example config [examples/config.sample](examples/config.sample) for the exact name of each filter parameter.
 
 Message de-duplication:
 

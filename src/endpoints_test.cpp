@@ -231,6 +231,33 @@ TEST(EndpointTest, AcceptMsg_OutMsgIdFilter)
     EXPECT_EQ(endpoint.accept_msg(&test_msg), Endpoint::AcceptState::Filtered);
 }
 
+TEST(EndpointTest, BlockMsg_OutMsgIdFilter)
+{
+    TestEndpoint endpoint;
+    buffer test_msg;
+
+    // broadcast message should normally be accepted
+    test_msg.curr.src_sysid = 1;
+    test_msg.curr.src_compid = 1;
+    test_msg.curr.target_sysid = -1;
+    test_msg.curr.target_compid = -1;
+
+    // Block specific (100) msg id messages
+    endpoint.filter_add_blocked_out_msg_id(100);
+
+    // Make sure that the message with the blocked message ID is acutally filtered
+    test_msg.curr.msg_id = 100;
+    EXPECT_EQ(endpoint.accept_msg(&test_msg), Endpoint::AcceptState::Filtered);
+
+    // accept message with other message IDs
+    test_msg.curr.msg_id = 2;
+    EXPECT_EQ(endpoint.accept_msg(&test_msg), Endpoint::AcceptState::Accepted);
+    test_msg.curr.msg_id = 255;
+    EXPECT_EQ(endpoint.accept_msg(&test_msg), Endpoint::AcceptState::Accepted);
+    test_msg.curr.msg_id = 368;
+    EXPECT_EQ(endpoint.accept_msg(&test_msg), Endpoint::AcceptState::Accepted);
+}
+
 TEST(EndpointTest, AcceptMsg_OutCompFilter)
 {
     TestEndpoint endpoint;
@@ -256,6 +283,31 @@ TEST(EndpointTest, AcceptMsg_OutCompFilter)
     EXPECT_EQ(endpoint.accept_msg(&test_msg), Endpoint::AcceptState::Filtered);
 }
 
+TEST(EndpointTest, BlockMsg_OutCompFilter)
+{
+    TestEndpoint endpoint;
+    buffer test_msg;
+
+    // broadcast message should normally be accepted
+    test_msg.curr.msg_id = 1;
+    test_msg.curr.src_sysid = 1;
+    test_msg.curr.target_sysid = -1;
+    test_msg.curr.target_compid = -1;
+
+    // only block messages with source component 100
+    endpoint.filter_add_blocked_out_src_comp(100);
+
+    // reject message with blocked source component ID
+    test_msg.curr.src_compid = 100;
+    EXPECT_EQ(endpoint.accept_msg(&test_msg), Endpoint::AcceptState::Filtered);
+
+    // accept message with other source component IDs
+    test_msg.curr.src_compid = 2;
+    EXPECT_EQ(endpoint.accept_msg(&test_msg), Endpoint::AcceptState::Accepted);
+    test_msg.curr.src_compid = 255;
+    EXPECT_EQ(endpoint.accept_msg(&test_msg), Endpoint::AcceptState::Accepted);
+}
+
 TEST(EndpointTest, AcceptMsg_OutSysFilter)
 {
     TestEndpoint endpoint;
@@ -279,6 +331,31 @@ TEST(EndpointTest, AcceptMsg_OutSysFilter)
     EXPECT_EQ(endpoint.accept_msg(&test_msg), Endpoint::AcceptState::Filtered);
     test_msg.curr.src_sysid = 255;
     EXPECT_EQ(endpoint.accept_msg(&test_msg), Endpoint::AcceptState::Filtered);
+}
+
+TEST(EndpointTest, BlockMsg_OutSysFilter)
+{
+    TestEndpoint endpoint;
+    buffer test_msg;
+
+    // broadcast message should normally be accepted
+    test_msg.curr.msg_id = 1;
+    test_msg.curr.src_compid = 1;
+    test_msg.curr.target_sysid = -1;
+    test_msg.curr.target_compid = -1;
+
+    // only block specific (42) system id
+    endpoint.filter_add_blocked_out_src_sys(42);
+
+    // block message with blocked source system ID
+    test_msg.curr.src_sysid = 42;
+    EXPECT_EQ(endpoint.accept_msg(&test_msg), Endpoint::AcceptState::Filtered);
+
+    // accept message with other source system IDs
+    test_msg.curr.src_sysid = 2;
+    EXPECT_EQ(endpoint.accept_msg(&test_msg), Endpoint::AcceptState::Accepted);
+    test_msg.curr.src_sysid = 255;
+    EXPECT_EQ(endpoint.accept_msg(&test_msg), Endpoint::AcceptState::Accepted);
 }
 
 TEST(EndpointTest, AcceptMsg_InMsgIdFilter)
@@ -308,6 +385,33 @@ TEST(EndpointTest, AcceptMsg_InMsgIdFilter)
     EXPECT_EQ(endpoint.allowed_by_incoming_filters(&test_msg), false);
 }
 
+TEST(EndpointTest, BlockMsg_InMsgIdFilter)
+{
+    TestEndpoint endpoint;
+    buffer test_msg;
+
+    // broadcast message should normally be accepted
+    test_msg.curr.src_sysid = 1;
+    test_msg.curr.src_compid = 1;
+    test_msg.curr.target_sysid = -1;
+    test_msg.curr.target_compid = -1;
+
+    // Block specific (78) incoming msg id's
+    endpoint.filter_add_blocked_in_msg_id(78);
+
+    // reject message with blocked message ID
+    test_msg.curr.msg_id = 78;
+    EXPECT_EQ(endpoint.allowed_by_incoming_filters(&test_msg), false);
+
+    // accept message with other message IDs
+    test_msg.curr.msg_id = 2;
+    EXPECT_EQ(endpoint.allowed_by_incoming_filters(&test_msg), true);
+    test_msg.curr.msg_id = 255;
+    EXPECT_EQ(endpoint.allowed_by_incoming_filters(&test_msg), true);
+    test_msg.curr.msg_id = 368;
+    EXPECT_EQ(endpoint.allowed_by_incoming_filters(&test_msg), true);
+}
+
 TEST(EndpointTest, AcceptMsg_InCompFilter)
 {
     TestEndpoint endpoint;
@@ -333,6 +437,31 @@ TEST(EndpointTest, AcceptMsg_InCompFilter)
     EXPECT_EQ(endpoint.allowed_by_incoming_filters(&test_msg), false);
 }
 
+TEST(EndpointTest, BlockMsg_InCompFilter)
+{
+    TestEndpoint endpoint;
+    buffer test_msg;
+
+    // broadcast message should normally be accepted
+    test_msg.curr.msg_id = 1;
+    test_msg.curr.src_sysid = 1;
+    test_msg.curr.target_sysid = -1;
+    test_msg.curr.target_compid = -1;
+
+    // Block messages with specific (96) component id
+    endpoint.filter_add_blocked_in_src_comp(96);
+
+    // reject message with blocked source component ID
+    test_msg.curr.src_compid = 96;
+    EXPECT_EQ(endpoint.allowed_by_incoming_filters(&test_msg), false);
+
+    // accept message with other source component IDs
+    test_msg.curr.src_compid = 2;
+    EXPECT_EQ(endpoint.allowed_by_incoming_filters(&test_msg), true);
+    test_msg.curr.src_compid = 255;
+    EXPECT_EQ(endpoint.allowed_by_incoming_filters(&test_msg), true);
+}
+
 TEST(EndpointTest, AcceptMsg_InSysFilter)
 {
     TestEndpoint endpoint;
@@ -356,6 +485,31 @@ TEST(EndpointTest, AcceptMsg_InSysFilter)
     EXPECT_EQ(endpoint.allowed_by_incoming_filters(&test_msg), false);
     test_msg.curr.src_sysid = 255;
     EXPECT_EQ(endpoint.allowed_by_incoming_filters(&test_msg), false);
+}
+
+TEST(EndpointTest, BlockMsg_InSysFilter)
+{
+    TestEndpoint endpoint;
+    buffer test_msg;
+
+    // broadcast message should normally be accepted
+    test_msg.curr.msg_id = 1;
+    test_msg.curr.src_compid = 1;
+    test_msg.curr.target_sysid = -1;
+    test_msg.curr.target_compid = -1;
+
+    // Block incoming messages from specific (23) system id
+    endpoint.filter_add_blocked_in_src_sys(23);
+
+    // accept message with allowed source component ID
+    test_msg.curr.src_sysid = 23;
+    EXPECT_EQ(endpoint.allowed_by_incoming_filters(&test_msg), false);
+
+    // reject message with other source component IDs
+    test_msg.curr.src_sysid = 2;
+    EXPECT_EQ(endpoint.allowed_by_incoming_filters(&test_msg), true);
+    test_msg.curr.src_sysid = 255;
+    EXPECT_EQ(endpoint.allowed_by_incoming_filters(&test_msg), true);
 }
 
 /**
