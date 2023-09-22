@@ -6,6 +6,7 @@
 # create a stamp file for having called "configure" -- this avoids lengthy
 # re-run of configure during incremental builds
 override_dh_auto_configure:
+	pip install future
 	if [ ! -e debian/debhelper-auto-configure-stamp ] ; then \
 		dh_auto_configure ; touch debian/debhelper-auto-configure-stamp ; \
 	fi
