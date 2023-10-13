@@ -727,13 +727,6 @@ UartEndpoint::UartEndpoint(std::string name)
     // nothing else to do here
 }
 
-UartEndpoint::~UartEndpoint()
-{
-    if (fd > 0) {
-        reset_uart(fd);
-    }
-}
-
 bool UartEndpoint::setup(UartEndpointConfig conf)
 {
     if (!this->validate_config(conf)) {
