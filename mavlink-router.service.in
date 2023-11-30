@@ -4,7 +4,7 @@ Description=MAVLink Router
 [Service]
 Type=simple
 ExecStart=@bindir@/mavlink-routerd
-Restart=on-failure
+Restart=always
 Nice=-20
 
 [Install]
