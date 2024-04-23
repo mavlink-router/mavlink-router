@@ -1,7 +1,7 @@
 Source: mavlink-router
 Section: unknown
 Priority: optional
-Maintainer: Helge Bahmann <helge@auterion.com>
+Maintainer: Auterion <distro@auterion.com>
 Build-Depends-Indep:
  debhelper (>= 11),
  pkg-config,
