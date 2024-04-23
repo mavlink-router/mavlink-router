@@ -63,6 +63,9 @@ AM_CONDITIONAL([HAVE_GTEST], [test x$HAVE_GTEST = xtrue])
 AC_SUBST([GTEST_LIBS])
 AC_SUBST([GTEST_CFLAGS])
 
+AC_CHECK_LIB([systemd], [main], [], [AC_MSG_ERROR([systemd library not found])])
+AC_SUBST([LIBS], ["-lsystemd"])
+
 #####################################################################
 # --with-
 #####################################################################

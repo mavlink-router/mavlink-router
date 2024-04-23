@@ -151,6 +151,7 @@ private:
     bool _log_aggregate_timeout(void *data);
     void _init_pipe();
     void _handle_pipe();
+    static int _watchdogIntervalUs();
 
     static Mainloop* instance;
 };

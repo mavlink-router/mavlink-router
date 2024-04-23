@@ -17,6 +17,7 @@
  */
 #include "mainloop.h"
 
+#include <chrono>
 #include <assert.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -24,6 +25,7 @@
 #include <sys/stat.h>
 #include <sys/timerfd.h>
 #include <unistd.h>
+#include <systemd/sd-daemon.h>
 
 #include <memory>
 #include <vector>
@@ -280,6 +282,10 @@ accept_error:
 
 int Mainloop::loop()
 {
+    sd_notify(0, "READY=1");
+    const int watchdog_interval_us = _watchdogIntervalUs();
+    auto last_watchdog_update = std::chrono::steady_clock::now();
+
     if (epollfd < 0)
         return EXIT_FAILURE;
 
@@ -290,6 +296,16 @@ int Mainloop::loop()
 
     while (!_should_exit.load(std::memory_order_relaxed)) {
         run_single(-1);
+
+        // Watchdog update
+        if (watchdog_interval_us > 0) {
+        const auto now = std::chrono::steady_clock::now();
+            if (std::chrono::duration_cast<std::chrono::microseconds>(now - last_watchdog_update)
+                    .count() > watchdog_interval_us) {
+                last_watchdog_update = now;
+                sd_notify(0, "WATCHDOG=1");
+            }
+        }
     }
 
     // This is a bit weird, but models previous behavior: run event handling a
@@ -298,12 +314,22 @@ int Mainloop::loop()
     if (_log_endpoint) {
         _log_endpoint->stop();
 
-        usec_t now = now_usec();
-        usec_t deadline = now + TIMEOUT_LOG_SHUTDOWN_US;
+        auto now = std::chrono::steady_clock::now();
+        const auto deadline = now + std::chrono::microseconds(TIMEOUT_LOG_SHUTDOWN_US);
 
         while (now < deadline) {
-            run_single((deadline - now) / 1000);
-            now = now_usec();
+            run_single(std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now).count());
+
+            // Watchdog update
+            if (watchdog_interval_us > 0) {
+                if (std::chrono::duration_cast<std::chrono::microseconds>(now - last_watchdog_update)
+                        .count() > watchdog_interval_us) {
+                    last_watchdog_update = now;
+                    sd_notify(0, "WATCHDOG=1");
+                }
+            }
+
+            now = std::chrono::steady_clock::now();
         }
 
         _log_endpoint->stop();
@@ -932,6 +958,15 @@ void Mainloop::_handle_pipe()
             }
         }
     }
+}
+
+int Mainloop::_watchdogIntervalUs()
+{
+  const char* watchdog_usec_env = getenv("WATCHDOG_USEC");
+  if (watchdog_usec_env) {
+    return atoi(watchdog_usec_env) / 2;
+  }
+  return 0;
 }
 
 MainloopSignalHandlers::MainloopSignalHandlers(Mainloop* mainloop)

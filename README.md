@@ -34,6 +34,7 @@ The following libraries need also to be installed :
     $ sudo apt install libtool
     $ sudo apt install autoconf
     $ sudo apt install pkg-config
+    $ sudo apt install libsystemd-dev
 
 #### Build ####
 

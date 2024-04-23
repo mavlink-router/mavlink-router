@@ -6,6 +6,7 @@ Type=simple
 ExecStart=@bindir@/mavlink-routerd
 Restart=always
 Nice=-20
+WatchdogSec=5s
 
 [Install]
 WantedBy=multi-user.target

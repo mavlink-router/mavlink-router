@@ -13,6 +13,7 @@ Build-Depends:
  libgtest-dev,
  libc6,
  libstdc++6,
+ libsystemd-dev,
 Standards-Version: 4.1.3
 Homepage: https://github.com/Auterion/mavlink-router
 
