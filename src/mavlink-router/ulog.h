@@ -44,8 +44,6 @@ protected:
 private:
     uint16_t _expected_seq = 0;
     bool _waiting_header = true;
-    bool _waiting_flags = true;
-    bool _meta_written = false;
     bool _waiting_first_msg_offset = false;
 
     uint8_t _buffer[BUFFER_LEN];
