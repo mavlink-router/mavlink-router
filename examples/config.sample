@@ -48,8 +48,8 @@
 #       Default: 0 (disabled)
 #
 #   DebugLogLevel
-#       One of <error>, <warning>, <info> or <debug>. Which debug log
-#       level is being used by mavlink-router, with <debug> being the
+#       One of <error>, <warning>, <info>, <debug> or <trace>. Which debug log
+#       level is being used by mavlink-router, with <trace> being the
 #       most verbose.
 #       Default:<info>
 #

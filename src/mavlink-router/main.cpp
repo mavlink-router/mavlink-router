@@ -170,6 +170,8 @@ static int log_level_from_str(const char *str)
         return (int)Log::Level::INFO;
     if (strcaseeq(str, "debug"))
         return (int)Log::Level::DEBUG;
+    if (strcaseeq(str, "trace"))
+        return (int)Log::Level::TRACE;
 
     return -EINVAL;
 }
