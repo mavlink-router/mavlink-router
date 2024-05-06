@@ -129,7 +129,7 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
         if (r <= 0)
             return r;
 
-        log_debug("%s: Got %zd bytes [%d]", _name.c_str(), r, fd);
+        log_trace("%s: Got %zd bytes [%d]", _name.c_str(), r, fd);
         rx_buf.len += r;
     }
 
@@ -254,7 +254,7 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
     *target_compid = -1;
 
     if (msg_entry == nullptr) {
-        log_debug("No message entry for %u", *msg_id);
+        log_trace("No message entry for %u", *msg_id);
     } else {
         if (msg_entry->flags & MAV_MSG_ENTRY_FLAG_HAVE_TARGET_SYSTEM) {
             // if target_system is 0, it may have been trimmed out on mavlink2
@@ -328,12 +328,12 @@ bool Endpoint::has_sys_comp_id(unsigned sys_comp_id)
 bool Endpoint::accept_msg(int target_sysid, int target_compid, uint8_t src_sysid,
                           uint8_t src_compid, bool crc_valid, uint32_t msg_id)
 {
-    if (Log::get_max_level() >= Log::Level::DEBUG) {
-        log_debug("Endpoint [%d] got message %u to %d/%d from %u/%u", fd, msg_id, target_sysid, target_compid,
+    if (Log::get_max_level() >= Log::Level::TRACE) {
+        log_trace("Endpoint [%d] got message %u to %d/%d from %u/%u", fd, msg_id, target_sysid, target_compid,
                   src_sysid, src_compid);
-        log_debug("\tKnown components:");
+        log_trace("\tKnown components:");
         for (auto it = _sys_comp_ids.begin(); it != _sys_comp_ids.end(); it++) {
-            log_debug("\t\t%u/%u", (*it >> 8), *it & 0xff);
+            log_trace("\t\t%u/%u", (*it >> 8), *it & 0xff);
         }
     }
 
@@ -789,7 +789,7 @@ int UartEndpoint::write_msg(const struct buffer *pbuf)
         log_debug("Discarding packet, incomplete write %zd but len=%u", r, pbuf->len);
     }
 
-    log_debug("UART [%d] wrote %zd bytes", fd, r);
+    log_trace("UART [%d] wrote %zd bytes", fd, r);
 
     return r;
 }
@@ -984,7 +984,7 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
     }
 
     if (tx_buf.len + pbuf->len > TX_BUF_MAX_SIZE) {
-        log_debug("Dropping message, tx buffer full");
+        log_trace("Dropping message, tx buffer full");
         return 0;
     }
 
@@ -1008,7 +1008,7 @@ int UdpEndpoint::flush_pending_msgs()
     _write_scheduled = false;
 
     if (tx_buf.len == 0) {
-        log_debug("No data in tx buffer, skipping write");
+        log_trace("No data in tx buffer, skipping write");
         return 0;
     }
 
@@ -1061,7 +1061,7 @@ int UdpEndpoint::flush_pending_msgs()
     // memcpy isn't safe for overlapping regions
     memmove(tx_buf.data, &tx_buf.data[r], tx_buf.len);
 
-    log_debug("UDP [%d] wrote %zd bytes", fd, r);
+    log_trace("UDP [%d] wrote %zd bytes", fd, r);
 
     return r;
 }
@@ -1264,7 +1264,7 @@ int TcpEndpoint::write_msg(const struct buffer *pbuf)
         log_debug("Discarding packet, incomplete write %zd but len=%u", r, pbuf->len);
     }
 
-    log_debug("TCP [%d] wrote %zd bytes", fd, r);
+    log_trace("TCP [%d] wrote %zd bytes", fd, r);
 
     return r;
 }

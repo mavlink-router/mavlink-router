@@ -159,7 +159,7 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid
 
     for (const auto& e : _endpoints) {
         if (e->accept_msg(target_sysid, target_compid, sender_sysid, sender_compid, crc_valid, msg_id)) {
-            log_debug("Endpoint [%d] accepted message %u to %d/%d from %u/%u", e->fd, msg_id,
+            log_trace("Endpoint [%d] accepted message %u to %d/%d from %u/%u", e->fd, msg_id,
                       target_sysid, target_compid, sender_sysid, sender_compid);
             write_msg(e.get(), buf);
             e->postprocess_msg(target_sysid, target_compid, sender_sysid, sender_compid, msg_id);
@@ -169,7 +169,7 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid
 
     for (auto i: _dynamic_endpoints) {
         if (i.second->accept_msg(target_sysid, target_compid, sender_sysid, sender_compid, crc_valid, msg_id)) {
-            log_debug("Endpoint [%d] accepted message to %d/%d from %u/%u", i.second->fd, target_sysid,
+            log_trace("Endpoint [%d] accepted message to %d/%d from %u/%u", i.second->fd, target_sysid,
                       target_compid, sender_sysid, sender_compid);
             write_msg(i.second, buf);
             unknown = false;
@@ -179,7 +179,7 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid
 
     for (struct endpoint_entry *e = g_tcp_endpoints; e; e = e->next) {
         if (e->endpoint->accept_msg(target_sysid, target_compid, sender_sysid, sender_compid, crc_valid, msg_id)) {
-            log_debug("Endpoint [%d] accepted message %u to %d/%d from %u/%u", e->endpoint->fd, msg_id,
+            log_trace("Endpoint [%d] accepted message %u to %d/%d from %u/%u", e->endpoint->fd, msg_id,
                       target_sysid, target_compid, sender_sysid, sender_compid);
             int r = write_msg(e->endpoint, buf);
             if (r == -EPIPE) {
@@ -192,7 +192,7 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid
 
     if (unknown) {
         _errors_aggregate.msg_to_unknown++;
-        log_debug("Message %u to unknown sysid/compid: %u/%u", msg_id, target_sysid, target_compid);
+        log_trace("Message %u to unknown sysid/compid: %u/%u", msg_id, target_sysid, target_compid);
     }
 }
 
@@ -419,7 +419,7 @@ int Mainloop::run_single(int timeout_msec)
 bool Mainloop::_log_aggregate_timeout(void *data)
 {
     if (_errors_aggregate.msg_to_unknown > 0) {
-        log_warning("%u messages to unknown endpoints in the last %d seconds",
+        log_debug("%u messages to unknown endpoints in the last %d seconds",
                     _errors_aggregate.msg_to_unknown, LOG_AGGREGATE_INTERVAL_SEC);
         _errors_aggregate.msg_to_unknown = 0;
     }
@@ -919,7 +919,7 @@ void Mainloop::_handle_pipe()
     char* buffer = cmd;
     if (num_read > 0) {
         cmd[num_read] = 0;
-        log_debug("Pipe read %ld bytes: %s", num_read, cmd);
+        log_trace("Pipe read %ld bytes: %s", num_read, cmd);
 
         // If more than one command separated by an end of
         // line was written in the pipe, separate each command
