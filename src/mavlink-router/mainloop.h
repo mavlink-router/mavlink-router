@@ -28,6 +28,7 @@
 #include "endpoint.h"
 #include "timeout.h"
 #include "ulog.h"
+#include "common/log.h"
 
 struct endpoint_entry {
     struct endpoint_entry *next;
@@ -207,6 +208,7 @@ struct options {
     char *logs_dir;
     LogMode log_mode;
     int debug_log_level;
+    Log::Backend log_backend;
     enum mavlink_dialect mavlink_dialect;
     unsigned long min_free_space;
     unsigned long max_log_files;

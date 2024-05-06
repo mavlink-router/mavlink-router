@@ -52,6 +52,7 @@ static struct options opt = {
     .logs_dir = nullptr,
     .log_mode = LogMode::always,
     .debug_log_level = (int)Log::Level::INFO,
+    .log_backend = Log::Backend::STDERR,
     .mavlink_dialect = Auto,
     .min_free_space = 0,
     .max_log_files = 0,
@@ -67,13 +68,14 @@ static const struct option long_options[] = {
     { "tcp-endpoint",           required_argument,  NULL,   'p' },
     { "log",                    required_argument,  NULL,   'l' },
     { "debug-log-level",        required_argument,  NULL,   'g' },
+    { "syslog",                 no_argument,        NULL,   'y' },
     { "heartbeat"      ,        no_argument,        NULL,   'b' },
     { "verbose",                no_argument,        NULL,   'v' },
     { "version",                no_argument,        NULL,   'V' },
     { }
 };
 
-static const char* short_options = "he:rt:c:d:l:p:g:bvV";
+static const char* short_options = "he:rt:c:d:l:p:g:bvVy";
 
 static void help(FILE *fp) {
     fprintf(fp,
@@ -96,6 +98,7 @@ static void help(FILE *fp) {
             "  -l --log <directory>         Enable Flight Stack logging\n"
             "  -g --debug-log-level <level> Set debug log level. Levels are\n"
             "                               <error|warning|info|debug>\n"
+            "  -y --syslog                  Use syslog output instead of stderr\n"
             "  -b --heartbeat               Broadcast log status as heartbeat when logging is enabled\n"
             "  -v --verbose                 Verbose. Same as --debug-log-level=debug\n"
             "  -V --version                 Show version\n"
@@ -412,6 +415,10 @@ static bool pre_parse_argv(int argc, char *argv[])
             opt.conf_dir = optarg;
             break;
         }
+        case 'y': {
+            opt.log_backend = Log::Backend::SYSLOG;
+            break;
+        }
         case 'V':
             puts(PACKAGE " version " VERSION);
             return false;
@@ -517,6 +524,7 @@ static int parse_argv(int argc, char *argv[])
         }
         case 'c':
         case 'd':
+        case 'y':
         case 'V':
             break; // These options were parsed on pre_parse_argv
         case '?':
@@ -949,12 +957,11 @@ int main(int argc, char *argv[])
 {
     Mainloop mainloop;
     int ret;
-    Log::open();
 
     if (!pre_parse_argv(argc, argv)) {
-        Log::close();
         return 0;
     }
+    Log::open(opt.log_backend);
 
     if (parse_conf_files() < 0)
         goto close_log;
