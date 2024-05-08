@@ -48,7 +48,7 @@
 #define UART_BAUD_RETRY_SEC 5
 
 Endpoint::Endpoint(const std::string& name)
-    : _name{name}
+    : _name{name}, _message_log(Mainloop::get_instance())
 {
     rx_buf.data = (uint8_t *) malloc(RX_BUF_MAX_SIZE);
     rx_buf.len = 0;
@@ -294,6 +294,13 @@ int Endpoint::read_msg(struct buffer *pbuf, int *target_sysid, int *target_compi
 
     pbuf->data = rx_buf.data;
     pbuf->len = expected_size;
+
+    uint8_t trimmed_zeros = 0;
+    if (msg_entry && mavlink2) {
+        trimmed_zeros = get_trimmed_zeros(msg_entry, pbuf);
+    }
+    _message_log.log_incoming(_get_current_sender().c_str(), payload, payload_len, msg_entry,
+                              trimmed_zeros, *msg_id, *src_sysid, *src_compid);
 
     return msg_entry != nullptr ? ReadOk : ReadUnkownMsg;
 }
@@ -712,6 +719,8 @@ int UartEndpoint::open(const char *path)
         }
     }
 
+    _path = path;
+
 set_latency_failed:
     if (ioctl(fd, TCFLSH, TCIOFLUSH) == -1) {
         log_error("Could not flush terminal (%m)");
@@ -974,6 +983,27 @@ ssize_t UdpEndpoint::_read_msg(uint8_t *buf, size_t len)
     if (r == -1)
         return -errno;
 
+    /* Store the sender */
+#ifdef ENABLE_IPV6
+    if (this->is_ipv6) {
+        char ip[INET6_ADDRSTRLEN];
+        if (inet_ntop(AF_INET6, &sockaddr6.sin6_addr, ip, INET6_ADDRSTRLEN) != nullptr) {
+            _current_sender = ip;
+        } else {
+            _current_sender.clear();
+        }
+    } else {
+#endif
+        char ip[INET_ADDRSTRLEN];
+        if (inet_ntop(AF_INET, &sockaddr.sin_addr, ip, INET_ADDRSTRLEN) != nullptr) {
+            _current_sender = ip;
+        } else {
+            _current_sender.clear();
+        }
+#ifdef ENABLE_IPV6
+    }
+#endif
+
     return r;
 }
 
@@ -1106,6 +1136,23 @@ int TcpEndpoint::accept(int listener_fd)
         return -1;
 
     log_info("TCP connection [%d] accepted", fd);
+
+    /* Store the sender */
+#ifdef ENABLE_IPV6
+    if (this->is_ipv6) {
+        char ip[INET6_ADDRSTRLEN];
+        if (inet_ntop(AF_INET6, &sockaddr6.sin6_addr, ip, INET6_ADDRSTRLEN) != nullptr) {
+            _ip = ip;
+        }
+    } else {
+#endif
+        char ip[INET_ADDRSTRLEN];
+        if (inet_ntop(AF_INET, &sockaddr.sin_addr, ip, INET_ADDRSTRLEN) != nullptr) {
+            _ip = ip;
+        }
+#ifdef ENABLE_IPV6
+    }
+#endif
 
     return fd;
 }

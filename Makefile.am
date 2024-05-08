@@ -150,6 +150,8 @@ mavlink_routerd_SOURCES = \
 	src/mavlink-router/main.cpp \
 	src/mavlink-router/mainloop.cpp \
 	src/mavlink-router/mainloop.h \
+	src/mavlink-router/message_log.cpp \
+	src/mavlink-router/message_log.h \
 	src/mavlink-router/pollable.h \
 	src/mavlink-router/pollable.cpp \
 	src/mavlink-router/timeout.h \
@@ -220,6 +222,8 @@ mainloop_test_SOURCES = \
 	src/mavlink-router/logendpoint.h \
 	src/mavlink-router/mainloop_test.cpp \
 	src/mavlink-router/mainloop.cpp \
+	src/mavlink-router/message_log.cpp \
+	src/mavlink-router/message_log.h \
 	src/mavlink-router/pollable.cpp \
 	src/mavlink-router/pollable.h \
 	src/mavlink-router/timeout.cpp \

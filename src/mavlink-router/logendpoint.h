@@ -61,6 +61,8 @@ public:
     bool accept_msg(int target_sysid, int target_compid, uint8_t src_sysid, uint8_t src_compid, bool crc_valid, uint32_t msg_id);
 
 protected:
+    const std::string& _get_current_sender() override { static const std::string sender; return sender; }
+
     const char *_logs_dir;
     int _target_system_id = -1;
     int _file = -1;

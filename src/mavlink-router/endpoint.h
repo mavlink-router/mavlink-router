@@ -27,6 +27,7 @@
 #include "comm.h"
 #include "pollable.h"
 #include "timeout.h"
+#include "message_log.h"
 
 class Mainloop;
 
@@ -123,6 +124,12 @@ protected:
     bool _check_crc(const mavlink_msg_entry_t *msg_entry);
     void _add_sys_comp_id(uint16_t sys_comp_id);
 
+    /*
+     * Get the sender of the latest received data (IP address or UART serial device),
+     * as human-readable string
+     */
+    virtual const std::string& _get_current_sender() = 0;
+
 #ifdef ENABLE_IPV6
     static bool is_ipv6(const char *ip);
     static bool ipv6_is_linklocal(const char *ip);
@@ -161,6 +168,7 @@ private:
     Timeout* _expire_timer = nullptr;
     std::vector<uint32_t> _message_filter;
     std::vector<uint32_t> _message_nodelay;
+    MessageLog _message_log;
 };
 
 class UartEndpoint : public Endpoint {
@@ -183,12 +191,15 @@ protected:
                  uint8_t *src_compid, bool *crc_valid, uint32_t *msg_id) override;
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
 
+    const std::string& _get_current_sender() override { return _path; }
+
 private:
     size_t _current_baud_idx = 0;
     Timeout *_change_baud_timeout = nullptr;
     std::vector<unsigned long> _baudrates;
 
     bool _change_baud_cb(void *data);
+    std::string _path;
 };
 
 class UdpEndpoint : public Endpoint {
@@ -211,6 +222,7 @@ public:
 #endif
 
 protected:
+    const std::string& _get_current_sender() override { return _current_sender; }
 
     void _schedule_write();
     bool _write_scheduled;
@@ -219,6 +231,8 @@ protected:
     unsigned int _max_packet_size, _max_timeout_ms;
 
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
+
+    std::string _current_sender;
 };
 
 class TcpEndpoint : public Endpoint {
@@ -252,6 +266,7 @@ public:
     bool is_critical() override { return false; };
 
 protected:
+    const std::string& _get_current_sender() override { return _ip; }
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
 
 private:
