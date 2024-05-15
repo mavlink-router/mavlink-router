@@ -34,7 +34,12 @@ public:
         TRACE,
     };
 
-    static int open();
+    enum class Backend {
+        STDERR,
+        SYSLOG,
+    };
+
+    static int open(Backend backend);
     static int close();
 
     static Level get_max_level() _pure_ { return _max_level; }
@@ -44,11 +49,15 @@ public:
     static void log(Level level, const char *format, ...) _printf_format_(2, 3);
 
 protected:
+    static void logv_to_fd(int fd, Level level, const char *format, va_list ap);
     static const char *_get_color(Level level);
+
+    static int syslog_log_level(Level level);
 
     static int _target_fd;
     static Level _max_level;
     static bool _show_colors;
+    static Backend _backend;
 };
 
 #define log_trace(...)   Log::log(Log::Level::TRACE, __VA_ARGS__)
