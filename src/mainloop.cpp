@@ -164,7 +164,7 @@ void Mainloop::route_msg(struct buffer *buf)
 
         switch (acceptState) {
         case Endpoint::AcceptState::Accepted:
-            log_debug("Endpoint [%d] accepted message %u to %d/%d from %u/%u",
+            log_trace("Endpoint [%d] accepted message %u to %d/%d from %u/%u",
                       e->fd,
                       buf->curr.msg_id,
                       buf->curr.target_sysid,
@@ -177,7 +177,7 @@ void Mainloop::route_msg(struct buffer *buf)
             unknown = false;
             break;
         case Endpoint::AcceptState::Filtered:
-            log_debug("Endpoint [%d] filtered out message %u to %d/%d from %u/%u",
+            log_trace("Endpoint [%d] filtered out message %u to %d/%d from %u/%u",
                       e->fd,
                       buf->curr.msg_id,
                       buf->curr.target_sysid,
@@ -195,7 +195,7 @@ void Mainloop::route_msg(struct buffer *buf)
 
     if (unknown) {
         _errors_aggregate.msg_to_unknown++;
-        log_debug("Message %u to unknown sysid/compid: %d/%d",
+        log_trace("Message %u to unknown sysid/compid: %d/%d",
                   buf->curr.msg_id,
                   buf->curr.target_sysid,
                   buf->curr.target_compid);
