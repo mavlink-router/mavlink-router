@@ -137,6 +137,9 @@ static Log::Level log_level_from_str(const char *str)
     if (strcaseeq(str, "debug")) {
         return Log::Level::DEBUG;
     }
+    if (strcaseeq(str, "trace")) {
+        return Log::Level::TRACE;
+    }
 
     throw std::invalid_argument("log_level_from_str: unkown string value");
 }

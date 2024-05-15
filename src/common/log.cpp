@@ -52,6 +52,8 @@ const char *Log::_get_color(Level level)
         return COLOR_WHITE;
     case Level::DEBUG:
         return COLOR_LIGHTBLUE;
+    case Level::TRACE:
+        break;
     }
 
     return nullptr;

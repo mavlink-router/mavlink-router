@@ -31,6 +31,7 @@ public:
         NOTICE,
         INFO,
         DEBUG,
+        TRACE,
     };
 
     static int open();
@@ -50,6 +51,7 @@ protected:
     static bool _show_colors;
 };
 
+#define log_trace(...)   Log::log(Log::Level::TRACE, __VA_ARGS__)
 #define log_debug(...)   Log::log(Log::Level::DEBUG, __VA_ARGS__)
 #define log_info(...)    Log::log(Log::Level::INFO, __VA_ARGS__)
 #define log_notice(...)  Log::log(Log::Level::NOTICE, __VA_ARGS__)

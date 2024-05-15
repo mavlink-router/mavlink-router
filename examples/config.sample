@@ -30,7 +30,7 @@
 #ReportStats = false
 
 # Logging verbosity (stderr)
-# Valid values: <error>, <warning>, <info> or <debug>
+# Valid values: <error>, <warning>, <info>, <debug> or <trace>
 # Default: <info>
 #DebugLogLevel = info
 
