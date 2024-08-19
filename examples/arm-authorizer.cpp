@@ -114,6 +114,7 @@ static void mission_ack_send()
     mission_ack.target_component = MAV_COMP_ID_ALL;
     mission_ack.type = 0;
     mission_ack.mission_type = MAV_MISSION_TYPE_MISSION;
+    mission_ack.opaque_id = 0;
 
     mavlink_msg_mission_ack_encode(SYSTEM_ID, MAV_COMP_ID_ALL, &msg, &mission_ack);
     msg_send(&msg);
