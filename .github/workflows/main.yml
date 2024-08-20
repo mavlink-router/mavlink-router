@@ -10,7 +10,7 @@ jobs:
     name: Formatting Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Run clang-format style check on src directory
         uses: jidicula/clang-format-action@v4.11.0
         with:
@@ -32,7 +32,7 @@ jobs:
           - name: i686
             arch: native
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0  # otherwise the version header just contains the commit hash
@@ -117,7 +117,7 @@ jobs:
       - name: install dependencies
         run: apk update && apk add build-base git linux-headers pkgconf meson ninja
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0  # otherwise the version header just contains the commit hash
