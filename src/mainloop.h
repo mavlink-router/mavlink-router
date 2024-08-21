@@ -36,7 +36,8 @@ struct Configuration {
     unsigned long tcp_port{5760};      ///< conf "TcpServerPort" or CLI "tcp-port"
     bool report_msg_statistics{false}; ///< conf "ReportStats" or CLI "report_msg_statistics"
     Log::Level debug_log_level{Log::Level::INFO}; ///< conf "DebugLogLevel" or CLI "debug-log-level"
-    unsigned long dedup_period_ms;                ///< conf "DeduplicationPeriod"
+    Log::Backend log_backend{Log::Backend::STDERR}; ///< CLI "syslog"
+    unsigned long dedup_period_ms;                  ///< conf "DeduplicationPeriod"
 
     LogOptions log_config; ///< logging is in General config section, but internally an endpoint
     std::vector<UartEndpointConfig> uart_configs;

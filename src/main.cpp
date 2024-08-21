@@ -50,12 +50,13 @@ static const struct option long_options[] = {{"endpoints", required_argument, nu
                                              {"log", required_argument, nullptr, 'l'},
                                              {"telemetry-log", no_argument, nullptr, 'T'},
                                              {"debug-log-level", required_argument, nullptr, 'g'},
+                                             {"syslog", no_argument, NULL, 'y'},
                                              {"verbose", no_argument, nullptr, 'v'},
                                              {"version", no_argument, nullptr, 'V'},
                                              {"sniffer-sysid", required_argument, nullptr, 's'},
                                              {}};
 
-static const char *short_options = "he:rt:c:d:l:p:g:vV:s:T:";
+static const char *short_options = "he:rt:c:d:l:p:g:vV:s:T:y";
 
 static void help(FILE *fp)
 {
@@ -86,6 +87,7 @@ static void help(FILE *fp)
         "  -v --verbose                 Verbose. Same as --debug-log-level=debug\n"
         "  -V --version                 Show version\n"
         "  -s --sniffer-sysid           Sysid that all messages are sent to.\n"
+        "  -y --syslog                  Use syslog output instead of stderr\n"
         "  -h --help                    Print this message\n",
         program_invocation_short_name);
 }
@@ -137,6 +139,9 @@ static Log::Level log_level_from_str(const char *str)
     if (strcaseeq(str, "debug")) {
         return Log::Level::DEBUG;
     }
+    if (strcaseeq(str, "trace")) {
+        return Log::Level::TRACE;
+    }
 
     throw std::invalid_argument("log_level_from_str: unkown string value");
 }
@@ -158,6 +163,10 @@ static bool pre_parse_argv(int argc, char *argv[], Configuration &config)
         }
         case 'd': {
             config.conf_dir = optarg;
+            break;
+        }
+        case 'y': {
+            config.log_backend = Log::Backend::SYSLOG;
             break;
         }
         case 'V':
@@ -296,6 +305,7 @@ static int parse_argv(int argc, char *argv[], Configuration &config)
         }
         case 'c':
         case 'd':
+        case 'y':
         case 'V':
             break; // These options were parsed on pre_parse_argv
         case '?':
@@ -595,13 +605,12 @@ int main(int argc, char *argv[])
     int retcode;
     Configuration config{};
 
-    Log::open();
-    log_info(PACKAGE " version %s", BUILD_VERSION);
-
     if (!pre_parse_argv(argc, argv, config)) {
-        Log::close();
         return 0;
     }
+
+    Log::open(config.log_backend);
+    log_info(PACKAGE " version %s", BUILD_VERSION);
 
     // Build remaining config from config files and CLI parameters
     if (parse_conf_files(config) < 0) {

@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/uio.h>
+#include <syslog.h>
 #include <unistd.h>
 
 #define COLOR_RED       "\033[31m"
@@ -34,6 +35,7 @@
 Log::Level Log::_max_level = Level::INFO;
 int Log::_target_fd = -1;
 bool Log::_show_colors;
+Log::Backend Log::_backend = Log::Backend::STDERR;
 
 const char *Log::_get_color(Level level)
 {
@@ -52,20 +54,30 @@ const char *Log::_get_color(Level level)
         return COLOR_WHITE;
     case Level::DEBUG:
         return COLOR_LIGHTBLUE;
+    case Level::TRACE:
+        break;
     }
 
     return nullptr;
 }
 
-int Log::open()
+int Log::open(Backend backend)
 {
     assert_or_return(_target_fd < 0, -1);
 
-    /* for now, only logging is supported only to stderr */
-    _target_fd = STDERR_FILENO;
+    _backend = backend;
 
-    if (isatty(_target_fd)) {
-        _show_colors = true;
+    switch (backend) {
+    case Backend::STDERR:
+        _target_fd = STDERR_FILENO;
+
+        if (isatty(_target_fd))
+            _show_colors = true;
+
+        break;
+    case Backend::SYSLOG:
+        openlog(nullptr, LOG_CONS, LOG_USER);
+        break;
     }
 
     return 0;
@@ -73,8 +85,15 @@ int Log::open()
 
 int Log::close()
 {
-    /* see _target_fd on open() */
-    fflush(stderr);
+    switch (_backend) {
+    case Backend::STDERR:
+        /* see _target_fd on open() */
+        fflush(stderr);
+        break;
+    case Backend::SYSLOG:
+        closelog();
+        break;
+    }
 
     return 0;
 }
@@ -84,17 +103,13 @@ void Log::set_max_level(Level level)
     _max_level = level;
 }
 
-void Log::logv(Level level, const char *format, va_list ap)
+void Log::logv_to_fd(int fd, Log::Level level, const char *format, va_list ap)
 {
     struct iovec iovec[6] = {};
     const char *color;
     int n = 0;
     char buffer[LINE_MAX];
     int save_errno;
-
-    if (_max_level < level) {
-        return;
-    }
 
     /* so %m works as expected */
     save_errno = errno;
@@ -120,7 +135,26 @@ void Log::logv(Level level, const char *format, va_list ap)
 
     IOVEC_SET_STRING(iovec[n++], "\n");
 
-    (void)writev(_target_fd, iovec, n);
+    (void)writev(fd, iovec, n);
+}
+
+void Log::logv(Level level, const char *format, va_list ap)
+{
+    if (_max_level < level) {
+        return;
+    }
+
+    switch (_backend) {
+    case Backend::STDERR:
+        logv_to_fd(_target_fd, level, format, ap);
+        break;
+    case Backend::SYSLOG:
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-nonliteral"
+        vsyslog(syslog_log_level(level), format, ap);
+#pragma GCC diagnostic pop
+        break;
+    }
 }
 
 void Log::log(Level level, const char *format, ...)
@@ -130,4 +164,23 @@ void Log::log(Level level, const char *format, ...)
     va_start(ap, format);
     logv(level, format, ap);
     va_end(ap);
+}
+
+int Log::syslog_log_level(Log::Level level)
+{
+    switch (level) {
+    case Level::ERROR:
+        return LOG_ERR;
+    case Level::WARNING:
+        return LOG_WARNING;
+    case Level::NOTICE:
+        return LOG_NOTICE;
+    case Level::INFO:
+        return LOG_INFO;
+    case Level::DEBUG:
+        return LOG_DEBUG;
+    case Level::TRACE:
+        return LOG_DEBUG;
+    }
+    return LOG_DEBUG;
 }
