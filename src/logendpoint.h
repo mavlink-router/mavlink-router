@@ -80,6 +80,7 @@ protected:
     } _timeout;
     uint32_t _timeout_write_total = 0;
     aiocb _fsync_cb = {};
+    static constexpr uint8_t ALIVE_TIMEOUT = 5;
 
     virtual const char *_get_logfile_extension() = 0;
 
@@ -94,6 +95,7 @@ protected:
 
     void _handle_auto_start_stop(const struct buffer *pbuf);
 
+    void _delete_last_log();
 private:
     int _get_file(const char *extension);
     static uint32_t _get_prefix(DIR *dir);
