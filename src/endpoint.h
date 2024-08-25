@@ -22,6 +22,7 @@
 
 #include <memory>
 #include <string>
+#include <sys/un.h>
 #include <utility>
 #include <vector>
 
@@ -384,6 +385,7 @@ protected:
     bool open(const std::string &ip, unsigned long port);
     static int open_ipv4(const char *ip, unsigned long port, sockaddr_in &sockaddr);
     static int open_ipv6(const char *ip, unsigned long port, sockaddr_in6 &sockaddr6);
+    static int open_socket(const char *ip, sockaddr_un &sockaddr);
 
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
 
@@ -396,7 +398,9 @@ private:
     bool _valid = true;
 
     bool is_ipv6;
+    bool is_unix_socket;
     int _retry_timeout = 0; // disable retry by default
     struct sockaddr_in sockaddr;
     struct sockaddr_in6 sockaddr6;
+    struct sockaddr_un sockaddr_un;
 };
