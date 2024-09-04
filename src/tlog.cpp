@@ -54,6 +54,32 @@ void TLog::stop()
     LogEndpoint::stop();
 }
 
+void TLog::_split_logfile()
+{
+    // Close the current log file
+    if (_file != -1) {
+        fsync(_file);
+        close(_file);
+        _file = -1;
+
+        // Mark the file as read-only
+        char log_file[PATH_MAX];
+        if (snprintf(log_file, sizeof(log_file), "%s/%s", _config.logs_dir.c_str(), _filename)
+            < (int)sizeof(log_file)) {
+            chmod(log_file, S_IRUSR | S_IRGRP | S_IROTH);
+        }
+    }
+
+    // Open a new log file with a unique name and timestamp
+    _file = _get_file(_get_logfile_extension());
+    if (_file < 0) {
+        log_error("Failed to open new tlog file");
+        return;
+    }
+
+    log_info("TLog file rotated, new file: %s", _filename);
+}
+
 int TLog::write_msg(const struct buffer *buffer)
 {
     /* set the expected system id to the first autopilot that we get a heartbeat from */
@@ -64,6 +90,20 @@ int TLog::write_msg(const struct buffer *buffer)
 
     /* Check if we should start or stop logging */
     _handle_auto_start_stop(buffer);
+
+    /* Check if the current file size exceeds the max allowed tlog file size */
+    struct stat file_stat;
+    if (fstat(_file, &file_stat) == 0) {
+
+        if (file_stat.st_size >= _max_tlog_file_size) {
+            log_info("Attempting to split file, current size: %ld, max size: %ld",
+                     file_stat.st_size,
+                     _max_tlog_file_size);
+            _split_logfile();
+        }
+    } else {
+        log_error("Failed to get file stats: %m");
+    }
 
     uint64_t ms_since_epoch = std::chrono::duration_cast<std::chrono::microseconds>(
                                   std::chrono::system_clock::now().time_since_epoch())
