@@ -481,7 +481,7 @@ uint8_t Endpoint::get_trimmed_zeros(const mavlink_msg_entry_t *msg_entry, const 
 void Endpoint::log_aggregate(unsigned int interval_sec)
 {
     if (_incomplete_msgs > 0) {
-        log_warning("Endpoint %s [%d]: %u incomplete messages in the last %d seconds", _name.c_str(), fd,
+        log_debug("Endpoint %s [%d]: %u incomplete messages in the last %d seconds", _name.c_str(), fd,
                     _incomplete_msgs, interval_sec);
         _incomplete_msgs = 0;
     }
