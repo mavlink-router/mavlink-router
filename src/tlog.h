@@ -44,4 +44,6 @@ protected:
 
 private:
     int64_t _max_tlog_file_size;
+    size_t _write_msg_count = 0;
+    void _check_and_split_logfile();
 };
