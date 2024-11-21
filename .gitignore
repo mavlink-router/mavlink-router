@@ -15,3 +15,6 @@ tags
 # Jetbrains IDEs
 .idea/
 compile_commands.json
+
+# VSCode IDE
+.vscode/

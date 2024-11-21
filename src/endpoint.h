@@ -24,6 +24,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <set>
 
 #include "comm.h"
 #include "pollable.h"
@@ -76,6 +77,9 @@ struct UdpEndpointConfig {
     std::vector<uint8_t> allow_src_sys_in;
     std::vector<uint8_t> block_src_sys_in;
     std::string group;
+    unsigned long coalesce_bytes;
+    unsigned long coalesce_ms;
+    std::vector<uint32_t> coalesce_nodelay;     
 };
 
 struct TcpEndpointConfig {
@@ -328,7 +332,7 @@ public:
     ~UdpEndpoint() override;
 
     int write_msg(const struct buffer *pbuf) override;
-    int flush_pending_msgs() override { return -ENOSYS; }
+    int flush_pending_msgs() override;
 
     bool setup(UdpEndpointConfig config); ///< open socket and apply config
 
@@ -336,6 +340,11 @@ public:
     static const char *section_pattern;
     static int parse_udp_mode(const char *val, size_t val_len, void *storage, size_t storage_len);
     static bool validate_config(const UdpEndpointConfig &config);
+
+    void add_no_coalesce_msg_id(uint32_t msg_id)
+    {
+        _coalesce_nodelay.insert(msg_id);
+    }
 
 protected:
     bool open(const char *ip, unsigned long port,
@@ -353,10 +362,20 @@ protected:
     Timeout *nomessage_timeout = nullptr;
     bool _nomessage_timeout_cb(void *data);
 
+    void _schedule_write();
+    bool _write_scheduled = false;
+
+    Timeout *_write_schedule_timer = nullptr;
+
+    unsigned int _coalesce_bytes = 0UL;               // max coalescence size
+    unsigned long _coalesce_ms = 0UL;                  // max time to hold data to try to coalesce packets together
+
 private:
     bool is_ipv6;
     struct sockaddr_in sockaddr;
     struct sockaddr_in6 sockaddr6;
+    std::set<uint32_t> _coalesce_nodelay{};     // immediately send if a mavlink msg_id is in this set
+
 };
 
 class TcpEndpoint : public Endpoint {
