@@ -259,6 +259,21 @@ Message de-duplication:
     data. So a period shorter than the update period of the fastest static
     message is fine in any case (less than 1000 ms for 1 Hz heartbeats).
 
+Message coalescing:
+  
+  - The router can combine MAVLink messages destined for the same UDP endpoint to 
+    minimize the number of UDP packets used. Instead of sending a separate
+    UDP packet for each MAVLink message, it consolidates multiple MAVLink
+    messages into a single UDP packet reducing the network load.
+    This feature can be activated by setting a maximum coalescing time and a
+    maximum coalescing buffer. The router will then combine as many MAVLink 
+    messages as possible within the specified time and buffer limits.
+    Once either of the two limits is reached, a single UDP packet is sent 
+    containing all the messages accumulated up to that point.
+    Additionally, a set of high-priority MAVLink message IDs can be
+    specified. When one of these messages is received, it is added to the UDP
+    packet being constructed and sent immediately.
+
 Endpoint groups:
 
   - Multiple endpoints can be configured to be in the same endpoin group.

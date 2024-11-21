@@ -195,6 +195,23 @@
 # Default: Empty (no group)
 #Group = 
 
+# Maximum message coalescence size (in Bytes). If set, also `CoalesceMs`
+# needs to be set for the coalescing mechanism to work properly.
+# Default: Empty (no message coalescence)
+# CoalesceBytes = 
+
+# Maximum duration (in milliseconds) of message gathering for coalescing
+# purposes, If set, also `CoalesceBytes` needs to be set for the
+# coalescing mechanism to work properly.
+# Default: Empty (no message coalescence)
+# CoalesceMs =
+
+# High priority MAVLink message IDs for which not to apply the 
+# coalescing mechanism (forward them as soon as received).
+# Format: Comma separated list of integers
+# Default: Empty (no high priority messages)
+# CoalesceNoDelay = 
+
 ## Example
 [UartEndpoint alpha]
 Device = /dev/ttyS0
