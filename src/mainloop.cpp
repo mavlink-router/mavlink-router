@@ -289,13 +289,15 @@ int Mainloop::loop()
             }
 
             if (events[i].events & EPOLLERR) {
-                log_error("poll error for fd %i", p->fd);
-
-                if (p->is_critical()) {
-                    log_error("Critical fd %i got error, exiting", p->fd);
-                    request_exit(EXIT_FAILURE);
+                if(events[i].events & EPOLLHUP || !p->is_critical()) {
+                    // EPOLLHUP is an expected error, in case the TCP connection
+                    // drops. In this case, we'll just need to clean up the TCP
+                    // connection later, no need to panic.
+                    log_debug("Non-critical error for fd %i.", p->fd);
+                    should_process_tcp_hangups = true;
                 } else {
-                    log_debug("Non-critical fd %i, error is okay.", p->fd);
+                    log_error("Critical error for fd %i, exiting", p->fd);
+                    request_exit(EXIT_FAILURE);
                 }
             }
         }
