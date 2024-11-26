@@ -1,22 +1,40 @@
 #!/usr/bin/make -f
-# See debhelper(7) (uncomment to enable)
-# output every command that modifies files on the build system.
-#export DH_VERBOSE = 1
-
-# create a stamp file for having called "configure" -- this avoids lengthy
-# re-run of configure during incremental builds
-override_dh_auto_configure:
-	pip install future
-	if [ ! -e debian/debhelper-auto-configure-stamp ] ; then \
-		dh_auto_configure ; touch debian/debhelper-auto-configure-stamp ; \
-	fi
-
-# make sure we return to pristine state on clean
-override_dh_auto_clean:
-	dh_auto_clean
-	rm -f debian/debhelper-auto-configure-stamp
 
 %:
-	# don't use build stamp so we can incrementally recompile and rebuild
-	# package on source changes
-	dh $@ --without=build-stamp
+	dh $@
+
+override_dh_auto_configure:
+ifneq ($(DEB_BUILD_ARCH_CPU),$(DEB_HOST_ARCH_CPU))
+	LC_ALL=C.UTF-8 meson setup obj-aarch64-linux-gnu \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--localstatedir=/var \
+		--libdir=lib/aarch64-linux-gnu \
+		--cross-file meson-cross-aarch64.ini \
+		--reconfigure 
+else
+ifeq ($(DEB_BUILD_ARCH_CPU),arm64)
+	LC_ALL=C.UTF-8 meson setup obj-aarch64-linux-gnu \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--localstatedir=/var \
+		--libdir=lib/aarch64-linux-gnu
+else
+	LC_ALL=C.UTF-8 meson setup obj-x86_64-linux-gnu \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--localstatedir=/var \
+		--libdir=lib/x86_64-linux-gnu
+endif
+endif
+
+override_dh_auto_build:
+ifneq ($(DEB_BUILD_ARCH_CPU),$(DEB_HOST_ARCH_CPU))
+	LC_ALL=C.UTF-8 ninja -C obj-aarch64-linux-gnu
+else
+ifeq ($(DEB_BUILD_ARCH_CPU),arm64)
+	LC_ALL=C.UTF-8 ninja -C obj-aarch64-linux-gnu
+else
+	LC_ALL=C.UTF-8 ninja -C obj-x86_64-linux-gnu
+endif
+endif

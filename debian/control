@@ -4,6 +4,7 @@ Priority: optional
 Maintainer: Auterion <distro@auterion.com>
 Build-Depends-Indep:
  debhelper (>= 11),
+ meson,
  pkg-config,
  systemd,
  python3-pip,
