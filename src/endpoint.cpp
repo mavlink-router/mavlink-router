@@ -1349,11 +1349,16 @@ ssize_t UdpEndpoint::_read_msg(uint8_t *buf, size_t len)
 int UdpEndpoint::write_msg(const struct buffer *pbuf)
 {
     // We cannot add the new message to the coalescence or to the tx buffer -> send immediately what is scheduled
-    if (tx_buf.len > 0 && tx_buf.len + pbuf->len > std::min(_coalesce_bytes, TX_BUF_MAX_SIZE)) {
-        log_trace("New message would overflow the coalescence or the transmission buffer, sending the pending ones before");
+    if (tx_buf.len > 0 && tx_buf.len + pbuf->len > _coalesce_bytes) {
+        log_trace("New message would overflow the coalescence, sending the pending ones before");
         flush_pending_msgs();
     }
 
+    if (tx_buf.len + pbuf->len > TX_BUF_MAX_SIZE) {
+        log_debug("Dropping message, tx buffer full");
+        return 0;
+    }
+    
     // Append new data in the tx buffer
     memcpy(&tx_buf.data[tx_buf.len], pbuf->data, pbuf->len);
     tx_buf.len += pbuf->len;
