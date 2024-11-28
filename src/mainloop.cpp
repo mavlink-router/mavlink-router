@@ -547,7 +547,7 @@ bool Mainloop::add_endpoints(const Configuration &config)
 
     // Create command server endpoint
     // TODO add config (ie address of the socket and enable/disable option)
-    g_commands_fd = command_us_open("/tmp/mavlink-router.sock");
+    g_commands_fd = command_us_open("/tmp/mavlink_router_pipe");
 
     // Create Log endpoint
     auto conf = config.log_config;
