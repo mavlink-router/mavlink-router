@@ -60,6 +60,7 @@ public:
     int loop();
     void route_msg(struct buffer *buf);
     void handle_tcp_connection();
+    void handle_us_command();
     int write_msg(const std::shared_ptr<Endpoint> &e, const struct buffer *buf) const;
     void process_tcp_hangups();
     Timeout *add_timeout(uint32_t timeout_msec, std::function<bool(void *)> cb, const void *data);
@@ -111,7 +112,8 @@ private:
     static const unsigned int LOG_AGGREGATE_INTERVAL_SEC = 5;
 
     std::vector<std::shared_ptr<Endpoint>> g_endpoints{};
-    int g_tcp_fd = -1; ///< for TCP server
+    int g_tcp_fd = -1;          ///< for TCP server
+    int g_commands_fd = -1;     ///< for the Unix socket commands endpoint
     std::shared_ptr<LogEndpoint> _log_endpoint{nullptr};
 
     Timeout *_timeouts = nullptr;
@@ -125,6 +127,7 @@ private:
     int _retcode;
 
     int tcp_open(unsigned long tcp_port);
+    int command_us_open(std::string address);
     void _del_timeouts();
     bool _retry_timeout_cb(void *data);
     bool _log_aggregate_timeout(void *data);

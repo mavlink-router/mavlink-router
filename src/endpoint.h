@@ -79,7 +79,7 @@ struct UdpEndpointConfig {
     std::string group;
     unsigned long coalesce_bytes;
     unsigned long coalesce_ms;
-    std::vector<uint32_t> coalesce_nodelay;     
+    std::vector<uint32_t> coalesce_nodelay;
 };
 
 struct TcpEndpointConfig {
@@ -236,9 +236,11 @@ public:
     bool allowed_by_incoming_filters(const struct buffer *pbuf) const;
 
     void link_group_member(std::shared_ptr<Endpoint> other);
+    void unlink_group_member(const std::string &name);
 
     std::string get_type() const { return this->_type; }
     std::string get_group_name() const { return this->_group_name; };
+    std::string get_name() const { return this->_name; };
 
     struct buffer rx_buf;
     struct buffer tx_buf;

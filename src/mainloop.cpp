@@ -21,6 +21,7 @@
 #include <signal.h>
 #include <sys/epoll.h>
 #include <sys/timerfd.h>
+#include <sys/un.h>
 #include <unistd.h>
 
 #include <atomic>
@@ -242,6 +243,123 @@ accept_error:
     delete tcp;
 }
 
+void Mainloop::handle_us_command()
+{
+    char buf[1024];
+    auto bytes = read(g_commands_fd, buf, sizeof(buf));
+    if (bytes < 0) {
+        log_error("Command Server: Error");
+    }
+    else {
+        buf[bytes] = '\0';
+        log_debug("Command Server: Read %ld bytes: %s", bytes, buf);
+
+        // Parse command
+        std::vector<std::string> a;
+        char *pch = strtok(buf, " ");
+        while (pch != NULL) {
+            a.push_back(std::string(pch));
+            pch = strtok(NULL, " \n");
+        }
+
+        if (a[0] == "add") {
+            // Add command
+            // add UDP Name IP Port Mode Group
+            // a0  a1   a2  a3  a4   a5   a6
+
+            // Sanity checks
+            if (a.size() != 7 || a[1] != "udp") {
+                log_error("Command Server: add command usage: \n\tadd <protocol> <endpoint_name> <IP> <port> <endpoint_mode> <group>");
+                return;
+            }
+            int port = atoi(a[4].c_str());
+            if (port <= 0) {
+                log_trace("Malformed port in add command");
+                return;
+            }
+            UdpEndpointConfig::Mode mode = a[5] == "server" ? UdpEndpointConfig::Mode::Server : UdpEndpointConfig::Mode::Client;
+
+            // Command to UDP endpoint configuration
+            UdpEndpointConfig conf{};
+            conf.mode = mode;
+            conf.name = a[2];
+            conf.address = a[3];
+            conf.port = port;
+            conf.group = a[6] == "NULL" ? "" : a[6];
+
+            // TODO support coalescing and filtering for dynamic endpoints 
+            // conf.allow_msg_id_out = ;
+            // conf.block_msg_id_out = ;
+            // conf.allow_src_comp_out = ;
+            // conf.block_src_comp_out = ;
+            // conf.allow_src_sys_out = ;
+            // conf.block_src_sys_out = ;
+            // conf.allow_msg_id_in = ;
+            // conf.block_msg_id_in = ;
+            // conf.allow_src_comp_in = ;
+            // conf.block_src_comp_in = ;
+            // conf.allow_src_sys_in = ;
+            // conf.block_src_sys_in = ;
+            // conf.coalesce_bytes = ;
+            // conf.coalesce_ms = ;
+            // conf.coalesce_nodelay = ;
+
+            // UDP endpoint configuration to instance
+            auto dynamic_udp = std::make_shared<UdpEndpoint>(conf.name);
+            if (!dynamic_udp->setup(conf)) {
+                log_error("Command Server: Could not open dynamic endpoint on %s:%d", a[3].c_str(), port);
+                return;
+            }
+
+            g_endpoints.emplace_back(dynamic_udp);
+            auto endpoint = g_endpoints.back();
+            this->add_fd(endpoint->fd, endpoint.get(), EPOLLIN);
+
+            // Update endpoints groups 
+            if (!endpoint->get_group_name().empty()) {
+                for (auto other : g_endpoints) { // find other endpoints in group
+                    if (other != endpoint && other->get_group_name() == endpoint->get_group_name()) {
+                        endpoint->link_group_member(other);
+                        other->link_group_member(endpoint);
+                    }
+                }
+            }
+        } else if (a[0] == "remove") {
+            // Remove command
+            // remove Name
+            //   a0    a1
+
+            // Sanity checks
+            if (a.size() != 2) {
+                log_error("Command Server: remove command usage: \n\tremove <endpoint_name>");
+                return;
+            }
+
+            // Remove dynamic endpoint
+            // Update groups    
+            for (auto e : g_endpoints) {
+                e->unlink_group_member(a[1]);
+            }
+
+            auto to_delete = std::find_if(g_endpoints.begin(), g_endpoints.end(), 
+                [&a](const std::shared_ptr<Endpoint> e) {return e->get_name() == a[1];});
+
+            if (to_delete == g_endpoints.end()) {
+                log_error("No endpoint named %s", a[1].c_str());
+            } else {
+                // Delete fd 
+                this->remove_fd(to_delete->get()->fd);
+                // Remove from endpoint list
+                g_endpoints.erase(to_delete);
+                log_info("Removed endpoint %s", a[1].c_str());
+            }
+            
+        } else {
+            log_error("Command Server: Unsupported command \'%s\'", a[0].c_str());
+        }
+    }
+}
+
 int Mainloop::loop()
 {
     const int max_events = 8;
@@ -269,6 +387,11 @@ int Mainloop::loop()
         for (i = 0; i < r; i++) {
             if (events[i].data.ptr == &g_tcp_fd) {
                 handle_tcp_connection();
+                continue;
+            }
+
+            if(events[i].data.ptr == &g_commands_fd){
+                handle_us_command();
                 continue;
             }
 
@@ -411,7 +534,7 @@ bool Mainloop::add_endpoints(const Configuration &config)
         }
 
         for (auto other : g_endpoints) { // find other endpoints in group
-            if (other != e && e->get_group_name() == e->get_group_name()) {
+            if (other != e && other->get_group_name() == e->get_group_name()) {
                 e->link_group_member(other);
             }
         }
@@ -421,6 +544,10 @@ bool Mainloop::add_endpoints(const Configuration &config)
     if (config.tcp_port != 0u) {
         g_tcp_fd = tcp_open(config.tcp_port);
     }
+
+    // Create command server endpoint
+    // TODO add config (ie address of the socket and enable/disable option)
+    g_commands_fd = command_us_open("/tmp/mavlink-router.sock");
 
     // Create Log endpoint
     auto conf = config.log_config;
@@ -504,6 +631,39 @@ int Mainloop::tcp_open(unsigned long tcp_port)
 
     return fd;
 }
+
+int Mainloop::command_us_open(std::string address)
+{
+    int fd;
+    struct sockaddr_un sockaddr_un = {0};
+
+    // Create socket
+    fd = socket(AF_UNIX, SOCK_DGRAM | SOCK_NONBLOCK, 0);
+    if (fd == -1) {
+        log_error("Command Server: Could not create Unix socket (%m)");
+        return -1;
+    }
+
+    // Remove unix socket address (maybe from a previous run)
+    remove(address.c_str());
+
+    // Bind socket to filename
+    sockaddr_un.sun_family = AF_UNIX;
+    strcpy(sockaddr_un.sun_path, address.c_str());
+
+    if (bind(fd, (struct sockaddr *)&sockaddr_un, sizeof(struct sockaddr_un)) < 0) {
+        log_error("Command Server: Could not bind to Unix socket (%m)");
+        close(fd);
+        return -1;
+    }
+
+    add_fd(fd, &g_commands_fd, EPOLLIN);
+
+    log_info("Opened Commands Server [%d] at %s", fd, sockaddr_un.sun_path);
+
+    return fd;
+}
+
 
 Timeout *Mainloop::add_timeout(uint32_t timeout_msec, std::function<bool(void *)> cb,
                                const void *data)

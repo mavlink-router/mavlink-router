@@ -647,6 +647,13 @@ void Endpoint::link_group_member(std::shared_ptr<Endpoint> other)
     log_info("Grouped %s with %s", other->_name.c_str(), _name.c_str());
 }
 
+void Endpoint::unlink_group_member(const std::string &name)
+{
+    _group_members.erase(std::remove_if(_group_members.begin(), _group_members.end(), 
+            [&name](auto member) {return member->get_name() == name;}), 
+        _group_members.end());
+}
+
 bool Endpoint::_check_crc(const mavlink_msg_entry_t *msg_entry) const
 {
     const bool mavlink2 = rx_buf.data[0] == MAVLINK_STX;
