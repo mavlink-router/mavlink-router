@@ -20,6 +20,7 @@
 #include <assert.h>
 #include <signal.h>
 #include <sys/epoll.h>
+#include <sys/stat.h>
 #include <sys/timerfd.h>
 #include <sys/un.h>
 #include <unistd.h>
@@ -632,34 +633,17 @@ int Mainloop::tcp_open(unsigned long tcp_port)
     return fd;
 }
 
-int Mainloop::command_us_open(std::string address)
+int Mainloop::command_us_open(const std::string& address)
 {
-    int fd;
-    struct sockaddr_un sockaddr_un = {0};
+    mkfifo(address.c_str(), 0600);
 
-    // Create socket
-    fd = socket(AF_UNIX, SOCK_DGRAM | SOCK_NONBLOCK, 0);
-    if (fd == -1) {
-        log_error("Command Server: Could not create Unix socket (%m)");
-        return -1;
+    int fd = ::open(address.c_str(), O_RDWR);
+    if (fd < 0) {
+        log_error("Failed to open Commands Server: %s", address.c_str());
+    } else {
+        add_fd(fd, &g_commands_fd, EPOLLIN);
+        log_info("Opened Commands Server [%d] at %s", fd, address.c_str());
     }
-
-    // Remove unix socket address (maybe from a previous run)
-    remove(address.c_str());
-
-    // Bind socket to filename
-    sockaddr_un.sun_family = AF_UNIX;
-    strcpy(sockaddr_un.sun_path, address.c_str());
-
-    if (bind(fd, (struct sockaddr *)&sockaddr_un, sizeof(struct sockaddr_un)) < 0) {
-        log_error("Command Server: Could not bind to Unix socket (%m)");
-        close(fd);
-        return -1;
-    }
-
-    add_fd(fd, &g_commands_fd, EPOLLIN);
-
-    log_info("Opened Commands Server [%d] at %s", fd, sockaddr_un.sun_path);
 
     return fd;
 }

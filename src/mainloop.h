@@ -127,7 +127,7 @@ private:
     int _retcode;
 
     int tcp_open(unsigned long tcp_port);
-    int command_us_open(std::string address);
+    int command_us_open(const std::string& address);
     void _del_timeouts();
     bool _retry_timeout_cb(void *data);
     bool _log_aggregate_timeout(void *data);
