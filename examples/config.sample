@@ -42,6 +42,12 @@
 # Default: 0 (de-duplication disabled)
 #DeDuplicationPeriod = 0
 
+# Command pipe path. A named pipe will be created at the provided path. It 
+# is possible to send create and delete commands over such channel to dynamically
+# manage UDP endpoints.
+# Default: "" (command disabled)
+#CommandPipePath = /tmp/mavlink_router_pipe
+
 ## TCP Server Endpoints
 
 # Listen for TCP connections on this port. Set to 0 to disable.

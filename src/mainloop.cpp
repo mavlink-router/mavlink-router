@@ -244,7 +244,7 @@ accept_error:
     delete tcp;
 }
 
-void Mainloop::handle_us_command()
+void Mainloop::handle_command_pipe()
 {
     char buf[1024];
     auto bytes = read(g_commands_fd, buf, sizeof(buf));
@@ -392,7 +392,13 @@ int Mainloop::loop()
             }
 
             if(events[i].data.ptr == &g_commands_fd){
-                handle_us_command();
+                if (events[i].events & (EPOLLERR | EPOLLHUP)) {
+                    // Reopen the command pipe if there was an error in reading it
+                    clean_command_pipe();
+                    open_command_pipe(command_pipe_path);
+                }
+                
+                handle_command_pipe();
                 continue;
             }
 
@@ -438,6 +444,7 @@ int Mainloop::loop()
     }
 
     clear_endpoints();
+    clean_command_pipe();
 
     // free all remaning Timeouts
     while (_timeouts != nullptr) {
@@ -547,8 +554,10 @@ bool Mainloop::add_endpoints(const Configuration &config)
     }
 
     // Create command server endpoint
-    // TODO add config (ie address of the socket and enable/disable option)
-    g_commands_fd = command_us_open("/tmp/mavlink_router_pipe");
+    if (!config.command_pipe_path.empty()) {
+        command_pipe_path = config.command_pipe_path;
+        g_commands_fd = open_command_pipe(command_pipe_path);
+    }
 
     // Create Log endpoint
     auto conf = config.log_config;
@@ -633,21 +642,29 @@ int Mainloop::tcp_open(unsigned long tcp_port)
     return fd;
 }
 
-int Mainloop::command_us_open(const std::string& address)
+int Mainloop::open_command_pipe(const std::string& address)
 {
     mkfifo(address.c_str(), 0600);
 
-    int fd = ::open(address.c_str(), O_RDWR);
+    int fd = ::open(address.c_str(), O_RDWR | O_CLOEXEC | O_NONBLOCK);
     if (fd < 0) {
-        log_error("Failed to open Commands Server: %s", address.c_str());
+        log_error("Failed to open Command Server: %s", address.c_str());
     } else {
         add_fd(fd, &g_commands_fd, EPOLLIN);
-        log_info("Opened Commands Server [%d] at %s", fd, address.c_str());
+        log_info("Opened Command Server [%d] at %s", fd, address.c_str());
     }
 
     return fd;
 }
 
+void Mainloop::clean_command_pipe() {
+    // clean command pipe after use
+    if (g_commands_fd != -1) {
+        ::close(g_commands_fd);
+        g_commands_fd = -1;
+    }
+    ::remove(command_pipe_path.c_str());
+}
 
 Timeout *Mainloop::add_timeout(uint32_t timeout_msec, std::function<bool(void *)> cb,
                                const void *data)
