@@ -100,6 +100,9 @@ struct TcpEndpointConfig {
     std::vector<uint8_t> allow_src_sys_in;
     std::vector<uint8_t> block_src_sys_in;
     std::string group;
+    unsigned long coalesce_bytes;
+    unsigned long coalesce_ms;
+    std::vector<uint32_t> coalesce_nodelay;
 };
 
 /*
@@ -386,7 +389,7 @@ public:
     ~TcpEndpoint() override;
 
     int write_msg(const struct buffer *pbuf) override;
-    int flush_pending_msgs() override { return -ENOSYS; }
+    int flush_pending_msgs() override;
     bool is_valid() override { return _valid; };
     bool is_critical() override { return false; };
 
@@ -401,6 +404,11 @@ public:
     static const char *section_pattern;
     static bool validate_config(const TcpEndpointConfig &config);
 
+    void add_no_coalesce_msg_id(uint32_t msg_id)
+    {
+        _coalesce_nodelay.insert(msg_id);
+    }
+
 protected:
     bool open(const std::string &ip, unsigned long port);
     static int open_ipv4(const char *ip, unsigned long port, sockaddr_in &sockaddr);
@@ -411,6 +419,14 @@ protected:
     void _schedule_reconnect();
     bool _retry_timeout_cb(void *data);
 
+    void _schedule_write();
+    bool _write_scheduled = false;
+
+    Timeout *_write_schedule_timer = nullptr;
+
+    unsigned int _coalesce_bytes = 0UL;               // max coalescence size
+    unsigned long _coalesce_ms = 0UL;                  // max time to hold data to try to coalesce packets together
+
 private:
     std::string _ip{};
     unsigned long _port = 0;
@@ -420,4 +436,6 @@ private:
     int _retry_timeout = 0; // disable retry by default
     struct sockaddr_in sockaddr;
     struct sockaddr_in6 sockaddr6;
+    std::set<uint32_t> _coalesce_nodelay{};     // immediately send if a mavlink msg_id is in this set
+
 };
