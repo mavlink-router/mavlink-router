@@ -141,4 +141,6 @@ private:
 
     static Mainloop _instance;
     static bool _initialized;
+
+    template<typename T> static void parse_into_vector(const std::string &command, std::vector<T> &vector);
 };

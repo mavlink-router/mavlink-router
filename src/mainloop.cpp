@@ -27,6 +27,7 @@
 
 #include <atomic>
 #include <memory>
+#include <sstream>
 
 #include <common/log.h>
 #include <common/util.h>
@@ -265,12 +266,22 @@ void Mainloop::handle_command_pipe()
 
         if (a[0] == "add") {
             // Add command
-            // add UDP Name IP Port Mode Group
-            // a0  a1   a2  a3  a4   a5   a6
+            // add UDP Name IP Port Mode Group CoalesceBytes CoalesceMs CoalesceNoDelay
+            // a0  a1   a2  a3  a4   a5   a6        a7          a8           a9 
+            //  allow_msg_id_out block_msg_id_out allow_src_comp_out block_src_comp_out allow_src_sys_out block_src_sys_out allow_msg_id_in 
+            //        a10               a11              a12                  a13             a14                a15              a16 
+            //  block_msg_id_in allow_src_comp_in block_src_comp_in allow_src_sys_in block_src_sys_in
+            //           a17           a18                a19             a20              a21 
+
+            std::set<unsigned> argc_options = {6, 7, 10, 22};
 
             // Sanity checks
-            if (a.size() != 7 || a[1] != "udp") {
-                log_error("Command Server: add command usage: \n\tadd <protocol> <endpoint_name> <IP> <port> <endpoint_mode> <group>");
+            if (!argc_options.count(a.size()) || a[1] != "udp") {
+                log_error("Command Server: add command usage:\n\tadd <protocol> <endpoint_name> <IP> <port> <endpoint_mode>");
+                log_error("Additional optional parameters for grouping and coalescing are: <group> <coalesce_bytes> <coalesce_ms> <coalesce_no_delay>");
+                log_error("Additional optional parameters for filtering are: <allow_msg_id_out> <block_msg_id_out> <allow_src_comp_out> <block_src_comp_out>");
+                log_error("<allow_src_sys_out> <block_src_sys_out> <allow_msg_id_in> <block_msg_id_in> <allow_src_comp_in> <block_src_comp_in> <allow_src_sys_in> <block_src_sys_in>");
+                log_error("Set the optional fields you wish to leave unconfigured to \"NULL\"");
                 return;
             }
             int port = atoi(a[4].c_str());
@@ -286,24 +297,31 @@ void Mainloop::handle_command_pipe()
             conf.name = a[2];
             conf.address = a[3];
             conf.port = port;
-            conf.group = a[6] == "NULL" ? "" : a[6];
 
-            // TODO support coalescing and filtering for dynamic endpoints 
-            // conf.allow_msg_id_out = ;
-            // conf.block_msg_id_out = ;
-            // conf.allow_src_comp_out = ;
-            // conf.block_src_comp_out = ;
-            // conf.allow_src_sys_out = ;
-            // conf.block_src_sys_out = ;
-            // conf.allow_msg_id_in = ;
-            // conf.block_msg_id_in = ;
-            // conf.allow_src_comp_in = ;
-            // conf.block_src_comp_in = ;
-            // conf.allow_src_sys_in = ;
-            // conf.block_src_sys_in = ;
-            // conf.coalesce_bytes = ;
-            // conf.coalesce_ms = ;
-            // conf.coalesce_nodelay = ;
+            if (a.size() > 6) { // group name provided
+                conf.group = a[6] == "NULL" ? "" : a[6];
+            }
+            
+            if (a.size() > 7) { // coalescence config provided
+                conf.coalesce_bytes = a[7] == "NULL" ? 0 : atoi(a[7].c_str());
+                conf.coalesce_ms = a[8] == "NULL" ? 0 : atoi(a[8].c_str());
+                parse_into_vector(a[9], conf.coalesce_nodelay);
+            }
+
+            if (a.size() > 10) { // filtering config provided
+                parse_into_vector(a[10], conf.allow_msg_id_out);
+                parse_into_vector(a[11], conf.block_msg_id_out);
+                parse_into_vector(a[12], conf.allow_src_comp_out);
+                parse_into_vector(a[14], conf.block_src_comp_out);
+                parse_into_vector(a[14], conf.allow_src_sys_out);
+                parse_into_vector(a[15], conf.block_src_sys_out);
+                parse_into_vector(a[16], conf.allow_msg_id_in);
+                parse_into_vector(a[17], conf.block_msg_id_in);
+                parse_into_vector(a[18], conf.allow_src_comp_in);
+                parse_into_vector(a[19], conf.block_src_comp_in);
+                parse_into_vector(a[20], conf.allow_src_sys_in);
+                parse_into_vector(a[21], conf.block_src_sys_in);
+            } 
 
             // UDP endpoint configuration to instance
             auto dynamic_udp = std::make_shared<UdpEndpoint>(conf.name);
@@ -358,6 +376,17 @@ void Mainloop::handle_command_pipe()
         } else {
             log_error("Command Server: Unsupported command \'%s\'", a[0].c_str());
         }
+    }
+}
+
+template <typename T>
+void Mainloop::parse_into_vector(const std::string &command, std::vector<T> &vector)
+{
+    if (command == "NULL") return;
+        
+    std::istringstream arguments{command};
+    for (std::string token; std::getline(arguments, token, ',');) {
+        vector.push_back(atoi(token.c_str()));
     }
 }
 
