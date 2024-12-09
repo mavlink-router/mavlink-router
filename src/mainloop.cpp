@@ -248,7 +248,9 @@ accept_error:
 void Mainloop::handle_command_pipe()
 {
     char buf[1024];
-    auto bytes = read(g_commands_fd, buf, sizeof(buf));
+    auto bytes = read(g_commands_fd, buf, sizeof(buf)-1);
+    char* cmd = buf;
+
     if (bytes < 0) {
         log_error("Command Server: Error");
     }
@@ -256,125 +258,133 @@ void Mainloop::handle_command_pipe()
         buf[bytes] = '\0';
         log_debug("Command Server: Read %ld bytes: %s", bytes, buf);
 
-        // Parse command
-        std::vector<std::string> a;
-        char *pch = strtok(buf, " ");
-        while (pch != NULL) {
-            a.push_back(std::string(pch));
-            pch = strtok(NULL, " \n");
-        }
+        char* current_new_line = strchr(cmd, '\n');
+        while (current_new_line != NULL) {
+            *current_new_line = '\0';
+            char *command = cmd;
+            cmd = current_new_line+1;
+            current_new_line = strchr(cmd, '\n');
 
-        if (a[0] == "add") {
-            // Add command
-            // add UDP Name IP Port Mode Group CoalesceBytes CoalesceMs CoalesceNoDelay
-            // a0  a1   a2  a3  a4   a5   a6        a7          a8           a9 
-            //  allow_msg_id_out block_msg_id_out allow_src_comp_out block_src_comp_out allow_src_sys_out block_src_sys_out allow_msg_id_in 
-            //        a10               a11              a12                  a13             a14                a15              a16 
-            //  block_msg_id_in allow_src_comp_in block_src_comp_in allow_src_sys_in block_src_sys_in
-            //           a17           a18                a19             a20              a21 
-
-            std::set<unsigned> argc_options = {6, 7, 10, 22};
-
-            // Sanity checks
-            if (!argc_options.count(a.size()) || a[1] != "udp") {
-                log_error("Command Server: add command usage:\n\tadd <protocol> <endpoint_name> <IP> <port> <endpoint_mode>");
-                log_error("Additional optional parameters for grouping and coalescing are: <group> <coalesce_bytes> <coalesce_ms> <coalesce_no_delay>");
-                log_error("Additional optional parameters for filtering are: <allow_msg_id_out> <block_msg_id_out> <allow_src_comp_out> <block_src_comp_out>");
-                log_error("<allow_src_sys_out> <block_src_sys_out> <allow_msg_id_in> <block_msg_id_in> <allow_src_comp_in> <block_src_comp_in> <allow_src_sys_in> <block_src_sys_in>");
-                log_error("Set the optional fields you wish to leave unconfigured to \"NULL\"");
-                return;
-            }
-            int port = atoi(a[4].c_str());
-            if (port <= 0) {
-                log_trace("Malformed port in add command");
-                return;
-            }
-            UdpEndpointConfig::Mode mode = a[5] == "server" ? UdpEndpointConfig::Mode::Server : UdpEndpointConfig::Mode::Client;
-
-            // Command to UDP endpoint configuration
-            UdpEndpointConfig conf{};
-            conf.mode = mode;
-            conf.name = a[2];
-            conf.address = a[3];
-            conf.port = port;
-
-            if (a.size() > 6) { // group name provided
-                conf.group = a[6] == "NULL" ? "" : a[6];
-            }
-            
-            if (a.size() > 7) { // coalescence config provided
-                conf.coalesce_bytes = a[7] == "NULL" ? 0 : atoi(a[7].c_str());
-                conf.coalesce_ms = a[8] == "NULL" ? 0 : atoi(a[8].c_str());
-                parse_into_vector(a[9], conf.coalesce_nodelay);
+            // Parse command
+            std::vector<std::string> a;
+            char *pch = strtok(command, " ");
+            while (pch != NULL) {
+                a.push_back(std::string(pch));
+                pch = strtok(NULL, " \n");
             }
 
-            if (a.size() > 10) { // filtering config provided
-                parse_into_vector(a[10], conf.allow_msg_id_out);
-                parse_into_vector(a[11], conf.block_msg_id_out);
-                parse_into_vector(a[12], conf.allow_src_comp_out);
-                parse_into_vector(a[14], conf.block_src_comp_out);
-                parse_into_vector(a[14], conf.allow_src_sys_out);
-                parse_into_vector(a[15], conf.block_src_sys_out);
-                parse_into_vector(a[16], conf.allow_msg_id_in);
-                parse_into_vector(a[17], conf.block_msg_id_in);
-                parse_into_vector(a[18], conf.allow_src_comp_in);
-                parse_into_vector(a[19], conf.block_src_comp_in);
-                parse_into_vector(a[20], conf.allow_src_sys_in);
-                parse_into_vector(a[21], conf.block_src_sys_in);
-            } 
+            if (a[0] == "add") {
+                // Add command
+                // add UDP Name IP Port Mode Group CoalesceBytes CoalesceMs CoalesceNoDelay
+                // a0  a1   a2  a3  a4   a5   a6        a7          a8           a9 
+                //  allow_msg_id_out block_msg_id_out allow_src_comp_out block_src_comp_out allow_src_sys_out block_src_sys_out allow_msg_id_in 
+                //        a10               a11              a12                  a13             a14                a15              a16 
+                //  block_msg_id_in allow_src_comp_in block_src_comp_in allow_src_sys_in block_src_sys_in
+                //           a17           a18                a19             a20              a21 
 
-            // UDP endpoint configuration to instance
-            auto dynamic_udp = std::make_shared<UdpEndpoint>(conf.name);
-            if (!dynamic_udp->setup(conf)) {
-                log_error("Command Server: Could not open dynamic endpoint on %s:%d", a[3].c_str(), port);
-                return;
-            }
+                std::set<unsigned> argc_options = {6, 7, 10, 22};
 
-            g_endpoints.emplace_back(dynamic_udp);
-            auto endpoint = g_endpoints.back();
-            this->add_fd(endpoint->fd, endpoint.get(), EPOLLIN);
+                // Sanity checks
+                if (!argc_options.count(a.size()) || a[1] != "udp") {
+                    log_error("Command Server: add command usage:\n\tadd <protocol> <endpoint_name> <IP> <port> <endpoint_mode>");
+                    log_error("Additional optional parameters for grouping and coalescing are: <group> <coalesce_bytes> <coalesce_ms> <coalesce_no_delay>");
+                    log_error("Additional optional parameters for filtering are: <allow_msg_id_out> <block_msg_id_out> <allow_src_comp_out> <block_src_comp_out>");
+                    log_error("<allow_src_sys_out> <block_src_sys_out> <allow_msg_id_in> <block_msg_id_in> <allow_src_comp_in> <block_src_comp_in> <allow_src_sys_in> <block_src_sys_in>");
+                    log_error("Set the optional fields you wish to leave unconfigured to \"NULL\"");
+                    return;
+                }
+                int port = atoi(a[4].c_str());
+                if (port <= 0) {
+                    log_trace("Malformed port in add command");
+                    return;
+                }
+                UdpEndpointConfig::Mode mode = a[5] == "server" ? UdpEndpointConfig::Mode::Server : UdpEndpointConfig::Mode::Client;
 
-            // Update endpoints groups 
-            if (!endpoint->get_group_name().empty()) {
-                for (auto other : g_endpoints) { // find other endpoints in group
-                    if (other != endpoint && other->get_group_name() == endpoint->get_group_name()) {
-                        endpoint->link_group_member(other);
-                        other->link_group_member(endpoint);
+                // Command to UDP endpoint configuration
+                UdpEndpointConfig conf{};
+                conf.mode = mode;
+                conf.name = a[2];
+                conf.address = a[3];
+                conf.port = port;
+
+                if (a.size() > 6) { // group name provided
+                    conf.group = a[6] == "NULL" ? "" : a[6];
+                }
+
+                if (a.size() > 7) { // coalescence config provided
+                    conf.coalesce_bytes = a[7] == "NULL" ? 0 : atoi(a[7].c_str());
+                    conf.coalesce_ms = a[8] == "NULL" ? 0 : atoi(a[8].c_str());
+                    parse_into_vector(a[9], conf.coalesce_nodelay);
+                }
+
+                if (a.size() > 10) { // filtering config provided
+                    parse_into_vector(a[10], conf.allow_msg_id_out);
+                    parse_into_vector(a[11], conf.block_msg_id_out);
+                    parse_into_vector(a[12], conf.allow_src_comp_out);
+                    parse_into_vector(a[14], conf.block_src_comp_out);
+                    parse_into_vector(a[14], conf.allow_src_sys_out);
+                    parse_into_vector(a[15], conf.block_src_sys_out);
+                    parse_into_vector(a[16], conf.allow_msg_id_in);
+                    parse_into_vector(a[17], conf.block_msg_id_in);
+                    parse_into_vector(a[18], conf.allow_src_comp_in);
+                    parse_into_vector(a[19], conf.block_src_comp_in);
+                    parse_into_vector(a[20], conf.allow_src_sys_in);
+                    parse_into_vector(a[21], conf.block_src_sys_in);
+                } 
+
+                // UDP endpoint configuration to instance
+                auto dynamic_udp = std::make_shared<UdpEndpoint>(conf.name);
+                if (!dynamic_udp->setup(conf)) {
+                    log_error("Command Server: Could not open dynamic endpoint on %s:%d", a[3].c_str(), port);
+                    return;
+                }
+
+                g_endpoints.emplace_back(dynamic_udp);
+                auto endpoint = g_endpoints.back();
+                this->add_fd(endpoint->fd, endpoint.get(), EPOLLIN);
+
+                // Update endpoints groups 
+                if (!endpoint->get_group_name().empty()) {
+                    for (auto other : g_endpoints) { // find other endpoints in group
+                        if (other != endpoint && other->get_group_name() == endpoint->get_group_name()) {
+                            endpoint->link_group_member(other);
+                            other->link_group_member(endpoint);
+                        }
                     }
                 }
-            }
-        } else if (a[0] == "remove") {
-            // Remove command
-            // remove Name
-            //   a0    a1
+            } else if (a[0] == "remove") {
+                // Remove command
+                // remove Name
+                //   a0    a1
 
-            // Sanity checks
-            if (a.size() != 2) {
-                log_error("Command Server: remove command usage: \n\tremove <endpoint_name>");
-                return;
-            }
+                // Sanity checks
+                if (a.size() != 2) {
+                    log_error("Command Server: remove command usage: \n\tremove <endpoint_name>");
+                    return;
+                }
 
-            // Remove dynamic endpoint
-            // Update groups    
-            for (auto e : g_endpoints) {
-                e->unlink_group_member(a[1]);
-            }
+                // Remove dynamic endpoint
+                // Update groups    
+                for (auto e : g_endpoints) {
+                    e->unlink_group_member(a[1]);
+                }
 
-            auto to_delete = std::find_if(g_endpoints.begin(), g_endpoints.end(), 
-                [&a](const std::shared_ptr<Endpoint> e) {return e->get_name() == a[1];});
+                auto to_delete = std::find_if(g_endpoints.begin(), g_endpoints.end(), 
+                    [&a](const std::shared_ptr<Endpoint> e) {return e->get_name() == a[1];});
 
-            if (to_delete == g_endpoints.end()) {
-                log_error("No endpoint named %s", a[1].c_str());
+                if (to_delete == g_endpoints.end()) {
+                    log_error("No endpoint named %s", a[1].c_str());
+                } else {
+                    // Delete fd 
+                    this->remove_fd(to_delete->get()->fd);
+                    // Remove from endpoint list
+                    g_endpoints.erase(to_delete);
+                    log_info("Removed endpoint %s", a[1].c_str());
+                }
+
             } else {
-                // Delete fd 
-                this->remove_fd(to_delete->get()->fd);
-                // Remove from endpoint list
-                g_endpoints.erase(to_delete);
-                log_info("Removed endpoint %s", a[1].c_str());
+                log_error("Command Server: Unsupported command \'%s\'", a[0].c_str());
             }
-            
-        } else {
-            log_error("Command Server: Unsupported command \'%s\'", a[0].c_str());
         }
     }
 }
