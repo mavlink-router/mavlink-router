@@ -1365,7 +1365,7 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
     }
 
     if (tx_buf.len + pbuf->len > TX_BUF_MAX_SIZE) {
-        log_debug("Dropping message, tx buffer full");
+        log_trace("Dropping message, tx buffer full");
         return 0;
     }
     
