@@ -58,7 +58,7 @@ struct UartEndpointConfig {
 };
 
 struct UdpEndpointConfig {
-    enum class Mode { Undefined = 0, Server, Client };
+    enum class Mode { Undefined = 0, Server, Client, Receiver };
 
     std::string name;
     std::string address;
@@ -184,7 +184,7 @@ public:
         return has_sys_comp_id(sys_comp_id);
     }
 
-    AcceptState accept_msg(const struct buffer *pbuf) const;
+    AcceptState virtual accept_msg(const struct buffer *pbuf) const;
 
     void filter_add_allowed_out_msg_id(uint32_t msg_id)
     {
@@ -346,6 +346,8 @@ public:
     static int parse_udp_mode(const char *val, size_t val_len, void *storage, size_t storage_len);
     static bool validate_config(const UdpEndpointConfig &config);
 
+    Endpoint::AcceptState accept_msg(const struct buffer *pbuf) const override;
+    
     void add_no_coalesce_msg_id(uint32_t msg_id)
     {
         _coalesce_nodelay.insert(msg_id);
@@ -375,6 +377,7 @@ protected:
     unsigned int _coalesce_bytes = 0UL;               // max coalescence size
     unsigned long _coalesce_ms = 0UL;                  // max time to hold data to try to coalesce packets together
 
+    UdpEndpointConfig::Mode _mode = UdpEndpointConfig::Mode::Undefined;
 private:
     bool is_ipv6;
     struct sockaddr_in sockaddr;
@@ -393,7 +396,7 @@ public:
     bool is_valid() override { return _valid; };
     bool is_critical() override { return false; };
 
-    Endpoint::AcceptState accept_msg(const struct buffer *pbuf) const;
+    Endpoint::AcceptState accept_msg(const struct buffer *pbuf) const override;
 
     int accept(int listener_fd);        ///< accept incoming connection
     bool setup(TcpEndpointConfig conf); ///< open connection and apply config

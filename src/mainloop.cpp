@@ -298,14 +298,36 @@ void Mainloop::handle_command_pipe()
                     log_trace("Malformed port in add command");
                     return;
                 }
-                UdpEndpointConfig::Mode mode = a[5] == "server" ? UdpEndpointConfig::Mode::Server : UdpEndpointConfig::Mode::Client;
+                auto to_create = std::find_if(g_endpoints.begin(), g_endpoints.end(), 
+                    [&a](const std::shared_ptr<Endpoint> e) {return e->get_name() == a[2];});
+                if (to_create != g_endpoints.end()) {
+                    log_error("Endpoint named \"%s\" already exists, please choose another name", a[2].c_str());
+                    return;
+                }
 
                 // Command to UDP endpoint configuration
                 UdpEndpointConfig conf{};
-                conf.mode = mode;
+
                 conf.name = a[2];
                 conf.address = a[3];
                 conf.port = port;
+
+                // UDP endpoint mode
+                if(a[5] == "server" ||  a[5] == "Server") {
+                    conf.mode = UdpEndpointConfig::Mode::Server;
+                }
+                else if (a[5] == "eavesdropping" ||  a[5] == "Eavesdropping") {
+                    conf.mode = UdpEndpointConfig::Mode::Server;
+                }
+                else if (a[5] == "receiver" ||  a[5] == "Receiver") {
+                    conf.mode = UdpEndpointConfig::Mode::Receiver;
+                }
+                else if (a[5] == "client" ||  a[5] == "Client") {
+                    conf.mode = UdpEndpointConfig::Mode::Client;
+                }
+                else {
+                    conf.mode = UdpEndpointConfig::Mode::Undefined;
+                }
 
                 if (a.size() > 6) { // group name provided
                     conf.group = a[6] == "NULL" ? "" : a[6];

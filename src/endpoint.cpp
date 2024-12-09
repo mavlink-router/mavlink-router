@@ -1108,6 +1108,7 @@ bool UdpEndpoint::setup(UdpEndpointConfig conf)
         return false;
     }
 
+    this->_mode = conf.mode;
     if (!this->open(conf.address.c_str(), conf.port, conf.mode)) {
         log_error("Could not open %s:%ld", conf.address.c_str(), conf.port);
         return false;
@@ -1184,7 +1185,7 @@ int UdpEndpoint::open_ipv6(const char *ip, unsigned long port, UdpEndpointConfig
     sockaddr6.sin6_port = htons(port);
 
     /* multicast address needs to listen to all, but "filter" incoming packets */
-    if (mode == UdpEndpointConfig::Mode::Server && ipv6_is_multicast(ip_str)) {
+    if ((mode == UdpEndpointConfig::Mode::Server || mode == UdpEndpointConfig::Mode::Receiver) && ipv6_is_multicast(ip_str)) {
         sockaddr6.sin6_addr = in6addr_any;
 
         struct ipv6_mreq group;
@@ -1204,7 +1205,7 @@ int UdpEndpoint::open_ipv6(const char *ip, unsigned long port, UdpEndpointConfig
         sockaddr6.sin6_scope_id = ipv6_get_scope_id(ip_str);
     }
 
-    if (mode == UdpEndpointConfig::Mode::Server) {
+    if (mode == UdpEndpointConfig::Mode::Server || mode == UdpEndpointConfig::Mode::Receiver) {
         if (bind(fd, (struct sockaddr *)&sockaddr6, sizeof(sockaddr6)) < 0) {
             log_error("Error binding IPv6 socket for [%s]:%lu (%m)", ip_str, port);
             goto fail;
@@ -1236,7 +1237,7 @@ int UdpEndpoint::open_ipv4(const char *ip, unsigned long port, UdpEndpointConfig
     sockaddr.sin_addr.s_addr = inet_addr(ip);
     sockaddr.sin_port = htons(port);
 
-    if (mode == UdpEndpointConfig::Mode::Server) {
+    if (mode == UdpEndpointConfig::Mode::Server || mode == UdpEndpointConfig::Mode::Receiver) {
         if (bind(fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) < 0) {
             log_error("Error binding IPv4 socket for %s:%lu (%m)", ip, port);
             goto fail;
@@ -1292,6 +1293,8 @@ bool UdpEndpoint::open(const char *ip, unsigned long port, UdpEndpointConfig::Mo
 
     if (mode == UdpEndpointConfig::Mode::Server) {
         log_info("Opened UDP Server [%d]%s: %s:%lu", fd, _name.c_str(), ip, port);
+    } else if (mode == UdpEndpointConfig::Mode::Receiver) {
+        log_info("Opened UDP Receiver [%d]%s: %s:%lu", fd, _name.c_str(), ip, port);
     } else {
         log_info("Opened UDP Client [%d]%s: %s:%lu", fd, _name.c_str(), ip, port);
     }
@@ -1484,6 +1487,8 @@ int UdpEndpoint::parse_udp_mode(const char *val, size_t val_len, void *storage, 
         *udp_mode = UdpEndpointConfig::Mode::Server;
     } else if (memcaseeq(val, val_len, "server", sizeof("server") - 1)) {
         *udp_mode = UdpEndpointConfig::Mode::Server;
+    } else if (memcaseeq(val, val_len, "receiver", sizeof("receiver") - 1)) {
+        *udp_mode = UdpEndpointConfig::Mode::Receiver;
     } else {
         log_error("Unknown 'mode' key: %.*s", (int)val_len, val);
         return -EINVAL;
@@ -1514,11 +1519,24 @@ bool UdpEndpoint::validate_config(const UdpEndpointConfig &config)
     }
 
     if (config.mode != UdpEndpointConfig::Mode::Client
-        && config.mode != UdpEndpointConfig::Mode::Server) {
+        && config.mode != UdpEndpointConfig::Mode::Server
+        && config.mode != UdpEndpointConfig::Mode::Receiver) {
         return false;
     }
 
     return true;
+}
+
+Endpoint::AcceptState UdpEndpoint::accept_msg(const struct buffer *pbuf) const
+{
+    // reject when UDP endpoint is in receiver mode
+    if (this->_mode == UdpEndpointConfig::Mode::Receiver) {
+        log_trace("Endpoint [%d]%s: in Receiver mode, not sending back any msg", fd, _name.c_str());
+        return Endpoint::AcceptState::Filtered;
+    }
+
+    // otherwise: refer to standard accept rules
+    return Endpoint::accept_msg(pbuf);
 }
 
 TcpEndpoint::TcpEndpoint(std::string name)
