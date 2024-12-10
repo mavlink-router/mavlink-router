@@ -291,18 +291,18 @@ void Mainloop::handle_command_pipe()
                     log_error("Additional optional parameters for filtering are: <allow_msg_id_out> <block_msg_id_out> <allow_src_comp_out> <block_src_comp_out>");
                     log_error("<allow_src_sys_out> <block_src_sys_out> <allow_msg_id_in> <block_msg_id_in> <allow_src_comp_in> <block_src_comp_in> <allow_src_sys_in> <block_src_sys_in>");
                     log_error("Set the optional fields you wish to leave unconfigured to \"NULL\"");
-                    return;
+                    continue;
                 }
                 int port = atoi(a[4].c_str());
                 if (port <= 0) {
                     log_trace("Malformed port in add command");
-                    return;
+                    continue;
                 }
                 auto to_create = std::find_if(g_endpoints.begin(), g_endpoints.end(), 
                     [&a](const std::shared_ptr<Endpoint> e) {return e->get_name() == a[2];});
                 if (to_create != g_endpoints.end()) {
                     log_error("Endpoint named \"%s\" already exists, please choose another name", a[2].c_str());
-                    return;
+                    continue;
                 }
 
                 // Command to UDP endpoint configuration
@@ -358,7 +358,7 @@ void Mainloop::handle_command_pipe()
                 auto dynamic_udp = std::make_shared<UdpEndpoint>(conf.name);
                 if (!dynamic_udp->setup(conf)) {
                     log_error("Command Server: Could not open dynamic endpoint on %s:%d", a[3].c_str(), port);
-                    return;
+                    continue;
                 }
 
                 g_endpoints.emplace_back(dynamic_udp);
@@ -382,7 +382,7 @@ void Mainloop::handle_command_pipe()
                 // Sanity checks
                 if (a.size() != 2) {
                     log_error("Command Server: remove command usage: \n\tremove <endpoint_name>");
-                    return;
+                    continue;
                 }
 
                 // Remove dynamic endpoint
