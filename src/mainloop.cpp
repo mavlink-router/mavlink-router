@@ -326,7 +326,7 @@ void Mainloop::handle_command_pipe()
                     conf.mode = UdpEndpointConfig::Mode::Client;
                 }
                 else {
-                    conf.mode = UdpEndpointConfig::Mode::Undefined;
+                    conf.mode = UdpEndpointConfig::Mode::Client;
                 }
 
                 if (a.size() > 6) { // group name provided
