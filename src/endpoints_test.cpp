@@ -15,6 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include "mainloop.h"
 
 #include "autolog.h"
 #include "binlog.h"
@@ -564,6 +565,7 @@ TEST(UartEndpointTest, ConfigValidateDevice)
  */
 TEST(UdpEndpointTest, Init)
 {
+    Mainloop::init();
     UdpEndpoint udp{"testname"};
 
     EXPECT_EQ(udp.get_type(), ENDPOINT_TYPE_UDP);
