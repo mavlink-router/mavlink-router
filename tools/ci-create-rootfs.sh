@@ -5,7 +5,7 @@ set -eux
 SCRIPT_DIR=$(dirname $(realpath ${BASH_SOURCE[0]}))
 
 ARCH=$1
-DISTRO="ubuntu:20.04"
+DISTRO="ubuntu:24.04"
 DISTRO_ARCH=
 
 if [ "$ARCH" == "aarch64" ]; then
