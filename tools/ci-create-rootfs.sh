@@ -21,6 +21,6 @@ fi
 # be used for subsequent calls, even if in another container
 sudo podman run --rm --privileged multiarch/qemu-user-static --reset -p yes
 
-podman build --from $DISTRO_ARCH/$DISTRO -t $ARCH-rootfs $SCRIPT_DIR
+podman build --from docker.io/$DISTRO_ARCH/$DISTRO -t $ARCH-rootfs $SCRIPT_DIR
 container=$(podman run -d $ARCH-rootfs)
 podman export $container
