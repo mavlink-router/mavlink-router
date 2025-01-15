@@ -21,10 +21,10 @@
 #include <common/mavlink.h>
 
 #include <memory>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
-#include <set>
 
 #include "comm.h"
 #include "pollable.h"
@@ -374,16 +374,15 @@ protected:
 
     Timeout *_write_schedule_timer = nullptr;
 
-    unsigned int _coalesce_bytes = 0UL;               // max coalescence size
-    unsigned long _coalesce_ms = 0UL;                  // max time to hold data to try to coalesce packets together
+    unsigned int _coalesce_bytes = 0UL; // max coalescence size
+    unsigned long _coalesce_ms = 0UL;   // max time to hold data to try to coalesce packets together
 
     UdpEndpointConfig::Mode _mode = UdpEndpointConfig::Mode::Undefined;
 private:
     bool is_ipv6;
     struct sockaddr_in sockaddr;
     struct sockaddr_in6 sockaddr6;
-    std::set<uint32_t> _coalesce_nodelay{};     // immediately send if a mavlink msg_id is in this set
-
+    std::set<uint32_t> _coalesce_nodelay{}; // immediately send if a mavlink msg_id is in this set
 };
 
 class TcpEndpoint : public Endpoint {
@@ -407,10 +406,7 @@ public:
     static const char *section_pattern;
     static bool validate_config(const TcpEndpointConfig &config);
 
-    void add_no_coalesce_msg_id(uint32_t msg_id)
-    {
-        _coalesce_nodelay.insert(msg_id);
-    }
+    void add_no_coalesce_msg_id(uint32_t msg_id) { _coalesce_nodelay.insert(msg_id); }
 
 protected:
     bool open(const std::string &ip, unsigned long port);
@@ -427,8 +423,8 @@ protected:
 
     Timeout *_write_schedule_timer = nullptr;
 
-    unsigned int _coalesce_bytes = 0UL;               // max coalescence size
-    unsigned long _coalesce_ms = 0UL;                  // max time to hold data to try to coalesce packets together
+    unsigned int _coalesce_bytes = 0UL; // max coalescence size
+    unsigned long _coalesce_ms = 0UL;   // max time to hold data to try to coalesce packets together
 
 private:
     std::string _ip{};
@@ -439,6 +435,5 @@ private:
     int _retry_timeout = 0; // disable retry by default
     struct sockaddr_in sockaddr;
     struct sockaddr_in6 sockaddr6;
-    std::set<uint32_t> _coalesce_nodelay{};     // immediately send if a mavlink msg_id is in this set
-
+    std::set<uint32_t> _coalesce_nodelay{}; // immediately send if a mavlink msg_id is in this set
 };

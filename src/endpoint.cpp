@@ -38,9 +38,9 @@
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/timerfd.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <sys/timerfd.h>
 
 #include <common/log.h>
 #include <common/util.h>
@@ -120,9 +120,9 @@ const ConfFile::OptionsTable TcpEndpoint::option_table[] = {
     {"AllowSrcSysIn",   false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_src_sys_in)},
     {"BlockSrcSysIn",   false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, block_src_sys_in)},
     {"group",           false,  ConfFile::parse_stdstring,      OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, group)},
-    {"CoalesceBytes",   false,  ConfFile::parse_ul,             OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, coalesce_bytes)},
-    {"CoalesceMs",      false,  ConfFile::parse_ul,             OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, coalesce_ms)},
-    {"CoalesceNoDelay", false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, coalesce_nodelay)},
+    {"CoalesceBytes",   false,  ConfFile::parse_ul,             OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, coalesce_bytes)},
+    {"CoalesceMs",      false,  ConfFile::parse_ul,             OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, coalesce_ms)},
+    {"CoalesceNoDelay", false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, coalesce_nodelay)},
     {}
 };
 // clang-format on
@@ -652,8 +652,10 @@ void Endpoint::link_group_member(std::shared_ptr<Endpoint> other)
 
 void Endpoint::unlink_group_member(const std::string &name)
 {
-    _group_members.erase(std::remove_if(_group_members.begin(), _group_members.end(), 
-            [&name](auto member) {return member->get_name() == name;}), 
+    _group_members.erase(
+        std::remove_if(_group_members.begin(),
+                       _group_members.end(),
+                       [&name](auto member) { return member->get_name() == name; }),
         _group_members.end());
 }
 
@@ -1082,11 +1084,11 @@ UdpEndpoint::UdpEndpoint(std::string name)
     bzero(&sockaddr, sizeof(sockaddr));
     bzero(&sockaddr6, sizeof(sockaddr6));
     _write_schedule_timer = Mainloop::get_instance().add_timeout(
-        _coalesce_ms, [this](void*)
-            {
-                flush_pending_msgs();
-                return true;
-            },
+        _coalesce_ms,
+        [this](void *) {
+            flush_pending_msgs();
+            return true;
+        },
         this);
 }
 
@@ -1371,35 +1373,34 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
         log_trace("Dropping message, tx buffer full");
         return 0;
     }
-    
+
     // Append new data in the tx buffer
     memcpy(&tx_buf.data[tx_buf.len], pbuf->data, pbuf->len);
     tx_buf.len += pbuf->len;
 
     int ret = pbuf->len;
 
-    if (_coalesce_bytes == 0 || 
-        _coalesce_ms == 0 ||
-        _coalesce_nodelay.find(pbuf->curr.msg_id) != _coalesce_nodelay.end() || 
-        pbuf->len > _coalesce_bytes) {
-            // Coalescing disabled, or high priority message, or new message larger than the coalescence size
-            ret = flush_pending_msgs();
-    }
-    else {
+    if (_coalesce_bytes == 0 || _coalesce_ms == 0
+        || _coalesce_nodelay.find(pbuf->curr.msg_id) != _coalesce_nodelay.end()
+        || pbuf->len > _coalesce_bytes) {
+        // Coalescing disabled, or high priority message, or new message larger than the coalescence size
+        ret = flush_pending_msgs();
+    } else {
         // Coalescing enabled
-        // Start coalescing timer (if not already running)  
+        // Start coalescing timer (if not already running)
         _schedule_write();
-        
+
         struct itimerspec ts;
         timerfd_gettime(_write_schedule_timer->fd, &ts);
-        double timer_seconds = (double) _coalesce_ms/1e3d - (ts.it_value.tv_sec + ts.it_value.tv_nsec/1e9d);  
+        double timer_seconds
+            = (double)_coalesce_ms / 1e3d - (ts.it_value.tv_sec + ts.it_value.tv_nsec / 1e9d);
 
-        log_trace("Coalescence state: size=%u/%u, timeout=%.2f/%.2f, is high prio message=%d", 
-            tx_buf.len,
-            std::min(_coalesce_bytes, TX_BUF_MAX_SIZE),
-            timer_seconds,
-            _coalesce_ms/1e3d,
-            _coalesce_nodelay.find(pbuf->curr.msg_id) != _coalesce_nodelay.end());
+        log_trace("Coalescence state: size=%u/%u, timeout=%.2f/%.2f, is high prio message=%d",
+                  tx_buf.len,
+                  std::min(_coalesce_bytes, TX_BUF_MAX_SIZE),
+                  timer_seconds,
+                  _coalesce_ms / 1e3d,
+                  _coalesce_nodelay.find(pbuf->curr.msg_id) != _coalesce_nodelay.end());
     }
     return ret;
 }
@@ -1416,7 +1417,7 @@ int UdpEndpoint::flush_pending_msgs()
 {
     Mainloop::get_instance().mod_timeout(_write_schedule_timer, 0);
     _write_scheduled = false;
-    
+
     if (tx_buf.len == 0) {
         log_trace("No data in tx buffer, skipping write");
         return 0;
@@ -1547,15 +1548,15 @@ TcpEndpoint::TcpEndpoint(std::string name)
 
     if (this->_name == "dynamic") {
         this->_coalesce_bytes = 5000;
-        this->_coalesce_ms = 33; 
+        this->_coalesce_ms = 33;
     }
-    
+
     _write_schedule_timer = Mainloop::get_instance().add_timeout(
-        _coalesce_ms, [this](void*)
-            {
-                flush_pending_msgs();
-                return true;
-            },
+        _coalesce_ms,
+        [this](void *) {
+            flush_pending_msgs();
+            return true;
+        },
         this);
 }
 
@@ -1820,37 +1821,40 @@ int TcpEndpoint::write_msg(const struct buffer *pbuf)
         log_trace("Dropping message, tx buffer full");
         return 0;
     }
-    
+
     // Append new data in the tx buffer
     memcpy(&tx_buf.data[tx_buf.len], pbuf->data, pbuf->len);
     tx_buf.len += pbuf->len;
 
     int ret = pbuf->len;
 
-    if (_coalesce_bytes == 0 || 
-        _coalesce_ms == 0 ||
-        _coalesce_nodelay.find(pbuf->curr.msg_id) != _coalesce_nodelay.end() || 
-        pbuf->len > _coalesce_bytes) {
-            log_trace("DEBUG %s %d %d %d %d", this->get_name().c_str(), _coalesce_bytes == 0, _coalesce_ms == 0,
-                _coalesce_nodelay.find(pbuf->curr.msg_id) != _coalesce_nodelay.end(), pbuf->len > _coalesce_bytes);
-            // Coalescing disabled, or high priority message, or new message larger than the coalescence size
-            ret = flush_pending_msgs();
-    }
-    else {
+    if (_coalesce_bytes == 0 || _coalesce_ms == 0
+        || _coalesce_nodelay.find(pbuf->curr.msg_id) != _coalesce_nodelay.end()
+        || pbuf->len > _coalesce_bytes) {
+        log_trace("DEBUG %s %d %d %d %d",
+                  this->get_name().c_str(),
+                  _coalesce_bytes == 0,
+                  _coalesce_ms == 0,
+                  _coalesce_nodelay.find(pbuf->curr.msg_id) != _coalesce_nodelay.end(),
+                  pbuf->len > _coalesce_bytes);
+        // Coalescing disabled, or high priority message, or new message larger than the coalescence size
+        ret = flush_pending_msgs();
+    } else {
         // Coalescing enabled
-        // Start coalescing timer (if not already running)  
+        // Start coalescing timer (if not already running)
         _schedule_write();
-        
+
         struct itimerspec ts;
         timerfd_gettime(_write_schedule_timer->fd, &ts);
-        double timer_seconds = (double) _coalesce_ms/1e3d - (ts.it_value.tv_sec + ts.it_value.tv_nsec/1e9d);  
+        double timer_seconds
+            = (double)_coalesce_ms / 1e3d - (ts.it_value.tv_sec + ts.it_value.tv_nsec / 1e9d);
 
-        log_trace("Coalescence state: size=%u/%u, timeout=%.2f/%.2f, is high prio message=%d", 
-            tx_buf.len,
-            _coalesce_bytes,
-            timer_seconds,
-            _coalesce_ms/1e3d,
-            _coalesce_nodelay.find(pbuf->curr.msg_id) != _coalesce_nodelay.end());
+        log_trace("Coalescence state: size=%u/%u, timeout=%.2f/%.2f, is high prio message=%d",
+                  tx_buf.len,
+                  _coalesce_bytes,
+                  timer_seconds,
+                  _coalesce_ms / 1e3d,
+                  _coalesce_nodelay.find(pbuf->curr.msg_id) != _coalesce_nodelay.end());
     }
     return ret;
 }
@@ -1867,12 +1871,12 @@ int TcpEndpoint::flush_pending_msgs()
 {
     Mainloop::get_instance().mod_timeout(_write_schedule_timer, 0);
     _write_scheduled = false;
-    
+
     if (tx_buf.len == 0) {
         log_trace("No data in tx buffer, skipping write");
         return 0;
     }
-    
+
     struct sockaddr *sock;
     socklen_t addrlen;
 

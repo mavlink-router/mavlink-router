@@ -38,7 +38,7 @@ struct Configuration {
     Log::Level debug_log_level{Log::Level::INFO}; ///< conf "DebugLogLevel" or CLI "debug-log-level"
     Log::Backend log_backend{Log::Backend::STDERR}; ///< CLI "syslog"
     unsigned long dedup_period_ms;                  ///< conf "DeduplicationPeriod"
-    std::string command_pipe_path{""};      
+    std::string command_pipe_path{""};
 
     LogOptions log_config; ///< logging is in General config section, but internally an endpoint
     std::vector<UartEndpointConfig> uart_configs;
@@ -113,9 +113,9 @@ private:
     static const unsigned int LOG_AGGREGATE_INTERVAL_SEC = 5;
 
     std::vector<std::shared_ptr<Endpoint>> g_endpoints{};
-    int g_tcp_fd = -1;          ///< for TCP server
-    int g_commands_fd = -1;     ///< for the named pipe commands endpoint
-    std::string command_pipe_path = ""; 
+    int g_tcp_fd = -1;      ///< for TCP server
+    int g_commands_fd = -1; ///< for the named pipe commands endpoint
+    std::string command_pipe_path = "";
     std::shared_ptr<LogEndpoint> _log_endpoint{nullptr};
 
     Timeout *_timeouts = nullptr;
@@ -129,7 +129,7 @@ private:
     int _retcode;
 
     int tcp_open(unsigned long tcp_port);
-    int open_command_pipe(const std::string& address);
+    int open_command_pipe(const std::string &address);
     void clean_command_pipe();
     void _del_timeouts();
     bool _retry_timeout_cb(void *data);
@@ -142,5 +142,6 @@ private:
     static Mainloop _instance;
     static bool _initialized;
 
-    template<typename T> static void parse_into_vector(const std::string &command, std::vector<T> &vector);
+    template <typename T>
+    static void parse_into_vector(const std::string &command, std::vector<T> &vector);
 };

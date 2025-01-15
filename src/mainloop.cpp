@@ -248,21 +248,20 @@ accept_error:
 void Mainloop::handle_command_pipe()
 {
     char buf[1024];
-    auto bytes = read(g_commands_fd, buf, sizeof(buf)-1);
-    char* cmd = buf;
+    auto bytes = read(g_commands_fd, buf, sizeof(buf) - 1);
+    char *cmd = buf;
 
     if (bytes < 0) {
         log_error("Command Server: Error");
-    }
-    else {
+    } else {
         buf[bytes] = '\0';
         log_debug("Command Server: Read %ld bytes: %s", bytes, buf);
 
-        char* current_new_line = strchr(cmd, '\n');
+        char *current_new_line = strchr(cmd, '\n');
         while (current_new_line != NULL) {
             *current_new_line = '\0';
             char *command = cmd;
-            cmd = current_new_line+1;
+            cmd = current_new_line + 1;
             current_new_line = strchr(cmd, '\n');
 
             // Parse command
@@ -276,21 +275,27 @@ void Mainloop::handle_command_pipe()
             if (a[0] == "add") {
                 // Add command
                 // add UDP Name IP Port Mode Group CoalesceBytes CoalesceMs CoalesceNoDelay
-                // a0  a1   a2  a3  a4   a5   a6        a7          a8           a9 
-                //  allow_msg_id_out block_msg_id_out allow_src_comp_out block_src_comp_out allow_src_sys_out block_src_sys_out allow_msg_id_in 
-                //        a10               a11              a12                  a13             a14                a15              a16 
+                // a0  a1   a2  a3  a4   a5   a6        a7          a8           a9
+                //  allow_msg_id_out block_msg_id_out allow_src_comp_out block_src_comp_out allow_src_sys_out block_src_sys_out allow_msg_id_in
+                //        a10               a11              a12                  a13             a14                a15              a16
                 //  block_msg_id_in allow_src_comp_in block_src_comp_in allow_src_sys_in block_src_sys_in
-                //           a17           a18                a19             a20              a21 
+                //           a17           a18                a19             a20              a21
 
                 std::set<unsigned> argc_options = {6, 7, 10, 22};
 
                 // Sanity checks
                 if (!argc_options.count(a.size()) || a[1] != "udp") {
-                    log_error("Command Server: add command usage:\n\tadd <protocol> <endpoint_name> <IP> <port> <endpoint_mode>");
-                    log_error("Additional optional parameters for grouping and coalescing are: <group> <coalesce_bytes> <coalesce_ms> <coalesce_no_delay>");
-                    log_error("Additional optional parameters for filtering are: <allow_msg_id_out> <block_msg_id_out> <allow_src_comp_out> <block_src_comp_out>");
-                    log_error("<allow_src_sys_out> <block_src_sys_out> <allow_msg_id_in> <block_msg_id_in> <allow_src_comp_in> <block_src_comp_in> <allow_src_sys_in> <block_src_sys_in>");
-                    log_error("Set the optional fields you wish to leave unconfigured to \"NULL\"");
+                    log_debug("Command Server: add command usage:\n\tadd <protocol> "
+                              "<endpoint_name> <IP> <port> <endpoint_mode>");
+                    log_debug("Additional optional parameters for grouping and coalescing are: "
+                              "<group> <coalesce_bytes> <coalesce_ms> <coalesce_no_delay>");
+                    log_debug(
+                        "Additional optional parameters for filtering are: <allow_msg_id_out> "
+                        "<block_msg_id_out> <allow_src_comp_out> <block_src_comp_out>");
+                    log_debug("<allow_src_sys_out> <block_src_sys_out> <allow_msg_id_in> "
+                              "<block_msg_id_in> <allow_src_comp_in> <block_src_comp_in> "
+                              "<allow_src_sys_in> <block_src_sys_in>");
+                    log_debug("Set the optional fields you wish to leave unconfigured to \"NULL\"");
                     continue;
                 }
                 int port = atoi(a[4].c_str());
@@ -298,10 +303,13 @@ void Mainloop::handle_command_pipe()
                     log_trace("Malformed port in add command");
                     continue;
                 }
-                auto to_create = std::find_if(g_endpoints.begin(), g_endpoints.end(), 
-                    [&a](const std::shared_ptr<Endpoint> e) {return e->get_name() == a[2];});
+                auto to_create = std::find_if(
+                    g_endpoints.begin(),
+                    g_endpoints.end(),
+                    [&a](const std::shared_ptr<Endpoint> e) { return e->get_name() == a[2]; });
                 if (to_create != g_endpoints.end()) {
-                    log_error("Endpoint named \"%s\" already exists, please choose another name", a[2].c_str());
+                    log_debug("Endpoint named \"%s\" already exists, please choose another name",
+                              a[2].c_str());
                     continue;
                 }
 
@@ -313,10 +321,9 @@ void Mainloop::handle_command_pipe()
                 conf.port = port;
 
                 // UDP endpoint mode
-                if(a[5] == "server" ||  a[5] == "Server") {
+                if (a[5] == "server" || a[5] == "Server") {
                     conf.mode = UdpEndpointConfig::Mode::Server;
-                }
-                else if (a[5] == "eavesdropping" ||  a[5] == "Eavesdropping") {
+                } else if (a[5] == "eavesdropping" || a[5] == "Eavesdropping") {
                     conf.mode = UdpEndpointConfig::Mode::Server;
                 }
                 else if (a[5] == "receiver" ||  a[5] == "Receiver") {
@@ -324,8 +331,7 @@ void Mainloop::handle_command_pipe()
                 }
                 else if (a[5] == "client" ||  a[5] == "Client") {
                     conf.mode = UdpEndpointConfig::Mode::Client;
-                }
-                else {
+                } else {
                     conf.mode = UdpEndpointConfig::Mode::Client;
                 }
 
@@ -352,12 +358,14 @@ void Mainloop::handle_command_pipe()
                     parse_into_vector(a[19], conf.block_src_comp_in);
                     parse_into_vector(a[20], conf.allow_src_sys_in);
                     parse_into_vector(a[21], conf.block_src_sys_in);
-                } 
+                }
 
                 // UDP endpoint configuration to instance
                 auto dynamic_udp = std::make_shared<UdpEndpoint>(conf.name);
                 if (!dynamic_udp->setup(conf)) {
-                    log_error("Command Server: Could not open dynamic endpoint on %s:%d", a[3].c_str(), port);
+                    log_debug("Command Server: Could not open dynamic endpoint on %s:%d",
+                              a[3].c_str(),
+                              port);
                     continue;
                 }
 
@@ -365,10 +373,11 @@ void Mainloop::handle_command_pipe()
                 auto endpoint = g_endpoints.back();
                 this->add_fd(endpoint->fd, endpoint.get(), EPOLLIN);
 
-                // Update endpoints groups 
+                // Update endpoints groups
                 if (!endpoint->get_group_name().empty()) {
                     for (auto other : g_endpoints) { // find other endpoints in group
-                        if (other != endpoint && other->get_group_name() == endpoint->get_group_name()) {
+                        if (other != endpoint
+                            && other->get_group_name() == endpoint->get_group_name()) {
                             endpoint->link_group_member(other);
                             other->link_group_member(endpoint);
                         }
@@ -381,23 +390,25 @@ void Mainloop::handle_command_pipe()
 
                 // Sanity checks
                 if (a.size() != 2) {
-                    log_error("Command Server: remove command usage: \n\tremove <endpoint_name>");
+                    log_debug("Command Server: remove command usage: \n\tremove <endpoint_name>");
                     continue;
                 }
 
                 // Remove dynamic endpoint
-                // Update groups    
+                // Update groups
                 for (auto e : g_endpoints) {
                     e->unlink_group_member(a[1]);
                 }
 
-                auto to_delete = std::find_if(g_endpoints.begin(), g_endpoints.end(), 
-                    [&a](const std::shared_ptr<Endpoint> e) {return e->get_name() == a[1];});
+                auto to_delete = std::find_if(
+                    g_endpoints.begin(),
+                    g_endpoints.end(),
+                    [&a](const std::shared_ptr<Endpoint> e) { return e->get_name() == a[1]; });
 
                 if (to_delete == g_endpoints.end()) {
-                    log_error("No endpoint named %s", a[1].c_str());
+                    log_debug("No endpoint named %s", a[1].c_str());
                 } else {
-                    // Delete fd 
+                    // Delete fd
                     this->remove_fd(to_delete->get()->fd);
                     // Remove from endpoint list
                     g_endpoints.erase(to_delete);
@@ -405,7 +416,7 @@ void Mainloop::handle_command_pipe()
                 }
 
             } else {
-                log_error("Command Server: Unsupported command \'%s\'", a[0].c_str());
+                log_debug("Command Server: Unsupported command \'%s\'", a[0].c_str());
             }
         }
     }
@@ -414,8 +425,9 @@ void Mainloop::handle_command_pipe()
 template <typename T>
 void Mainloop::parse_into_vector(const std::string &command, std::vector<T> &vector)
 {
-    if (command == "NULL") return;
-        
+    if (command == "NULL")
+        return;
+
     std::istringstream arguments{command};
     for (std::string token; std::getline(arguments, token, ',');) {
         vector.push_back(atoi(token.c_str()));
@@ -452,13 +464,13 @@ int Mainloop::loop()
                 continue;
             }
 
-            if(events[i].data.ptr == &g_commands_fd){
+            if (events[i].data.ptr == &g_commands_fd) {
                 if (events[i].events & (EPOLLERR | EPOLLHUP)) {
                     // Reopen the command pipe if there was an error in reading it
                     clean_command_pipe();
                     open_command_pipe(command_pipe_path);
                 }
-                
+
                 handle_command_pipe();
                 continue;
             }
@@ -480,7 +492,7 @@ int Mainloop::loop()
             }
 
             if (events[i].events & EPOLLERR) {
-                if(events[i].events & EPOLLHUP || !p->is_critical()) {
+                if (events[i].events & EPOLLHUP || !p->is_critical()) {
                     // EPOLLHUP is an expected error, in case the TCP connection
                     // drops. In this case, we'll just need to clean up the TCP
                     // connection later, no need to panic.
@@ -703,7 +715,7 @@ int Mainloop::tcp_open(unsigned long tcp_port)
     return fd;
 }
 
-int Mainloop::open_command_pipe(const std::string& address)
+int Mainloop::open_command_pipe(const std::string &address)
 {
     mkfifo(address.c_str(), 0600);
 
@@ -718,7 +730,8 @@ int Mainloop::open_command_pipe(const std::string& address)
     return fd;
 }
 
-void Mainloop::clean_command_pipe() {
+void Mainloop::clean_command_pipe()
+{
     // clean command pipe after use
     if (g_commands_fd != -1) {
         ::close(g_commands_fd);
