@@ -255,7 +255,7 @@ void Mainloop::handle_command_pipe()
         log_error("Command Server: Error");
     } else {
         buf[bytes] = '\0';
-        log_debug("Command Server: Read %ld bytes: %s", bytes, buf);
+        log_debug("Command Server: Read %zd bytes: %s", bytes, buf);
 
         char *current_new_line = strchr(cmd, '\n');
         while (current_new_line != NULL) {
