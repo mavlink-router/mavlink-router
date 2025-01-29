@@ -1187,7 +1187,8 @@ int UdpEndpoint::open_ipv6(const char *ip, unsigned long port, UdpEndpointConfig
     sockaddr6.sin6_port = htons(port);
 
     /* multicast address needs to listen to all, but "filter" incoming packets */
-    if ((mode == UdpEndpointConfig::Mode::Server || mode == UdpEndpointConfig::Mode::Receiver) && ipv6_is_multicast(ip_str)) {
+    if ((mode == UdpEndpointConfig::Mode::Server || mode == UdpEndpointConfig::Mode::Receiver)
+        && ipv6_is_multicast(ip_str)) {
         sockaddr6.sin6_addr = in6addr_any;
 
         struct ipv6_mreq group;

@@ -347,11 +347,8 @@ public:
     static bool validate_config(const UdpEndpointConfig &config);
 
     Endpoint::AcceptState accept_msg(const struct buffer *pbuf) const override;
-    
-    void add_no_coalesce_msg_id(uint32_t msg_id)
-    {
-        _coalesce_nodelay.insert(msg_id);
-    }
+
+    void add_no_coalesce_msg_id(uint32_t msg_id) { _coalesce_nodelay.insert(msg_id); }
 
 protected:
     bool open(const char *ip, unsigned long port,
@@ -378,6 +375,7 @@ protected:
     unsigned long _coalesce_ms = 0UL;   // max time to hold data to try to coalesce packets together
 
     UdpEndpointConfig::Mode _mode = UdpEndpointConfig::Mode::Undefined;
+
 private:
     bool is_ipv6;
     struct sockaddr_in sockaddr;

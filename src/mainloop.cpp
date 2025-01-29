@@ -325,11 +325,9 @@ void Mainloop::handle_command_pipe()
                     conf.mode = UdpEndpointConfig::Mode::Server;
                 } else if (a[5] == "eavesdropping" || a[5] == "Eavesdropping") {
                     conf.mode = UdpEndpointConfig::Mode::Server;
-                }
-                else if (a[5] == "receiver" ||  a[5] == "Receiver") {
+                } else if (a[5] == "receiver" || a[5] == "Receiver") {
                     conf.mode = UdpEndpointConfig::Mode::Receiver;
-                }
-                else if (a[5] == "client" ||  a[5] == "Client") {
+                } else if (a[5] == "client" || a[5] == "Client") {
                     conf.mode = UdpEndpointConfig::Mode::Client;
                 } else {
                     conf.mode = UdpEndpointConfig::Mode::Client;
