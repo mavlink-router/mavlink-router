@@ -55,12 +55,12 @@ static void setup_signal_handlers()
     sigaction(SIGPIPE, &sa, nullptr);
 }
 
-Mainloop &Mainloop::init()
+Mainloop &Mainloop::init(const Configuration &configuration)
 {
     assert(_initialized == false);
 
     _initialized = true;
-
+    _instance._configuration = configuration;
     return _instance;
 }
 
@@ -292,8 +292,16 @@ int Mainloop::loop()
                 log_error("poll error for fd %i", p->fd);
 
                 if (p->is_critical()) {
-                    log_error("Critical fd %i got error, exiting", p->fd);
-                    request_exit(EXIT_FAILURE);
+                    log_error("Critical fd %i got error", p->fd);
+                    if (_configuration.skip_failed_endpoints) {
+                        Endpoint *ep = static_cast<Endpoint *>(events[i].data.ptr);
+                        log_error("Disabling failed endpoint [%d]%s", ep->fd, ep->get_name().c_str());
+                        ep->disabled(true);
+                        this->remove_fd(ep->fd);
+                    } else {
+                        log_error("Exiting.");
+                        request_exit(EXIT_FAILURE);
+                    }
                 } else {
                     log_debug("Non-critical fd %i, error is okay.", p->fd);
                 }
@@ -371,12 +379,15 @@ bool Mainloop::add_endpoints(const Configuration &config)
         auto uart = std::make_shared<UartEndpoint>(conf.name);
 
         if (!uart->setup(conf)) {
-            return false;
+            if (!config.skip_failed_endpoints) {
+                return false;
+            }
+            log_error("Skipping endpoint %s [%s]", conf.name.c_str(), conf.device.c_str());
+        } else {
+            g_endpoints.push_back(uart);
+            auto endpoint = g_endpoints.back();
+            this->add_fd(endpoint->fd, endpoint.get(), EPOLLIN);
         }
-
-        g_endpoints.push_back(uart);
-        auto endpoint = g_endpoints.back();
-        this->add_fd(endpoint->fd, endpoint.get(), EPOLLIN);
     }
 
     for (const auto &conf : config.udp_configs) {
