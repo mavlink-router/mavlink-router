@@ -55,12 +55,11 @@ static void setup_signal_handlers()
     sigaction(SIGPIPE, &sa, nullptr);
 }
 
-Mainloop &Mainloop::init(const Configuration &configuration)
+Mainloop &Mainloop::init()
 {
     assert(_initialized == false);
 
     _initialized = true;
-    _instance._configuration = configuration;
     return _instance;
 }
 
@@ -369,6 +368,7 @@ bool Mainloop::dedup_check_msg(const buffer *buf)
 
 bool Mainloop::add_endpoints(const Configuration &config)
 {
+    _configuration = config;
     // Create UART and UDP endpoints
     if (config.sniffer_sysid != 0) {
         Endpoint::sniffer_sysid = config.sniffer_sysid;

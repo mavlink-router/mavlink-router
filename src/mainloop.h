@@ -93,7 +93,7 @@ public:
     /*
      * Initialize and return singleton.
      */
-    static Mainloop &init(const Configuration &configuration);
+    static Mainloop &init();
 
     /*
      * De-initialize singleton so we can start a fresh on the same

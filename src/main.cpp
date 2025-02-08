@@ -608,6 +608,7 @@ fail:
 
 int main(int argc, char *argv[])
 {
+    Mainloop &mainloop = Mainloop::init();
     int retcode;
     Configuration config{};
 
@@ -615,7 +616,6 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    Mainloop &mainloop = Mainloop::init(config);
     Log::open(config.log_backend);
     log_info(PACKAGE " version %s", BUILD_VERSION);
 
