@@ -490,7 +490,7 @@ int Mainloop::loop()
             }
 
             if (events[i].events & EPOLLERR) {
-                if (events[i].events & EPOLLHUP || !p->is_critical()) {
+                if (events[i].events & EPOLLHUP && !p->is_critical()) {
                     // EPOLLHUP is an expected error, in case the TCP connection
                     // drops. In this case, we'll just need to clean up the TCP
                     // connection later, no need to panic.
