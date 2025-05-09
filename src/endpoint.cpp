@@ -1005,6 +1005,7 @@ ssize_t UartEndpoint::_read_msg(uint8_t *buf, size_t len)
         return 0;
     }
     if (r == -1) {
+        log_error("UART %s: Error reading from uart (%m)", _name.c_str());
         return -errno;
     }
 
@@ -1024,8 +1025,11 @@ int UartEndpoint::write_msg(const struct buffer *pbuf)
     }
 
     ssize_t r = ::write(fd, pbuf->data, pbuf->len);
-    if (r == -1 && errno == EAGAIN) {
-        return -EAGAIN;
+    if (r == -1) {
+        if (errno != EAGAIN) {
+            log_error("UART %s: Error writing to uart (%m)", _name.c_str());
+        }
+        return -errno;
     }
 
     _stat.write.total++;
@@ -1351,6 +1355,7 @@ ssize_t UdpEndpoint::_read_msg(uint8_t *buf, size_t len)
         return 0;
     }
     if (r == -1) {
+        log_error("UDP %s: Error receiving udp packet (%m)", _name.c_str());
         return -errno;
     }
 
@@ -1793,6 +1798,7 @@ ssize_t TcpEndpoint::_read_msg(uint8_t *buf, size_t len)
         return 0;
     }
     if (r == -1) {
+        log_error("TCP %s: Error receiving tcp packet (%m)", _name.c_str());
         return -errno;
     }
 
