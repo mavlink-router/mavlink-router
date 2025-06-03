@@ -36,10 +36,42 @@
 #include "logendpoint.h"
 #include "mainloop.h"
 
+#include <netdb.h>
+#include <arpa/inet.h>
+
 #define DEFAULT_CONFFILE "/etc/mavlink-router/main.conf"
 #define DEFAULT_CONF_DIR "/etc/mavlink-router/config.d"
 
 extern const char *BUILD_VERSION;
+
+static std::string resolve_hostname_to_ip(const std::string& address_or_hostname)
+{
+    struct sockaddr_in sa;
+    if (inet_pton(AF_INET, address_or_hostname.c_str(), &(sa.sin_addr)) != 0) {
+        return address_or_hostname;
+    }
+
+    log_info("Resolving hostname '%s'...", address_or_hostname.c_str());
+
+    struct addrinfo hints = {};
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_DGRAM;
+
+    struct addrinfo *result;
+    int status = getaddrinfo(address_or_hostname.c_str(), nullptr, &hints, &result);
+    if (status != 0) {
+        log_error("Could not resolve hostname '%s': %s", address_or_hostname.c_str(), gai_strerror(status));
+        return "";
+    }
+
+    char ip_str[INET_ADDRSTRLEN];
+    struct sockaddr_in *ipv4 = (struct sockaddr_in *)result->ai_addr;
+    inet_ntop(AF_INET, &(ipv4->sin_addr), ip_str, sizeof(ip_str));
+
+    freeaddrinfo(result);
+
+    return std::string(ip_str);
+}
 
 static const struct option long_options[] = {{"endpoints", required_argument, nullptr, 'e'},
                                              {"conf-file", required_argument, nullptr, 'c'},
@@ -488,6 +520,21 @@ static int parse_confs(ConfFile &conffile, Configuration &config)
             return ret;
         }
 
+        if (!opt_udp.address.empty()) {
+            std::string resolved_ip = resolve_hostname_to_ip(opt_udp.address);
+
+            if (resolved_ip.empty()) {
+                log_error("Could not resolve hostname for endpoint '%s'.", opt_udp.name.c_str());
+                return -EINVAL;
+            }
+
+            if (opt_udp.address != resolved_ip) {
+                log_info("Resolved hostname '%s' to '%s' for endpoint '%s'",
+                        opt_udp.address.c_str(), resolved_ip.c_str(), opt_udp.name.c_str());
+                opt_udp.address = resolved_ip;
+            }
+        }
+
         if (UdpEndpointConfig::Mode::Client == opt_udp.mode && ULONG_MAX == opt_udp.port) {
             opt_udp.port = find_next_udp_port(opt_udp.address, config);
         }
@@ -496,7 +543,7 @@ static int parse_confs(ConfFile &conffile, Configuration &config)
             return -EINVAL; // error message was already logged by validate_config()
         }
         config.udp_configs.push_back(opt_udp);
-    }
+}
 
     iter = {};
     offset = strlen(TcpEndpoint::section_pattern) - 1;
