@@ -531,9 +531,9 @@ int Mainloop::loop()
 bool Mainloop::_log_aggregate_timeout(void *data)
 {
     if (_errors_aggregate.msg_to_unknown > 0) {
-        log_warning("%u messages to unknown endpoints in the last %d seconds",
-                    _errors_aggregate.msg_to_unknown,
-                    LOG_AGGREGATE_INTERVAL_SEC);
+        log_info("%u messages to unknown endpoints in the last %d seconds",
+                 _errors_aggregate.msg_to_unknown,
+                 LOG_AGGREGATE_INTERVAL_SEC);
         _errors_aggregate.msg_to_unknown = 0;
     }
 
