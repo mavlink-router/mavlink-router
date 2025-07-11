@@ -2,7 +2,7 @@
 Description=MAVLink Router
 
 [Service]
-Type=simple
+Type=notify
 ExecStart=@bindir@/mavlink-routerd --syslog
 Restart=always
 Nice=-20
