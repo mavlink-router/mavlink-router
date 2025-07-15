@@ -49,6 +49,7 @@ if dep_gtest.found()
           ],
           link_with: libcommon_private,
           install: false,
+          cpp_args: ['-w']
   )
   test('mainloop', exe_mainloop_test)
 
@@ -74,6 +75,7 @@ if dep_gtest.found()
           ],
           link_with: libcommon_private,
           install: false,
+          cpp_args: ['-w']
   )
   test('endpoints', exe_endpoints_test)
 endif
