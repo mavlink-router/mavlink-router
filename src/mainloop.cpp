@@ -306,9 +306,9 @@ void Mainloop::handle_command_pipe()
                 auto to_create = std::find_if(
                     g_endpoints.begin(),
                     g_endpoints.end(),
-                    [&a](const std::shared_ptr<Endpoint> e) { return e->get_name() == a[2]; });
+                    [&a](const std::shared_ptr<Endpoint> &e) { return e->get_name() == a[2]; });
                 if (to_create != g_endpoints.end()) {
-                    log_debug("Endpoint named \"%s\" already exists, please choose another name",
+                    log_trace("Endpoint named \"%s\" already exists, please choose another name",
                               a[2].c_str());
                     continue;
                 }
