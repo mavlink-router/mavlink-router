@@ -23,11 +23,11 @@
 
 class DedupImpl {
     using hash_t = uint64_t;
-    using time_t = uint32_t;
+    using time_t = uint64_t;
 
 public:
     DedupImpl()
-        : _start_time(std::chrono::system_clock::now())
+        : _start_time(std::chrono::steady_clock::now())
     {
     }
 
@@ -35,7 +35,7 @@ public:
     {
         using namespace std::chrono;
         time_t timestamp
-            = duration_cast<milliseconds>(std::chrono::system_clock::now() - _start_time).count();
+            = duration_cast<milliseconds>(std::chrono::steady_clock::now() - _start_time).count();
         // pop data from front queue, delete corresponding data from multiset
         while (!_time_hash_queue.empty()
                && timestamp > _time_hash_queue.front().first + dedup_period_ms) {
@@ -62,7 +62,7 @@ public:
     }
 
 private:
-    const std::chrono::time_point<std::chrono::system_clock> _start_time;
+    const std::chrono::time_point<std::chrono::steady_clock> _start_time;
 
     std::queue<std::pair<time_t, hash_t>> _time_hash_queue;
     std::unordered_set<hash_t> _packet_hash_set;
