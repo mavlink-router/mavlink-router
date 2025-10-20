@@ -73,8 +73,8 @@ const ConfFile::OptionsTable UartEndpoint::option_table[] = {
     {"AllowSrcSysIn",   false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, allow_src_sys_in)},
     {"BlockSrcSysIn",   false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, block_src_sys_in)},
     // New: throttle args
-    {"RateLimitMsgIdOut",     false, ConfFile::parse_uint32_vector, OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, rate_limit_msg_id_out)},
-    {"RateLimitPeriodMsOut",  false, ConfFile::parse_uint32_vector, OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, rate_limit_period_ms_out)},
+    {"ThrottleLimitMsgIdOut",     false, ConfFile::parse_uint32_vector, OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, rate_limit_msg_id_out)},
+    {"ThrottledMsgPeriodOut",  false, ConfFile::parse_uint32_vector, OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, rate_limit_period_ms_out)},
 
     {"group",           false, ConfFile::parse_stdstring,       OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, group)},
     {}
@@ -99,8 +99,8 @@ const ConfFile::OptionsTable UdpEndpoint::option_table[] = {
     {"AllowSrcSysIn",   false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_src_sys_in)},
     {"BlockSrcSysIn",   false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, block_src_sys_in)},
         // New: throttle args
-    {"RateLimitMsgIdOut",     false, ConfFile::parse_uint32_vector, OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, rate_limit_msg_id_out)},
-    {"RateLimitPeriodMsOut",  false, ConfFile::parse_uint32_vector, OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, rate_limit_period_ms_out)},
+    {"ThrottleLimitMsgIdOut",     false, ConfFile::parse_uint32_vector, OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, rate_limit_msg_id_out)},
+    {"ThrottledMsgPeriodOut",  false, ConfFile::parse_uint32_vector, OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, rate_limit_period_ms_out)},
     {"group",           false,  ConfFile::parse_stdstring,      OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, group)},
     {}
 };
@@ -123,8 +123,8 @@ const ConfFile::OptionsTable TcpEndpoint::option_table[] = {
     {"AllowSrcSysIn",   false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_src_sys_in)},
     {"BlockSrcSysIn",   false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, block_src_sys_in)},
         // New: throttle args
-    {"RateLimitMsgIdOut",     false, ConfFile::parse_uint32_vector, OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, rate_limit_msg_id_out)},
-    {"RateLimitPeriodMsOut",  false, ConfFile::parse_uint32_vector, OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, rate_limit_period_ms_out)},
+    {"ThrottleLimitMsgIdOut",     false, ConfFile::parse_uint32_vector, OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, rate_limit_msg_id_out)},
+    {"ThrottledMsgPeriodOut",  false, ConfFile::parse_uint32_vector, OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, rate_limit_period_ms_out)},
     {"group",           false,  ConfFile::parse_stdstring,      OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, group)},
     {}
 };
@@ -846,7 +846,7 @@ bool UartEndpoint::setup(UartEndpointConfig conf)
         this->filter_add_blocked_in_src_sys(src_sys);
     }
     if (conf.rate_limit_msg_id_out.size() != conf.rate_limit_period_ms_out.size()) {
-        log_warning("UartEndpoint %s: RateLimitMsgIdOut and RateLimitPeriodMsOut length mismatch",
+        log_warning("UartEndpoint %s: ThrottleLimitMsgIdOut and ThrottledMsgPeriodOut length mismatch",
                     conf.name.c_str());
     } else {
         for (size_t i = 0; i < conf.rate_limit_msg_id_out.size(); ++i) {
@@ -1191,7 +1191,7 @@ bool UdpEndpoint::setup(UdpEndpointConfig conf)
         this->filter_add_blocked_in_src_sys(src_sys);
     }
     if (conf.rate_limit_msg_id_out.size() != conf.rate_limit_period_ms_out.size()) {
-        log_warning("UdpEndpoint %s: RateLimitMsgIdOut and RateLimitPeriodMsOut length mismatch",
+        log_warning("UdpEndpoint %s: ThrottleLimitMsgIdOut and ThrottledMsgPeriodOut length mismatch",
                     conf.name.c_str());
     } else {
         for (size_t i = 0; i < conf.rate_limit_msg_id_out.size(); ++i) {
@@ -1574,7 +1574,7 @@ bool TcpEndpoint::setup(TcpEndpointConfig conf)
         this->filter_add_blocked_in_src_sys(src_sys);
     }
     if (conf.rate_limit_msg_id_out.size() != conf.rate_limit_period_ms_out.size()) {
-        log_warning("TcpEndpoint %s: RateLimitMsgIdOut and RateLimitPeriodMsOut length mismatch",
+        log_warning("TcpEndpoint %s: ThrottleLimitMsgIdOut and ThrottledMsgPeriodOut length mismatch",
                     conf.name.c_str());
     } else {
         for (size_t i = 0; i < conf.rate_limit_msg_id_out.size(); ++i) {
