@@ -257,6 +257,42 @@ void Endpoint::_rate_limit_mark_sent(uint32_t msg_id, uint64_t now_ms)
 }
 
 
+uint64_t Endpoint::_now_monotonic_ms()
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return static_cast<uint64_t>(ts.tv_sec) * 1000ULL
+           + static_cast<uint64_t>(ts.tv_nsec / 1000000ULL);
+}
+
+bool Endpoint::_rate_limit_allows(uint32_t msg_id, uint64_t now_ms) const
+{
+    auto throttled_msg = _msg_and_rate_map.find(msg_id);
+    if (throttled_msg == _msg_and_rate_map.end()) {
+        return true; // no throttle configured
+    }
+    const uint32_t msg_rate_ms = throttled_msg->second;
+    auto last_throttled_msg = _throttled_msgs_last_send.find(msg_id);
+   if (last_throttled_msg == _throttled_msgs_last_send.end()) {
+       return true; // not yet sent
+    }
+    const uint64_t elapsed = (now_ms >= last_throttled_msg->second) ? (now_ms - last_throttled_msg->second) : 0ULL;
+    bool is_allowed=elapsed >= static_cast<uint64_t>(msg_rate_ms);
+    return is_allowed;
+}
+
+void Endpoint::_rate_limit_mark_sent(uint32_t msg_id, uint64_t now_ms)
+{
+    if (msg_id == UINT32_MAX) {
+        return; // not valid
+    }
+    if (_msg_and_rate_map.find(msg_id) == _msg_and_rate_map.end()) {
+        return; // not tracked
+    }
+   _throttled_msgs_last_send[msg_id] = now_ms; // record last sent time
+}
+
+
 bool Endpoint::handle_canwrite()
 {
     int r = flush_pending_msgs();
@@ -603,6 +639,15 @@ Endpoint::AcceptState Endpoint::accept_msg(const struct buffer *pbuf) const
     if (pbuf->curr.msg_id != UINT32_MAX && !_blocked_outgoing_src_systems.empty()
         && vector_contains(_blocked_outgoing_src_systems, pbuf->curr.src_sysid)) {
         return Endpoint::AcceptState::Filtered;
+    }
+
+    // If filter is defined and message is in the set and should be dropped based on throttling: discard it
+    if (!_msg_and_rate_map.empty()) {
+        const uint64_t now_ms = _now_monotonic_ms();
+        if (!_rate_limit_allows(pbuf->curr.msg_id, now_ms)) {
+            log_trace("%s: Throttled MsgId %u", _name.c_str(), pbuf->curr.msg_id);
+            return Endpoint::AcceptState::Filtered;
+        }
     }
 
     // If filter is defined and message is in the set and should be dropped based on throttling: discard it
@@ -1088,6 +1133,9 @@ int UartEndpoint::write_msg(const struct buffer *pbuf)
     } else {
         // Record message sent time for rate limiting
         _rate_limit_mark_sent(pbuf->curr.msg_id, _now_monotonic_ms());
+    } else {
+        // Record message sent time for rate limiting
+        _rate_limit_mark_sent(pbuf->curr.msg_id, _now_monotonic_ms());
     }
 
     log_trace("UART [%d]%s: Wrote %zd bytes", fd, _name.c_str(), r);
@@ -1446,6 +1494,9 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
                   _name.c_str(),
                   r,
                   pbuf->len);
+    }else {
+        // Record message sent time for rate limiting
+        _rate_limit_mark_sent(pbuf->curr.msg_id, _now_monotonic_ms());
     }else {
         // Record message sent time for rate limiting
         _rate_limit_mark_sent(pbuf->curr.msg_id, _now_monotonic_ms());
@@ -1816,6 +1867,9 @@ int TcpEndpoint::write_msg(const struct buffer *pbuf)
                   _name.c_str(),
                   r,
                   pbuf->len);
+    }else {
+        // Record message sent time for rate limiting
+        _rate_limit_mark_sent(pbuf->curr.msg_id, _now_monotonic_ms());
     }else {
         // Record message sent time for rate limiting
         _rate_limit_mark_sent(pbuf->curr.msg_id, _now_monotonic_ms());
