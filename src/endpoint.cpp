@@ -72,8 +72,8 @@ const ConfFile::OptionsTable UartEndpoint::option_table[] = {
     {"BlockSrcCompIn",  false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, block_src_comp_in)},
     {"AllowSrcSysIn",   false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, allow_src_sys_in)},
     {"BlockSrcSysIn",   false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, block_src_sys_in)},
-    {"ThrottleMsgIdOut",     false, ConfFile::parse_uint32_vector, OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, rate_limit_msg_id_out)},
-    {"ThrottledMsgPeriodOut",  false, ConfFile::parse_uint32_vector, OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, rate_limit_period_ms_out)},
+    {"RateLimitMsgIdOut",     false, ConfFile::parse_uint32_vector, OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, rate_limit_msg_id_out)},
+    {"RateLimitPeriodOut",  false, ConfFile::parse_uint32_vector, OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, rate_limit_period_out)},
     {"group",           false, ConfFile::parse_stdstring,       OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, group)},
     {}
 };
@@ -96,8 +96,8 @@ const ConfFile::OptionsTable UdpEndpoint::option_table[] = {
     {"BlockSrcCompIn",  false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, block_src_comp_in)},
     {"AllowSrcSysIn",   false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_src_sys_in)},
     {"BlockSrcSysIn",   false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, block_src_sys_in)},
-    {"ThrottleMsgIdOut",     false, ConfFile::parse_uint32_vector, OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, rate_limit_msg_id_out)},
-    {"ThrottledMsgPeriodOut",  false, ConfFile::parse_uint32_vector, OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, rate_limit_period_ms_out)},
+    {"RateLimitMsgIdOut",     false, ConfFile::parse_uint32_vector, OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, rate_limit_msg_id_out)},
+    {"RateLimitPeriodOut",  false, ConfFile::parse_uint32_vector, OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, rate_limit_period_out)},
     {"group",           false,  ConfFile::parse_stdstring,      OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, group)},
     {}
 };
@@ -119,8 +119,8 @@ const ConfFile::OptionsTable TcpEndpoint::option_table[] = {
     {"BlockSrcCompIn",  false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, block_src_comp_in)},
     {"AllowSrcSysIn",   false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_src_sys_in)},
     {"BlockSrcSysIn",   false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, block_src_sys_in)},
-    {"ThrottleMsgIdOut",     false, ConfFile::parse_uint32_vector, OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, rate_limit_msg_id_out)},
-    {"ThrottledMsgPeriodOut",  false, ConfFile::parse_uint32_vector, OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, rate_limit_period_ms_out)},
+    {"RateLimitMsgIdOut",     false, ConfFile::parse_uint32_vector, OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, rate_limit_msg_id_out)},
+    {"RateLimitPeriodOut",  false, ConfFile::parse_uint32_vector, OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, rate_limit_period_out)},
     {"group",           false,  ConfFile::parse_stdstring,      OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, group)},
     {}
 };
@@ -216,42 +216,6 @@ Endpoint::~Endpoint()
     free(rx_buf.data);
     free(tx_buf.data);
 }
-
-uint64_t Endpoint::_now_monotonic_ms()
-{
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return static_cast<uint64_t>(ts.tv_sec) * 1000ULL
-           + static_cast<uint64_t>(ts.tv_nsec / 1000000ULL);
-}
-
-bool Endpoint::_rate_limit_allows(uint32_t msg_id, uint64_t now_ms) const
-{
-    auto throttled_msg = _msg_and_rate_map.find(msg_id);
-    if (throttled_msg == _msg_and_rate_map.end()) {
-        return true; // no throttle configured
-    }
-    const uint32_t msg_rate_ms = throttled_msg->second;
-    auto last_throttled_msg = _throttled_msgs_last_send.find(msg_id);
-   if (last_throttled_msg == _throttled_msgs_last_send.end()) {
-       return true; // not yet sent
-    }
-    const uint64_t elapsed = (now_ms >= last_throttled_msg->second) ? (now_ms - last_throttled_msg->second) : 0ULL;
-    bool is_allowed=elapsed >= static_cast<uint64_t>(msg_rate_ms);
-    return is_allowed;
-}
-
-void Endpoint::_rate_limit_record_msg_sent(uint32_t msg_id, uint64_t now_ms)
-{
-    if (msg_id == UINT32_MAX) {
-        return; // not valid
-    }
-    if (_msg_and_rate_map.find(msg_id) == _msg_and_rate_map.end()) {
-        return; // not tracked
-    }
-   _throttled_msgs_last_send[msg_id] = now_ms; // record last sent time
-}
-
 
 uint64_t Endpoint::_now_monotonic_ms()
 {
@@ -886,12 +850,12 @@ bool UartEndpoint::setup(UartEndpointConfig conf)
     for (auto src_sys : conf.block_src_sys_in) {
         this->filter_add_blocked_in_src_sys(src_sys);
     }
-    if (conf.rate_limit_msg_id_out.size() != conf.rate_limit_period_ms_out.size()) {
-        log_warning("UartEndpoint %s: ThrottleMsgIdOut and ThrottledMsgPeriodOut length mismatch",
+    if (conf.rate_limit_msg_id_out.size() != conf.rate_limit_period_out.size()) {
+        log_warning("UartEndpoint %s: RateLimitMsgIdOut and RateLimitPeriodOut length mismatch",
                     conf.name.c_str());
     } else {
         for (size_t i = 0; i < conf.rate_limit_msg_id_out.size(); ++i) {
-            this->rate_limit_set(conf.rate_limit_msg_id_out[i], conf.rate_limit_period_ms_out[i]);
+            this->rate_limit_set(conf.rate_limit_msg_id_out[i], conf.rate_limit_period_out[i]);
        }
     }
 
@@ -1231,12 +1195,12 @@ bool UdpEndpoint::setup(UdpEndpointConfig conf)
     for (auto src_sys : conf.block_src_sys_in) {
         this->filter_add_blocked_in_src_sys(src_sys);
     }
-    if (conf.rate_limit_msg_id_out.size() != conf.rate_limit_period_ms_out.size()) {
-        log_warning("UdpEndpoint %s: ThrottleMsgIdOut and ThrottledMsgPeriodOut length mismatch",
+    if (conf.rate_limit_msg_id_out.size() != conf.rate_limit_period_out.size()) {
+        log_warning("UdpEndpoint %s: RateLimitMsgIdOut and RateLimitPeriodOut length mismatch",
                     conf.name.c_str());
     } else {
         for (size_t i = 0; i < conf.rate_limit_msg_id_out.size(); ++i) {
-            this->rate_limit_set(conf.rate_limit_msg_id_out[i], conf.rate_limit_period_ms_out[i]);
+            this->rate_limit_set(conf.rate_limit_msg_id_out[i], conf.rate_limit_period_out[i]);
        }
     }
 
@@ -1613,12 +1577,12 @@ bool TcpEndpoint::setup(TcpEndpointConfig conf)
     for (auto src_sys : conf.block_src_sys_in) {
         this->filter_add_blocked_in_src_sys(src_sys);
     }
-    if (conf.rate_limit_msg_id_out.size() != conf.rate_limit_period_ms_out.size()) {
-        log_warning("TcpEndpoint %s: ThrottleMsgIdOut and ThrottledMsgPeriodOut length mismatch",
+    if (conf.rate_limit_msg_id_out.size() != conf.rate_limit_period_out.size()) {
+        log_warning("TcpEndpoint %s: RateLimitMsgIdOut and RateLimitPeriodOut length mismatch",
                     conf.name.c_str());
     } else {
         for (size_t i = 0; i < conf.rate_limit_msg_id_out.size(); ++i) {
-            this->rate_limit_set(conf.rate_limit_msg_id_out[i], conf.rate_limit_period_ms_out[i]);
+            this->rate_limit_set(conf.rate_limit_msg_id_out[i], conf.rate_limit_period_out[i]);
        }
     }
 

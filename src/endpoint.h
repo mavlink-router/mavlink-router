@@ -54,7 +54,7 @@ struct UartEndpointConfig {
     std::vector<uint8_t> allow_src_sys_in;
     std::vector<uint8_t> block_src_sys_in;
     std::vector<uint32_t> rate_limit_msg_id_out;
-    std::vector<uint32_t> rate_limit_period_ms_out;
+    std::vector<uint32_t> rate_limit_period_out;
     std::string group;
 };
 
@@ -78,7 +78,7 @@ struct UdpEndpointConfig {
     std::vector<uint8_t> allow_src_sys_in;
     std::vector<uint8_t> block_src_sys_in;
     std::vector<uint32_t> rate_limit_msg_id_out;
-    std::vector<uint32_t> rate_limit_period_ms_out;
+    std::vector<uint32_t> rate_limit_period_out;
     std::string group;
 };
 
@@ -100,7 +100,7 @@ struct TcpEndpointConfig {
     std::vector<uint8_t> allow_src_sys_in;
     std::vector<uint8_t> block_src_sys_in;
     std::vector<uint32_t> rate_limit_msg_id_out;
-    std::vector<uint32_t> rate_limit_period_ms_out;
+    std::vector<uint32_t> rate_limit_period_out;
     std::string group;
 };
 
