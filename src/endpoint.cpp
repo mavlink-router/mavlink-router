@@ -610,15 +610,6 @@ Endpoint::AcceptState Endpoint::accept_msg(const struct buffer *pbuf) const
         }
     }
 
-    // If filter is defined and message is in the set and should be dropped based on throttling: discard it
-    if (!_msg_and_rate_map.empty()) {
-        const uint64_t now_ms = _now_monotonic_ms();
-        if (!_rate_limit_allows(pbuf->curr.msg_id, now_ms)) {
-            log_trace("%s: Throttled MsgId %u", _name.c_str(), pbuf->curr.msg_id);
-            return Endpoint::AcceptState::Filtered;
-        }
-    }
-
     // Message is broadcast on sysid or sysid is non-existent: accept msg
     if (pbuf->curr.target_sysid == 0 || pbuf->curr.target_sysid == -1) {
         return Endpoint::AcceptState::Accepted;
