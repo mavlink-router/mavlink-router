@@ -72,10 +72,8 @@ const ConfFile::OptionsTable UartEndpoint::option_table[] = {
     {"BlockSrcCompIn",  false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, block_src_comp_in)},
     {"AllowSrcSysIn",   false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, allow_src_sys_in)},
     {"BlockSrcSysIn",   false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, block_src_sys_in)},
-    // New: throttle args
     {"ThrottleMsgIdOut",     false, ConfFile::parse_uint32_vector, OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, rate_limit_msg_id_out)},
     {"ThrottledMsgPeriodOut",  false, ConfFile::parse_uint32_vector, OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, rate_limit_period_ms_out)},
-
     {"group",           false, ConfFile::parse_stdstring,       OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, group)},
     {}
 };
@@ -98,7 +96,6 @@ const ConfFile::OptionsTable UdpEndpoint::option_table[] = {
     {"BlockSrcCompIn",  false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, block_src_comp_in)},
     {"AllowSrcSysIn",   false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_src_sys_in)},
     {"BlockSrcSysIn",   false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, block_src_sys_in)},
-        // New: throttle args
     {"ThrottleMsgIdOut",     false, ConfFile::parse_uint32_vector, OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, rate_limit_msg_id_out)},
     {"ThrottledMsgPeriodOut",  false, ConfFile::parse_uint32_vector, OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, rate_limit_period_ms_out)},
     {"group",           false,  ConfFile::parse_stdstring,      OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, group)},
@@ -122,7 +119,6 @@ const ConfFile::OptionsTable TcpEndpoint::option_table[] = {
     {"BlockSrcCompIn",  false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, block_src_comp_in)},
     {"AllowSrcSysIn",   false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_src_sys_in)},
     {"BlockSrcSysIn",   false,  ConfFile::parse_uint8_vector,   OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, block_src_sys_in)},
-        // New: throttle args
     {"ThrottleMsgIdOut",     false, ConfFile::parse_uint32_vector, OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, rate_limit_msg_id_out)},
     {"ThrottledMsgPeriodOut",  false, ConfFile::parse_uint32_vector, OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, rate_limit_period_ms_out)},
     {"group",           false,  ConfFile::parse_stdstring,      OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, group)},
@@ -245,7 +241,7 @@ bool Endpoint::_rate_limit_allows(uint32_t msg_id, uint64_t now_ms) const
     return is_allowed;
 }
 
-void Endpoint::_rate_limit_mark_sent(uint32_t msg_id, uint64_t now_ms)
+void Endpoint::_rate_limit_record_msg_sent(uint32_t msg_id, uint64_t now_ms)
 {
     if (msg_id == UINT32_MAX) {
         return; // not valid
@@ -281,7 +277,7 @@ bool Endpoint::_rate_limit_allows(uint32_t msg_id, uint64_t now_ms) const
     return is_allowed;
 }
 
-void Endpoint::_rate_limit_mark_sent(uint32_t msg_id, uint64_t now_ms)
+void Endpoint::_rate_limit_record_msg_sent(uint32_t msg_id, uint64_t now_ms)
 {
     if (msg_id == UINT32_MAX) {
         return; // not valid
@@ -1130,12 +1126,9 @@ int UartEndpoint::write_msg(const struct buffer *pbuf)
                   _name.c_str(),
                   r,
                   pbuf->len);
-    } else {
+    }else {
         // Record message sent time for rate limiting
-        _rate_limit_mark_sent(pbuf->curr.msg_id, _now_monotonic_ms());
-    } else {
-        // Record message sent time for rate limiting
-        _rate_limit_mark_sent(pbuf->curr.msg_id, _now_monotonic_ms());
+        _rate_limit_record_msg_sent(pbuf->curr.msg_id, _now_monotonic_ms());
     }
 
     log_trace("UART [%d]%s: Wrote %zd bytes", fd, _name.c_str(), r);
@@ -1496,12 +1489,8 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
                   pbuf->len);
     }else {
         // Record message sent time for rate limiting
-        _rate_limit_mark_sent(pbuf->curr.msg_id, _now_monotonic_ms());
-    }else {
-        // Record message sent time for rate limiting
-        _rate_limit_mark_sent(pbuf->curr.msg_id, _now_monotonic_ms());
+        _rate_limit_record_msg_sent(pbuf->curr.msg_id, _now_monotonic_ms());
     }
-
     log_trace("UDP [%d]%s: Wrote %zd bytes", fd, _name.c_str(), r);
 
     return r;
@@ -1869,10 +1858,7 @@ int TcpEndpoint::write_msg(const struct buffer *pbuf)
                   pbuf->len);
     }else {
         // Record message sent time for rate limiting
-        _rate_limit_mark_sent(pbuf->curr.msg_id, _now_monotonic_ms());
-    }else {
-        // Record message sent time for rate limiting
-        _rate_limit_mark_sent(pbuf->curr.msg_id, _now_monotonic_ms());
+        _rate_limit_record_msg_sent(pbuf->curr.msg_id, _now_monotonic_ms());
     }
 
     log_trace("TCP [%d]%s: Wrote %zd bytes", fd, _name.c_str(), r);

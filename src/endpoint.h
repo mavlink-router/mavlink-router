@@ -258,14 +258,10 @@ protected:
     virtual ssize_t _read_msg(uint8_t *buf, size_t len) = 0;
     bool _check_crc(const mavlink_msg_entry_t *msg_entry) const;
     void _add_sys_comp_id(uint8_t sysid, uint8_t compid);
-
-        // Outgoing rate-limit configuration and state
-
-
-    // Returns true if allowed to send now (does NOT update last-sent)
+    // Returns true if allowed to send now (does NOT update "last-sent" msg information)
     bool _rate_limit_allows(uint32_t msg_id, uint64_t now_ms) const;
-    // Record successful send time
-    void _rate_limit_mark_sent(uint32_t msg_id, uint64_t now_ms);
+    // Record successful msg send time
+    void _rate_limit_record_msg_sent(uint32_t msg_id, uint64_t now_ms);
     // Monotonic now in ms
     static uint64_t _now_monotonic_ms();
 
@@ -296,7 +292,6 @@ protected:
     uint32_t _incomplete_msgs = 0;
     std::vector<uint16_t> _sys_comp_ids;
     std::unordered_map<uint32_t, uint32_t> _msg_and_rate_map;
-    // msg_id -> last sent timestamp (monotonic ms)
     std::unordered_map<uint32_t, uint64_t> _throttled_msgs_last_send;
 
 private:
