@@ -27,6 +27,8 @@ jobs:
             arch: arm-linux-gnueabihf
           - name: aarch64
             arch: aarch64-linux-gnu
+          - name: riscv64
+            arch: riscv64-linux-gnu
           - name: x86_64
             arch: native
           - name: i686
@@ -93,7 +95,7 @@ jobs:
         if: ${{ matrix.arch == 'native' }}
         run: ./tests/routing_test.py -b ./build-${{ matrix.name }}/src/mavlink-routerd
 
-      - uses: actions/upload-artifact@master
+      - uses: actions/upload-artifact@v4
         with:
           path: build-${{ matrix.name }}/src/mavlink-routerd
           name: mavlink-routerd-glibc-${{ matrix.name }}
@@ -109,10 +111,10 @@ jobs:
           overwrite: true
 
   alpine-linux:
-    name: alpine 3.14 (musl)
+    name: alpine 3.18 (musl)
     runs-on: ubuntu-24.04
     needs: [formatting-check]
-    container: alpine:3.14
+    container: alpine:3.18
     steps:
       - name: install dependencies
         run: apk update && apk add build-base git linux-headers pkgconf meson ninja
@@ -131,7 +133,7 @@ jobs:
       - name: Rename
         run: cp build/src/mavlink-routerd build/src/mavlink-routerd-musl-x86-64
 
-      - uses: actions/upload-artifact@master
+      - uses: actions/upload-artifact@v4
         with:
           path: build/src/mavlink-routerd-musl-x86-64
           name: mavlink-routerd-musl-x86-64
