@@ -3,7 +3,7 @@ Description=MAVLink Router
 
 [Service]
 Type=simple
-ExecStart=@BINDIR@/mavlink-routerd --syslog
+ExecStart=@BINDIR@/mavlink-routerd --debug-log-level info --syslog
 Restart=on-failure
 Nice=-20
 
