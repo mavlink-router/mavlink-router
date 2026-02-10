@@ -76,6 +76,20 @@ struct UdpEndpointConfig {
     std::vector<uint8_t> allow_src_sys_in;
     std::vector<uint8_t> block_src_sys_in;
     std::string group;
+
+    /**
+     * Optional network interface name (e.g. "eth0", "eth0.10", "wlan0").
+     *
+     * When set on a Server-mode endpoint, the bind address is resolved
+     * from this interface instead of using the 'address' field directly.
+     * This allows the configuration to remain stable even if the
+     * interface's IP address changes (e.g. DHCP renewal).
+     *
+     * Resolution priority:
+     *   1. If 'interface' is non-empty → resolve its IPv4 address at bind time.
+     *   2. Otherwise, fall back to 'address' (or "0.0.0.0" if also empty).
+     */
+    std::string interface;
 };
 
 struct TcpEndpointConfig {
@@ -336,6 +350,15 @@ public:
     static const char *section_pattern;
     static int parse_udp_mode(const char *val, size_t val_len, void *storage, size_t storage_len);
     static bool validate_config(const UdpEndpointConfig &config);
+
+    /**
+     * Resolve the IPv4 address assigned to a network interface.
+     *
+     * @param iface_name  Network interface name (e.g. "eth0", "eth0.10", "wlan0").
+     * @param[out] ip_out Resolved IPv4 address in dotted-decimal notation.
+     * @return true on success, false if the interface is not found or has no IPv4 address.
+     */
+    static bool resolve_interface_address(const std::string &iface_name, std::string &ip_out);
 
 protected:
     bool open(const char *ip, unsigned long port,
