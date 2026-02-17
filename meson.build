@@ -6,6 +6,7 @@ project(
         default_options: [
                 'cpp_std=gnu++14',
                 'prefix=/usr',
+                'sysconfdir=/etc',
                 'warning_level=2',
                 'buildtype=debugoptimized',
         ],

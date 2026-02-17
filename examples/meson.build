@@ -16,3 +16,9 @@ px4_offboard_mode = executable('px4-offboard-mode',
         link_with: libcommon_private,
         install: false,
 )
+
+install_data(
+        'config.sample',
+        install_dir: join_paths(get_option('sysconfdir'), 'mavlink-router'),
+        rename: 'main.conf',
+)
