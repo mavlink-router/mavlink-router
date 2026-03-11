@@ -27,7 +27,8 @@
 #include "endpoint.h"
 #include "timeout.h"
 
-#define LOG_ENDPOINT_SYSTEM_ID 2
+// System ID is now configurable via LogSystemId in the configuration
+extern int log_endpoint_sys_id;
 
 enum class LogMode {
     always = 0,  ///< Log from start until mavlink-router exits

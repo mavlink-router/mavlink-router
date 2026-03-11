@@ -32,7 +32,7 @@ bool BinLog::_logging_start_timeout()
 {
     mavlink_message_t msg;
 
-    mavlink_msg_remote_log_block_status_pack(LOG_ENDPOINT_SYSTEM_ID,
+    mavlink_msg_remote_log_block_status_pack(log_endpoint_sys_id,
                                              MAV_COMP_ID_ALL,
                                              &msg,
                                              _target_system_id,
@@ -72,7 +72,7 @@ void BinLog::_send_stop()
 {
     mavlink_message_t msg;
 
-    mavlink_msg_remote_log_block_status_pack(LOG_ENDPOINT_SYSTEM_ID,
+    mavlink_msg_remote_log_block_status_pack(log_endpoint_sys_id,
                                              MAV_COMP_ID_ALL,
                                              &msg,
                                              _target_system_id,
@@ -154,7 +154,7 @@ void BinLog::_send_ack(uint32_t seqno)
 
     // Message filled a gap, or is duplicated. just send the ack
     if (seqno < _last_acked_seqno) {
-        mavlink_msg_remote_log_block_status_pack(LOG_ENDPOINT_SYSTEM_ID,
+        mavlink_msg_remote_log_block_status_pack(log_endpoint_sys_id,
                                                  MAV_COMP_ID_ALL,
                                                  &msg,
                                                  _target_system_id,
@@ -169,7 +169,7 @@ void BinLog::_send_ack(uint32_t seqno)
     // TODO send ack to source only?
     // Send nacks regarding unseen seqno
     for (uint32_t i = _last_acked_seqno + 1; i < seqno; i++) {
-        mavlink_msg_remote_log_block_status_pack(LOG_ENDPOINT_SYSTEM_ID,
+        mavlink_msg_remote_log_block_status_pack(log_endpoint_sys_id,
                                                  MAV_COMP_ID_ALL,
                                                  &msg,
                                                  _target_system_id,
@@ -180,7 +180,7 @@ void BinLog::_send_ack(uint32_t seqno)
     }
 
     // Send ack to seen seqno
-    mavlink_msg_remote_log_block_status_pack(LOG_ENDPOINT_SYSTEM_ID,
+    mavlink_msg_remote_log_block_status_pack(log_endpoint_sys_id,
                                              MAV_COMP_ID_ALL,
                                              &msg,
                                              _target_system_id,

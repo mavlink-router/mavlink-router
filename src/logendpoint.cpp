@@ -42,6 +42,9 @@
 
 #include "mainloop.h"
 
+// System ID variable definition
+int log_endpoint_sys_id = 1;
+
 #define ALIVE_TIMEOUT 5
 #define MAX_RETRIES   10
 
@@ -63,7 +66,7 @@ LogEndpoint::LogEndpoint(std::string name, LogOptions conf)
     , _config{conf}
 {
     assert(!_config.logs_dir.empty());
-    _add_sys_comp_id(LOG_ENDPOINT_SYSTEM_ID, 0);
+    _add_sys_comp_id(log_endpoint_sys_id, 0);
     _fsync_cb.aio_fildes = -1;
 
 #if HAVE_DECL_AIO_INIT

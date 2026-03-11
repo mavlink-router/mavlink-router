@@ -48,6 +48,7 @@ static const struct option long_options[] = {{"endpoints", required_argument, nu
                                              {"tcp-port", required_argument, nullptr, 't'},
                                              {"tcp-endpoint", required_argument, nullptr, 'p'},
                                              {"log", required_argument, nullptr, 'l'},
+                                             {"log-sysid", required_argument, nullptr, 'L'},
                                              {"telemetry-log", no_argument, nullptr, 'T'},
                                              {"debug-log-level", required_argument, nullptr, 'g'},
                                              {"syslog", no_argument, NULL, 'y'},
@@ -56,7 +57,7 @@ static const struct option long_options[] = {{"endpoints", required_argument, nu
                                              {"sniffer-sysid", required_argument, nullptr, 's'},
                                              {}};
 
-static const char *short_options = "he:rt:c:d:l:p:g:vV:s:T:y";
+static const char *short_options = "he:rt:c:d:l:L:p:g:vV:s:T:y";
 
 static void help(FILE *fp)
 {
@@ -80,6 +81,8 @@ static void help(FILE *fp)
         "  -d --conf-dir <dir>          Directory where to look for .conf files overriding\n"
         "                               default conf file.\n"
         "  -l --log <directory>         Enable Flight Stack logging\n"
+        "  -L --log-sysid <id>          System ID to log from (1-255). If not specified,\n"
+        "                               auto-detects from first autopilot heartbeat.\n"
         "  -T --telemetry-log           Enable Telemetry logging. Only works if Flight\n"
         "                               logging directoy is set.\n"
         "  -g --debug-log-level <level> Set debug log level. Levels are\n"
@@ -239,6 +242,16 @@ static int parse_argv(int argc, char *argv[], Configuration &config)
         }
         case 'l': {
             config.log_config.logs_dir.assign((const char *)optarg);
+            break;
+        }
+        case 'L': {
+            int id = atoi(optarg);
+            if ((id <= 0) || (id > 255)) {
+                log_error("Invalid log sysid %s", optarg);
+                help(stderr);
+                return -EINVAL;
+            }
+            log_endpoint_sys_id = id;
             break;
         }
         case 'T': {
