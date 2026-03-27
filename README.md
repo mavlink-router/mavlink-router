@@ -27,15 +27,15 @@ distros:
 
 Debian/Ubuntu:
 
-    $ sudo apt install git meson ninja-build pkg-config gcc g++ systemd
+    $ sudo apt install git meson ninja-build pkg-config gcc g++ systemd systemd-dev
 
 Fedora:
 
-    $ sudo dnf install git meson gcc g++ systemd
+    $ sudo dnf install git meson gcc g++ systemd systemd-dev
 
 Archlinux:
 
-    $ sudo pacman -S git meson gcc systemd
+    $ sudo pacman -S git meson gcc systemd systemd-dev
 
 Note that meson package must be version 0.55 or later. If your package manager
 does not have this version, a more recent version can be downloaded via pip:
