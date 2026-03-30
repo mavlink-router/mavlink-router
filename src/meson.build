@@ -27,6 +27,11 @@ exe_mavlink_router = executable('mavlink-routerd',
 )
 
 if dep_gtest.found()
+  test_args = [
+    '-Wno-float-equal',
+    '-Wno-suggest-attribute=noreturn',
+    '-Wno-missing-noreturn',
+  ]
   exe_mainloop_test = executable('mainloop_test',
           [
             'autolog.cpp',
@@ -47,6 +52,7 @@ if dep_gtest.found()
             dep_gtest,
             dep_rt,
           ],
+          cpp_args : test_args,
           link_with: libcommon_private,
           install: false,
   )
@@ -72,6 +78,7 @@ if dep_gtest.found()
             dep_gtest,
             dep_rt,
           ],
+          cpp_args : test_args,
           link_with: libcommon_private,
           install: false,
   )
