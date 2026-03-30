@@ -116,6 +116,12 @@
 # Default: <false>
 #FlowControl = false
 
+# Enable automatic reconnect after the configured timeout in seconds. Set to 0
+# to disable reconnection. When a UART device is disconnected or unavailable
+# at startup, mavlink-router will attempt to reconnect at this interval.
+# Default: 5 seconds
+#RetryTimeout = 5
+
 # Only allow specified MAVLink message IDs to be sent via this endpoint. An
 # empty list allows all message IDs.
 # Format: Comma separated list of integers
@@ -199,6 +205,7 @@
 [UartEndpoint alpha]
 Device = /dev/ttyS0
 Baud = 52000
+RetryTimeout = 5
 
 
 ##

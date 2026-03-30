@@ -39,4 +39,10 @@ public:
      * router exit.
      */
     virtual bool is_critical() { return true; };
+
+    /**
+     * Handle EPOLLERR events. Called when epoll reports an error
+     * on this fd. Can be used to trigger reconnection logic.
+     */
+    virtual void handle_error() { };
 };
