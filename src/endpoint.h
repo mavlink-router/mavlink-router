@@ -394,6 +394,7 @@ private:
     std::string _ip{};
     unsigned long _port = 0;
     bool _valid = true;
+    std::string _hostname{};
 
     bool is_ipv6;
     int _retry_timeout = 0; // disable retry by default

@@ -577,21 +577,83 @@ TEST(UdpEndpointTest, ConfigValidateAddress)
     config.port = 14550;
     config.mode = UdpEndpointConfig::Mode::Client;
 
-    // build valid config
+    // valid IPv4 address
     config.address = "127.0.0.1";
     EXPECT_TRUE(UdpEndpoint::validate_config(config)) << "with address " << config.address;
 
+    // valid bracketed IPv6 address
     config.address = "[::1]";
     EXPECT_TRUE(UdpEndpoint::validate_config(config)) << "with address " << config.address;
 
-    // build invalid IP address
+    // empty address must be rejected
     config.address = "";
     EXPECT_FALSE(UdpEndpoint::validate_config(config)) << "with address " << config.address;
 
+    // IPv4 wrapped in brackets is not valid IPv6 and not a hostname
     config.address = "[127.0.0.1]";
     EXPECT_FALSE(UdpEndpoint::validate_config(config)) << "with address " << config.address;
 
+    // bare IPv6 without brackets must be rejected
     config.address = "::1";
+    EXPECT_FALSE(UdpEndpoint::validate_config(config)) << "with address " << config.address;
+}
+
+TEST(UdpEndpointTest, ConfigValidateAddress_Hostname)
+{
+    UdpEndpointConfig config;
+    config.port = 14550;
+    config.mode = UdpEndpointConfig::Mode::Client;
+
+    // plain hostname
+    config.address = "localhost";
+    EXPECT_TRUE(UdpEndpoint::validate_config(config)) << "with address " << config.address;
+
+    // mDNS .local name
+    config.address = "jetson.local";
+    EXPECT_TRUE(UdpEndpoint::validate_config(config)) << "with address " << config.address;
+
+    // Tailscale VPN name
+    config.address = "jetson.tail8371dd.ts.net";
+    EXPECT_TRUE(UdpEndpoint::validate_config(config)) << "with address " << config.address;
+
+    // multi-label DNS name
+    config.address = "support.ardupilot.org";
+    EXPECT_TRUE(UdpEndpoint::validate_config(config)) << "with address " << config.address;
+
+    // single-label hostname with digits
+    config.address = "host42";
+    EXPECT_TRUE(UdpEndpoint::validate_config(config)) << "with address " << config.address;
+
+    // hostname with hyphens inside labels
+    config.address = "my-drone-01.local";
+    EXPECT_TRUE(UdpEndpoint::validate_config(config)) << "with address " << config.address;
+
+    // fully-qualified domain name with trailing dot
+    config.address = "drone.example.com.";
+    EXPECT_TRUE(UdpEndpoint::validate_config(config)) << "with address " << config.address;
+
+    // label starting with hyphen must be rejected
+    config.address = "-invalid.local";
+    EXPECT_FALSE(UdpEndpoint::validate_config(config)) << "with address " << config.address;
+
+    // label ending with hyphen must be rejected
+    config.address = "invalid-.local";
+    EXPECT_FALSE(UdpEndpoint::validate_config(config)) << "with address " << config.address;
+
+    // double dot (empty label) must be rejected
+    config.address = "drone..local";
+    EXPECT_FALSE(UdpEndpoint::validate_config(config)) << "with address " << config.address;
+
+    // leading dot (empty first label) must be rejected
+    config.address = ".drone.local";
+    EXPECT_FALSE(UdpEndpoint::validate_config(config)) << "with address " << config.address;
+
+    // underscore is not a valid hostname character
+    config.address = "my_drone.local";
+    EXPECT_FALSE(UdpEndpoint::validate_config(config)) << "with address " << config.address;
+
+    // spaces are not valid
+    config.address = "my drone.local";
     EXPECT_FALSE(UdpEndpoint::validate_config(config)) << "with address " << config.address;
 }
 
@@ -668,21 +730,82 @@ TEST(TcpEndpointTest, ConfigValidateAddress)
     TcpEndpointConfig config;
     config.port = 14550;
 
-    // build valid config
+    // valid IPv4 address
     config.address = "127.0.0.1";
     EXPECT_TRUE(TcpEndpoint::validate_config(config)) << "with address " << config.address;
 
+    // valid bracketed IPv6 address
     config.address = "[::1]";
     EXPECT_TRUE(TcpEndpoint::validate_config(config)) << "with address " << config.address;
 
-    // build invalid IP address
+    // empty address must be rejected
     config.address = "";
     EXPECT_FALSE(TcpEndpoint::validate_config(config)) << "with address " << config.address;
 
+    // IPv4 wrapped in brackets is not valid IPv6 and not a hostname
     config.address = "[127.0.0.1]";
     EXPECT_FALSE(TcpEndpoint::validate_config(config)) << "with address " << config.address;
 
+    // bare IPv6 without brackets must be rejected
     config.address = "::1";
+    EXPECT_FALSE(TcpEndpoint::validate_config(config)) << "with address " << config.address;
+}
+
+TEST(TcpEndpointTest, ConfigValidateAddress_Hostname)
+{
+    TcpEndpointConfig config;
+    config.port = 14550;
+
+    // plain hostname
+    config.address = "localhost";
+    EXPECT_TRUE(TcpEndpoint::validate_config(config)) << "with address " << config.address;
+
+    // mDNS .local name
+    config.address = "jetson.local";
+    EXPECT_TRUE(TcpEndpoint::validate_config(config)) << "with address " << config.address;
+
+    // Tailscale VPN name
+    config.address = "jetson.tail8371dd.ts.net";
+    EXPECT_TRUE(TcpEndpoint::validate_config(config)) << "with address " << config.address;
+
+    // multi-label DNS name
+    config.address = "support.ardupilot.org";
+    EXPECT_TRUE(TcpEndpoint::validate_config(config)) << "with address " << config.address;
+
+    // single-label hostname with digits
+    config.address = "host42";
+    EXPECT_TRUE(TcpEndpoint::validate_config(config)) << "with address " << config.address;
+
+    // hostname with hyphens inside labels
+    config.address = "my-drone-01.local";
+    EXPECT_TRUE(TcpEndpoint::validate_config(config)) << "with address " << config.address;
+
+    // fully-qualified domain name with trailing dot
+    config.address = "drone.example.com.";
+    EXPECT_TRUE(TcpEndpoint::validate_config(config)) << "with address " << config.address;
+
+    // label starting with hyphen must be rejected
+    config.address = "-invalid.local";
+    EXPECT_FALSE(TcpEndpoint::validate_config(config)) << "with address " << config.address;
+
+    // label ending with hyphen must be rejected
+    config.address = "invalid-.local";
+    EXPECT_FALSE(TcpEndpoint::validate_config(config)) << "with address " << config.address;
+
+    // double dot (empty label) must be rejected
+    config.address = "drone..local";
+    EXPECT_FALSE(TcpEndpoint::validate_config(config)) << "with address " << config.address;
+
+    // leading dot (empty first label) must be rejected
+    config.address = ".drone.local";
+    EXPECT_FALSE(TcpEndpoint::validate_config(config)) << "with address " << config.address;
+
+    // underscore is not a valid hostname character
+    config.address = "my_drone.local";
+    EXPECT_FALSE(TcpEndpoint::validate_config(config)) << "with address " << config.address;
+
+    // spaces are not valid
+    config.address = "my drone.local";
     EXPECT_FALSE(TcpEndpoint::validate_config(config)) << "with address " << config.address;
 }
 
