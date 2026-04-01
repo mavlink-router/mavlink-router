@@ -224,3 +224,25 @@ void BinLog::_restart()
     stop();
     start();
 }
+
+bool BinLog::_alive_timeout()
+{
+    if (_timeout_write_total == _stat.write.total) {
+        // we probably just got FMT plus a MODE change
+        // https://github.com/ArduPilot/ardupilot/blame/7b5ab8bb8cfd6fded545beb49585c54b38b04999/libraries/AP_Logger/AP_Logger_Backend.cpp#L454
+        if (_last_acked_seqno > 400) {
+            log_warning("No Log messages received in %u seconds restarting Log...", ALIVE_TIMEOUT);
+            stop();
+            start();
+        } else {
+            // silent restart
+            LogEndpoint::_delete_last_log();
+            stop();
+            start();
+        }
+
+    }
+
+    _timeout_write_total = _stat.write.total;
+    return true;
+}
