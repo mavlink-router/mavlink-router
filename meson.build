@@ -4,7 +4,7 @@ project(
         version: '3',
         license: 'Apache 2.0',
         default_options: [
-                'cpp_std=gnu++14',
+                'cpp_std=gnu++17',
                 'prefix=/usr',
                 'warning_level=2',
                 'buildtype=debugoptimized',
@@ -24,15 +24,23 @@ cc = meson.get_compiler('c')
 
 # Mandatory dependencies
 dep_math = cxx.find_library('m')
-dep_rt = cxx.find_library('rt')
+
 dep_thread = dependency('threads')
 
-# Optional dependencies
-systemd_system_unit_dir = get_option('systemdsystemunitdir')
-if systemd_system_unit_dir == 'auto'
-		dep_systemd = dependency('systemd')
-		systemd_system_unit_dir = dep_systemd.get_variable(pkgconfig: 'systemdsystemunitdir')
-endif
+deps_platform = []
+
+if host_machine.system() != 'darwin'
+        deps_platform += cxx.find_library('rt')
+        # Optional dependencies
+        systemd_system_unit_dir = get_option('systemdsystemunitdir')
+        if systemd_system_unit_dir == 'auto'
+                dep_systemd = dependency('systemd')
+                systemd_system_unit_dir = dep_systemd.get_variable(pkgconfig: 'systemdsystemunitdir')
+        endif
+else
+    dep_epoll_shim = dependency('epoll-shim-interpose', required: true)
+    deps_platform += dep_epoll_shim
+endif 
 
 dep_gtest = dependency('gtest', main : true, required : false)
 
@@ -128,12 +136,14 @@ mavlink_inc = include_directories('modules/mavlink_c_library_v2/ardupilotmega')
 src_inc = include_directories('src')
 
 # Additonal data to be installed
-configure_file(
-        input: 'mavlink-router.service.in',
-        output: 'mavlink-router.service',
-        configuration: conf,
-        install_dir: systemd_system_unit_dir,
-)
+if host_machine.system() != 'darwin'
+        configure_file(
+                input: 'mavlink-router.service.in',
+                output: 'mavlink-router.service',
+                configuration: conf,
+                install_dir: systemd_system_unit_dir,
+        )
+endif
 
 subdir('src')
 subdir('examples')

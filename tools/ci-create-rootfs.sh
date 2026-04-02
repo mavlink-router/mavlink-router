@@ -15,6 +15,6 @@ DISTRO="ubuntu:24.04"
 
 	podman build --arch $ARCH --from docker.io/$DISTRO -t $ARCH-rootfs $SCRIPT_DIR
 	container=$(podman run --arch $ARCH -d $ARCH-rootfs)
-} >/dev/null
+} >&2
 
 podman export $container

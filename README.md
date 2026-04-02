@@ -37,6 +37,10 @@ Archlinux:
 
     $ sudo pacman -S git meson gcc systemd
 
+macOS:
+
+    $ brew install meson ninja pkg-config epoll-shim
+
 Note that meson package must be version 0.55 or later. If your package manager
 does not have this version, a more recent version can be downloaded via pip:
 
