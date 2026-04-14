@@ -38,6 +38,7 @@ struct Configuration {
     Log::Level debug_log_level{Log::Level::INFO}; ///< conf "DebugLogLevel" or CLI "debug-log-level"
     Log::Backend log_backend{Log::Backend::STDERR}; ///< CLI "syslog"
     unsigned long dedup_period_ms;                  ///< conf "DeduplicationPeriod"
+    unsigned long max_tlog_file_size{209715200};    ///< conf "MaxTLogFileSize", default 200MB
 
     LogOptions log_config; ///< logging is in General config section, but internally an endpoint
     std::vector<UartEndpointConfig> uart_configs;

@@ -442,6 +442,7 @@ bool Mainloop::add_endpoints(const Configuration &config)
         g_endpoints.emplace_back(this->_log_endpoint);
 
         if (conf.log_telemetry) {
+            log_info("Creating TLog with MaxTLogFileSize: %lu", conf.max_tlog_file_size);
             auto tlog_endpoint = std::make_shared<TLog>(conf);
             tlog_endpoint->mark_unfinished_logs();
             g_endpoints.emplace_back(tlog_endpoint);

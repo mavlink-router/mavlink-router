@@ -25,6 +25,7 @@ class TLog : public LogEndpoint {
 public:
     TLog(LogOptions conf)
         : LogEndpoint{"TLog", conf}
+        , _max_tlog_file_size(conf.max_tlog_file_size)
     {
     }
 
@@ -35,8 +36,14 @@ public:
     int flush_pending_msgs() override { return -ENOSYS; }
 
 protected:
+    void _split_logfile();
     ssize_t _read_msg(uint8_t *buf, size_t len) override { return 0; };
     bool _logging_start_timeout() override;
 
     const char *_get_logfile_extension() override { return "tlog"; };
+
+private:
+    int64_t _max_tlog_file_size;
+    size_t _write_msg_count = 0;
+    void _check_and_split_logfile();
 };
