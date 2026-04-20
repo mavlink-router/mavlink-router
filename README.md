@@ -29,6 +29,10 @@ Debian/Ubuntu:
 
     $ sudo apt install git meson ninja-build pkg-config gcc g++ systemd
 
+If you are using Ubuntu 23 or newer, you may also need to install systemd-dev:
+
+    $ sudo apt install systemd-dev
+
 Fedora:
 
     $ sudo dnf install git meson gcc g++ systemd
