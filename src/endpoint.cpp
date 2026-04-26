@@ -27,7 +27,9 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <ifaddrs.h>
+#ifdef __linux__
 #include <linux/serial.h>
+#endif
 #include <net/if.h>
 #include <netdb.h>
 #include <netinet/tcp.h>
@@ -46,6 +48,18 @@
 #include <common/xtermios.h>
 
 #include "mainloop.h"
+
+/* Drop libepoll-shim's `#define close(...) epoll_shim_close(...)`
+ * macro after all system includes are pulled in. Without this the
+ * macro would substitute every `close()` call site, including
+ * member functions of TcpEndpoint, breaking compilation. epoll
+ * fds in this code base are only opened/closed in mainloop.cpp,
+ * where the macro remains active. */
+#ifdef __FreeBSD__
+#undef close
+#endif
+
+
 
 #define RX_BUF_MAX_SIZE (MAVLINK_MAX_PACKET_LEN * 4)
 #define TX_BUF_MAX_SIZE (8U * 1024U)
@@ -823,7 +837,7 @@ int UartEndpoint::set_speed(speed_t baudrate)
 
     log_info("UART [%d]%s: speed = %u", fd, _name.c_str(), baudrate);
 
-    if (ioctl(fd, TCFLSH, TCIOFLUSH) == -1) {
+    if (tcflush(fd, TCIOFLUSH) == -1) {
         log_error("UART [%d]%s: Could not flush terminal (%m)", fd, _name.c_str());
         return -1;
     }
@@ -916,6 +930,7 @@ bool UartEndpoint::open(const char *path)
     // chip sets if their driver does not support this
     // configuration request
 
+#ifdef __linux__
     {
         struct serial_struct serial_ctl;
 
@@ -936,7 +951,8 @@ bool UartEndpoint::open(const char *path)
     }
 
 set_latency_failed:
-    if (ioctl(fd, TCFLSH, TCIOFLUSH) == -1) {
+#endif /* __linux__ */
+    if (tcflush(fd, TCIOFLUSH) == -1) {
         log_error("Could not flush terminal on %s (%m)", path);
         goto fail;
     }

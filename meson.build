@@ -27,6 +27,12 @@ dep_math = cxx.find_library('m')
 dep_rt = cxx.find_library('rt')
 dep_thread = dependency('threads')
 
+if host_machine.system() != 'linux'
+    dep_epoll_shim = dependency('epoll-shim', required: true)
+else
+    dep_epoll_shim = dependency('', required: false)
+endif
+
 # Optional dependencies
 systemd_system_unit_dir = get_option('systemdsystemunitdir')
 if systemd_system_unit_dir == 'auto'

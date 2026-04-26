@@ -17,6 +17,7 @@
  */
 #pragma once
 
+#include <netinet/in.h>
 #include <common/conf_file.h>
 #include <common/mavlink.h>
 

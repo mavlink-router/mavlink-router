@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -60,8 +61,8 @@ static void handle_new_message(const mavlink_message_t *msg)
 
 int main(int argc, char *argv[])
 {
-    struct sockaddr_in sockaddr;
-    const socklen_t addrlen = sizeof(sockaddr);
+    struct sockaddr_in srv_addr;
+    const socklen_t addrlen = sizeof(srv_addr);
     int port = 14550;
     int fd;
 
@@ -86,12 +87,12 @@ int main(int argc, char *argv[])
     }
     printf("Connecting to: %s:%i\n", ip, port);
 
-    bzero(&sockaddr, addrlen);
-    sockaddr.sin_family = AF_INET;
-    sockaddr.sin_addr.s_addr = inet_addr(ip);
-    sockaddr.sin_port = htons(port);
+    bzero(&srv_addr, addrlen);
+    srv_addr.sin_family = AF_INET;
+    srv_addr.sin_addr.s_addr = inet_addr(ip);
+    srv_addr.sin_port = htons(port);
 
-    if (bind(fd, (struct sockaddr *)&sockaddr, addrlen) == -1) {
+    if (bind(fd, (struct sockaddr *)&srv_addr, addrlen) == -1) {
         fprintf(stderr, "Could not bind to %s:%d (%m)", ip, port);
         free(ip);
         return 1;
