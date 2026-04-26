@@ -53,3 +53,43 @@ int reset_uart(int fd);
 #define CBAUD 0
 #endif
 #endif /* __linux__ */
+
+/* Linux-only termios output flags used by endpoint.cpp; map to
+ * 0 so bitwise masks become no-ops on POSIX. */
+#ifndef __linux__
+#ifndef OLCUC
+#define OLCUC 0
+#endif
+#ifndef OFILL
+#define OFILL 0
+#endif
+#ifndef OFDEL
+#define OFDEL 0
+#endif
+#ifndef ONLRET
+#define ONLRET 0
+#endif
+#ifndef IUCLC
+#define IUCLC 0
+#endif
+#ifndef IUTF8
+#define IUTF8 0
+#endif
+#ifndef XCASE
+#define XCASE 0
+#endif
+#ifndef ECHOPRT
+#define ECHOPRT 0
+#endif
+#ifndef ECHOCTL
+#define ECHOCTL 0
+#endif
+#ifndef ECHOKE
+#define ECHOKE 0
+#endif
+/* Linux defines IPV6_ADD_MEMBERSHIP in <netinet/in.h>; POSIX /
+ * BSD only define IPV6_JOIN_GROUP. They identify the same option. */
+#ifndef IPV6_ADD_MEMBERSHIP
+#define IPV6_ADD_MEMBERSHIP IPV6_JOIN_GROUP
+#endif
+#endif /* __linux__ */

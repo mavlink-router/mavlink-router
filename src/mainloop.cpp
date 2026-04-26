@@ -20,6 +20,9 @@
 #include <assert.h>
 #include <signal.h>
 #include <sys/epoll.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
 #include <sys/timerfd.h>
 #include <unistd.h>
 

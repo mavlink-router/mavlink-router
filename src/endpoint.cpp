@@ -49,6 +49,18 @@
 
 #include "mainloop.h"
 
+/* Drop libepoll-shim's `#define close(...) epoll_shim_close(...)`
+ * macro after all system includes are pulled in. Without this the
+ * macro would substitute every `close()` call site, including
+ * member functions of TcpEndpoint, breaking compilation. epoll
+ * fds in this code base are only opened/closed in mainloop.cpp,
+ * where the macro remains active. */
+#ifdef __FreeBSD__
+#undef close
+#endif
+
+
+
 #define RX_BUF_MAX_SIZE (MAVLINK_MAX_PACKET_LEN * 4)
 #define TX_BUF_MAX_SIZE (8U * 1024U)
 

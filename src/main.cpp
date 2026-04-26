@@ -89,7 +89,13 @@ static void help(FILE *fp)
         "  -s --sniffer-sysid           Sysid that all messages are sent to.\n"
         "  -y --syslog                  Use syslog output instead of stderr\n"
         "  -h --help                    Print this message\n",
-        program_invocation_short_name);
+        (
+#ifdef __linux__
+        program_invocation_short_name
+#else
+        getprogname()
+#endif
+        ));
 }
 
 static uint32_t find_next_udp_port(const std::string &ip, const Configuration &config)
