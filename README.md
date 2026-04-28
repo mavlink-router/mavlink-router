@@ -292,6 +292,10 @@ Logs are collected on `.bin` (for Ardupilot) or `.ulg` (for PX4) files in the
 specified directory. Note that they are named `XXXXX-date-time`, where `XXXXX`
 is an increasing number.
 
+When `LogMode=while-armed` is used, `LogStopDelay` can be set to keep collecting
+post-disarm logger data before stopping the flight stack log. It defaults to `0`,
+which preserves the existing behavior of stopping immediately on disarm.
+
 #### Telemetry Logging
 
 Similar to flight stack logging its also possible to write the raw telemetry 
