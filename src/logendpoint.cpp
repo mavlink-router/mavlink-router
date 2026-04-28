@@ -54,6 +54,7 @@ const ConfFile::OptionsTable LogEndpoint::option_table[] = {
     {"MaxLogFiles",     false, ConfFile::parse_ul,                  OPTIONS_TABLE_STRUCT_FIELD(LogOptions, max_log_files)},
     {"LogSystemId",     false, LogEndpoint::parse_fcu_id,           OPTIONS_TABLE_STRUCT_FIELD(LogOptions, fcu_id)},
     {"LogTelemetry",    false, ConfFile::parse_bool,                OPTIONS_TABLE_STRUCT_FIELD(LogOptions, log_telemetry)},
+    {"LogStopDelay",    false, ConfFile::parse_ul,                  OPTIONS_TABLE_STRUCT_FIELD(LogOptions, log_stop_delay)},
     {}
 };
 // clang-format on
@@ -367,6 +368,11 @@ void LogEndpoint::stop()
         _timeout.alive = nullptr;
     }
 
+    if (_timeout.stop_delay) {
+        mainloop.del_timeout(_timeout.stop_delay);
+        _timeout.stop_delay = nullptr;
+    }
+
     if (_timeout.fsync) {
         mainloop.del_timeout(_timeout.fsync);
         _timeout.fsync = nullptr;
@@ -434,6 +440,11 @@ logging_timeout_error:
 
 bool LogEndpoint::_alive_timeout()
 {
+    if (_timeout.stop_delay) {
+        _timeout_write_total = _stat.write.total;
+        return true;
+    }
+
     if (_timeout_write_total == _stat.write.total) {
         log_warning("No Log messages received in %u seconds restarting Log...", ALIVE_TIMEOUT);
         stop();
@@ -477,6 +488,21 @@ bool LogEndpoint::_start_alive_timeout()
     return !!_timeout.alive;
 }
 
+void LogEndpoint::_cancel_stop_delay_timeout()
+{
+    if (_timeout.stop_delay) {
+        Mainloop::get_instance().del_timeout(_timeout.stop_delay);
+        _timeout.stop_delay = nullptr;
+    }
+}
+
+bool LogEndpoint::_stop_delay_timeout()
+{
+    _timeout.stop_delay = nullptr;
+    stop();
+    return false;
+}
+
 void LogEndpoint::_handle_auto_start_stop(const struct buffer *pbuf)
 {
     // wait until initialized
@@ -502,12 +528,42 @@ void LogEndpoint::_handle_auto_start_stop(const struct buffer *pbuf)
             const mavlink_heartbeat_t *heartbeat = (mavlink_heartbeat_t *)pbuf->curr.payload;
             const bool is_armed = heartbeat->base_mode & MAV_MODE_FLAG_SAFETY_ARMED;
 
-            if (_file == -1 && is_armed) {
+            if (is_armed) {
+                _cancel_stop_delay_timeout();
+
+                if (_file != -1) {
+                    return;
+                }
+
                 if (!start()) {
                     _config.log_mode = LogMode::disabled;
                 }
             } else if (_file != -1 && !is_armed) {
-                stop();
+
+                if (_config.log_stop_delay == 0) {
+                    stop();
+                    return;
+                }
+
+                if (_config.log_stop_delay > UINT32_MAX / MSEC_PER_SEC) {
+                    log_error("LogStopDelay=%lu is too large, stopping log immediately",
+                              _config.log_stop_delay);
+                    stop();
+                    return;
+                }
+
+                if (!_timeout.stop_delay) {
+                    log_info("Stopping log in %lu seconds after disarm", _config.log_stop_delay);
+                    _timeout.stop_delay = Mainloop::get_instance().add_timeout(
+                        _config.log_stop_delay * MSEC_PER_SEC,
+                        std::bind(&LogEndpoint::_stop_delay_timeout, this),
+                        this);
+
+                    if (!_timeout.stop_delay) {
+                        log_error("Unable to add timeout");
+                        stop();
+                    }
+                }
             }
         }
     }

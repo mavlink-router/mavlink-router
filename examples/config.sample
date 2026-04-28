@@ -67,10 +67,15 @@
 # Default: <always>
 #LogMode = always
 
+# Delay stopping while-armed logs after disarm.
+# This leaves time for post-disarm logger data to arrive.
+# Default: 0 seconds (stop immediately on disarm).
+#LogStopDelay = 0
+
 # Preset the FCU MAVLink ID from which logs should be received. If absent, it
 # will be set to the system ID of the first flight stack heartbeat received.
 # No default value.
-#LogSystemId = 
+#LogSystemId =
 
 # Auto-delete old log files until there's at least the configured amount of
 # bytes free on the storage device. Set to 0 to disable this functionality.
@@ -88,7 +93,7 @@
 # Default: 0 (disabled)
 #SnifferSysid=254
 
-# Log raw mavlink telemetry data as tlog files to disc. Only works if Logging path 
+# Log raw mavlink telemetry data as tlog files to disc. Only works if Logging path
 # is defined. This also uses LogMode to control the recording.
 # Valid values: <true>, <false>
 # Default: <false>
@@ -104,7 +109,7 @@
 
 # Path to UART device. like `/dev/ttyS0`
 # Mandatory, no default value
-#Device = 
+#Device =
 
 # List of baudrates to use for the UART connection. The values will be cycled
 # through until valid MAVLink packets are received.
@@ -120,80 +125,80 @@
 # empty list allows all message IDs.
 # Format: Comma separated list of integers
 # Default: Empty list (disabled)
-#AllowMsgIdOut = 
+#AllowMsgIdOut =
 
 # Block specified MAVLink message IDs to be sent via this endpoint. An
 # empty list won't block any message IDs.
 # Format: Comma separated list of integers
 # Default: Empty list (disabled)
-#BlockMsgIdOut = 
+#BlockMsgIdOut =
 
 # Only allow messages from the specified MAVLink source component IDs to be
 # sent via this endpoint. An empty list allows all source components.
 # Format: Comma separated list of integers
 # Default: Empty list (disabled)
-#AllowSrcCompOut = 
+#AllowSrcCompOut =
 
 # Block messages from the specified MAVLink source component IDs to be
 # sent via this endpoint. An empty list won't block any source components.
 # Format: Comma separated list of integers
 # Default: Empty list (disabled)
-#BlockSrcCompOut = 
+#BlockSrcCompOut =
 
 # Only allow messages from the specified MAVLink source systems to be sent via
 # this endpoint. An empty list allows all source components.
 # Format: Comma separated list of integers
 # Default: Empty list (disabled)
-#AllowSrcSysOut = 
+#AllowSrcSysOut =
 
 # Block messages from the specified MAVLink source systems to be sent via
 # this endpoint. An empty list won't block any source systems.
 # Format: Comma separated list of integers
 # Default: Empty list (disabled)
-#BlockSrcSysOut = 
+#BlockSrcSysOut =
 
 # Only allow specified MAVLink message IDs to be received on this endpoint.
 # An empty list allows all message IDs.
 # Format: Comma separated list of integers
 # Default: Empty list (disabled)
-#AllowMsgIdIn = 
+#AllowMsgIdIn =
 
 # Block specified MAVLink message IDs to be received on this endpoint.
 # An empty list won't block any message IDs.
 # Format: Comma separated list of integers
 # Default: Empty list (disabled)
-#BlockMsgIdIn = 
+#BlockMsgIdIn =
 
 # Only allow messages from the specified MAVLink source component IDs to be
 # received on this endpoint. An empty list allows all source components.
 # Format: Comma separated list of integers
 # Default: Empty list (disabled)
-#AllowSrcCompIn = 
+#AllowSrcCompIn =
 
 # Block messages from the specified MAVLink source component IDs to be
 # received on this endpoint. An empty list won't block any source components.
 # Format: Comma separated list of integers
 # Default: Empty list (disabled)
-#BlockSrcCompIn = 
+#BlockSrcCompIn =
 
 # Only allow messages from the specified MAVLink source systems to be received
 # on this endpoint. An empty list allows all source components.
 # Format: Comma separated list of integers
 # Default: Empty list (disabled)
-#AllowSrcSysIn = 
+#AllowSrcSysIn =
 
 # Block messages from the specified MAVLink source systems to be received
 # on this endpoint. An empty list won't block any source systems.
 # Format: Comma separated list of integers
 # Default: Empty list (disabled)
-#BlockSrcSysIn = 
+#BlockSrcSysIn =
 
 # Group parallel/ redundant data links to use the same list of connected
 # systems. This is needed to prevent messages from one of the parallel links
 # being send back on the other one right away.
 # Set the same name (arbitrary string) on multiple endpoints to group them.
 # Default: Empty (no group)
-#Group = 
+#Group =
 
 ## Example
 [UartEndpoint alpha]
@@ -212,22 +217,22 @@ Baud = 52000
 # behavior (client mode is <normal> in the configuraiton).
 # Valid values: <normal>, <server>
 # Mandatory, no default value
-#Mode = 
+#Mode =
 
 # Binding or target IP address (depending on mode).
 # IPv6 addresses must be encosed in square brackets like `[::1]`.
 # Binding to `0.0.0.0` or `[::]` will listen on all interfaces.
 # Mandatory, no default value
-#Address = 
+#Address =
 
 # UDP port to be used with the configured address.
 # Mandatory in <server> mode, no default value
 # Optional in <normal> mode, will select the next port not used by mavlink-router
 #   starting from 14550 when not speciifed.
-#Port = 
+#Port =
 
 # See description at UartEndpoint
-#AllowMsgIdOut = 
+#AllowMsgIdOut =
 
 ## Examples
 # bind to 0.0.0.0:10000
@@ -253,11 +258,11 @@ Port = 11000
 # Server IP address to connect to.
 # IPv6 addresses must be encosed in square brackets like `[::1]`.
 # Mandatory, no default value
-#Address = 
+#Address =
 
 # TCP port to be used with the configured address.
 # Mandatory, no default value
-#Port = 
+#Port =
 
 # Enable automatic reconnect after the configured timeout in seconds. Set to 0
 # to disable reconnection.
@@ -265,7 +270,7 @@ Port = 11000
 #RetryTimeout = 5
 
 # See description at UartEndpoint
-#AllowMsgIdOut = 
+#AllowMsgIdOut =
 
 ## Example
 # connect to 127.0.0.1:25760 (e.g. another mavlink-router)
