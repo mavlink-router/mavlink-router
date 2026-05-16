@@ -734,3 +734,43 @@ TEST(LogEndpointTest, Init)
     TLog tlog{conf};
     EXPECT_EQ(tlog.get_type(), ENDPOINT_TYPE_LOG);
 }
+
+TEST(LogEndpointTest, AcceptMsg_CapturesTargetedMessages)
+{
+    LogOptions conf;
+    conf.logs_dir = "./";
+
+    TLog tlog{conf};
+    buffer test_msg;
+    test_msg.curr.msg_id = 1;
+
+    // broadcast message: accepted (same as before)
+    test_msg.curr.src_sysid = 1;
+    test_msg.curr.src_compid = 1;
+    test_msg.curr.target_sysid = 0;
+    test_msg.curr.target_compid = 0;
+    EXPECT_EQ(tlog.accept_msg(&test_msg), Endpoint::AcceptState::Accepted);
+
+    // point-to-point message addressed to the FCU: must be captured even
+    // though the log endpoint has neither its sysid nor a matching sniffer
+    test_msg.curr.src_sysid = 255;
+    test_msg.curr.src_compid = 190;
+    test_msg.curr.target_sysid = 1;
+    test_msg.curr.target_compid = 1;
+    EXPECT_EQ(tlog.accept_msg(&test_msg), Endpoint::AcceptState::Accepted);
+
+    // point-to-point response from FCU back to GCS: also captured
+    test_msg.curr.src_sysid = 1;
+    test_msg.curr.src_compid = 1;
+    test_msg.curr.target_sysid = 255;
+    test_msg.curr.target_compid = 190;
+    EXPECT_EQ(tlog.accept_msg(&test_msg), Endpoint::AcceptState::Accepted);
+
+    // message emitted by the log endpoint itself is rejected to avoid
+    // logging our own outgoing control traffic
+    test_msg.curr.src_sysid = LOG_ENDPOINT_SYSTEM_ID;
+    test_msg.curr.src_compid = 0;
+    test_msg.curr.target_sysid = 1;
+    test_msg.curr.target_compid = 1;
+    EXPECT_EQ(tlog.accept_msg(&test_msg), Endpoint::AcceptState::Rejected);
+}
