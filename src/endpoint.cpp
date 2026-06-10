@@ -60,6 +60,7 @@ const ConfFile::OptionsTable UartEndpoint::option_table[] = {
     {"baud",            false, ConfFile::parse_uint32_vector,   OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, baudrates)},
     {"device",          true,  ConfFile::parse_stdstring,       OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, device)},
     {"FlowControl",     false, ConfFile::parse_bool,            OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, flowcontrol)},
+    {"RetryTimeout",    false, ConfFile::parse_i,               OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, retry_timeout)},
     {"AllowMsgIdOut",   false, ConfFile::parse_uint32_vector,   OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, allow_msg_id_out)},
     {"BlockMsgIdOut",   false, ConfFile::parse_uint32_vector,   OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, block_msg_id_out)},
     {"AllowSrcCompOut", false, ConfFile::parse_uint8_vector,    OPTIONS_TABLE_STRUCT_FIELD(UartEndpointConfig, allow_src_comp_out)},
@@ -733,25 +734,11 @@ bool UartEndpoint::setup(UartEndpointConfig conf)
         return false;
     }
 
-    if (!this->open(conf.device.c_str())) {
-        return false;
-    }
-
-    if (conf.baudrates.size() == 1) {
-        if (this->set_speed(conf.baudrates[0]) < 0) {
-            return false;
-        }
-    } else {
-        if (this->add_speeds(conf.baudrates) < 0) {
-            return false;
-        }
-    }
-
-    if (conf.flowcontrol) {
-        if (this->set_flow_control(true) < 0) {
-            return false;
-        }
-    }
+    _device = conf.device;
+    _flowcontrol = conf.flowcontrol;
+    _retry_timeout_interval = conf.retry_timeout;
+    _baudrates = conf.baudrates;
+    _current_baud_idx = 0;
 
     for (auto msg_id : conf.allow_msg_id_out) {
         this->filter_add_allowed_out_msg_id(msg_id);
@@ -792,6 +779,21 @@ bool UartEndpoint::setup(UartEndpointConfig conf)
     }
 
     this->_group_name = conf.group;
+
+    if (_baudrates.empty()) {
+        _baudrates.push_back(DEFAULT_BAUDRATE);
+    }
+
+    if (!this->open(_device.c_str()) || !_configure_port()) {
+        if (_retry_timeout_interval > 0) {
+            log_warning("Could not open UART %s. Re-trying every %d sec",
+                        _device.c_str(),
+                        _retry_timeout_interval);
+            _schedule_reconnect();
+            return true;
+        }
+        return false;
+    }
 
     return true;
 }
@@ -951,6 +953,101 @@ fail:
     return false;
 }
 
+void UartEndpoint::_close()
+{
+    if (fd >= 0) {
+        Mainloop::get_instance().remove_fd(fd);
+        ::close(fd);
+        log_info("UART [%d]%s: Connection closed", fd, _name.c_str());
+        fd = -1;
+    }
+
+    if (_change_baud_timeout != nullptr) {
+        Mainloop::get_instance().del_timeout(_change_baud_timeout);
+        _change_baud_timeout = nullptr;
+    }
+}
+
+bool UartEndpoint::_configure_port()
+{
+    if (_baudrates.empty()) {
+        return false;
+    }
+
+    if (_baudrates.size() == 1) {
+        if (set_speed(_baudrates[0]) < 0) {
+            return false;
+        }
+    } else {
+        if (add_speeds(_baudrates) < 0) {
+            return false;
+        }
+    }
+
+    if (_flowcontrol) {
+        if (set_flow_control(true) < 0) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool UartEndpoint::_retry_timeout_cb(void *data)
+{
+    auto *uart = static_cast<UartEndpoint *>(data);
+    if (!uart->reopen()) {
+        return true;
+    }
+
+    uart->_retry_timeout_timer = nullptr;
+    return false;
+}
+
+void UartEndpoint::_schedule_reconnect()
+{
+    if (_retry_timeout_interval <= 0) {
+        return;
+    }
+
+    if (_retry_timeout_timer != nullptr) {
+        return;
+    }
+
+    _close();
+
+    _retry_timeout_timer = Mainloop::get_instance().add_timeout(
+        MSEC_PER_SEC * _retry_timeout_interval,
+        std::bind(&UartEndpoint::_retry_timeout_cb, this, std::placeholders::_1),
+        this);
+
+    if (_retry_timeout_timer == nullptr) {
+        log_warning("Could not create retry timeout for UART %s\n"
+                    "No attempts to reconnect will be made",
+                    _device.c_str());
+    }
+}
+
+bool UartEndpoint::reopen()
+{
+    if (_retry_timeout_timer != nullptr) {
+        Mainloop::get_instance().del_timeout(_retry_timeout_timer);
+        _retry_timeout_timer = nullptr;
+    }
+
+    if (!this->open(_device.c_str()) || !_configure_port()) {
+        return false;
+    }
+
+    if (Mainloop::get_instance().add_fd(fd, this, EPOLLIN) < 0) {
+        _close();
+        return false;
+    }
+
+    log_info("UART [%d]%s: Reconnected to %s", fd, _name.c_str(), _device.c_str());
+    return true;
+}
+
 bool UartEndpoint::_change_baud_cb(void *data)
 {
     _current_baud_idx = (_current_baud_idx + 1) % _baudrates.size();
@@ -985,10 +1082,25 @@ int UartEndpoint::read_msg(struct buffer *pbuf)
 ssize_t UartEndpoint::_read_msg(uint8_t *buf, size_t len)
 {
     ssize_t r = ::read(fd, buf, len);
-    if ((r == -1 && errno == EAGAIN) || r == 0) {
+    if (r == 0) {
+        log_warning("UART [%d]%s: Device disconnected", fd, _name.c_str());
+        _schedule_reconnect();
         return 0;
     }
+
     if (r == -1) {
+        if (errno == EAGAIN) {
+            return 0;
+        }
+
+        if (errno == EBADF || errno == EIO || errno == ENODEV) {
+            log_warning("UART [%d]%s: Permanent read error (%m), scheduling reconnect",
+                        fd,
+                        _name.c_str());
+            _schedule_reconnect();
+            return 0;
+        }
+
         return -errno;
     }
 
@@ -1035,7 +1147,13 @@ int UartEndpoint::add_speeds(const std::vector<speed_t> &bauds)
         return -EINVAL;
     }
 
+    if (_change_baud_timeout != nullptr) {
+        Mainloop::get_instance().del_timeout(_change_baud_timeout);
+        _change_baud_timeout = nullptr;
+    }
+
     _baudrates = bauds;
+    _current_baud_idx = 0;
 
     set_speed(_baudrates[0]);
 
