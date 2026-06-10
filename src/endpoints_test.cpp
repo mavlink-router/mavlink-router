@@ -19,10 +19,13 @@
 #include "autolog.h"
 #include "binlog.h"
 #include "endpoint.h"
+#include "mainloop.h"
 #include "tlog.h"
 #include "ulog.h"
 
+#include <fcntl.h>
 #include <limits.h>
+#include <unistd.h>
 
 #include <gtest/gtest.h>
 
@@ -45,6 +48,14 @@ public:
     // expose some internal data
     void set_sys_comp_ids(std::vector<uint16_t> sys_comp_ids) { _sys_comp_ids = sys_comp_ids; };
     std::vector<uint16_t> get_sys_comp_ids() { return _sys_comp_ids; };
+};
+
+class TestUartEndpoint : public UartEndpoint {
+public:
+    explicit TestUartEndpoint(std::string name)
+        : UartEndpoint(std::move(name)) {}
+
+    using UartEndpoint::read_msg;
 };
 
 static uint16_t build_sys_comp_id(unsigned sysid, unsigned compid)
@@ -557,6 +568,80 @@ TEST(UartEndpointTest, ConfigValidateDevice)
     // build invalid baud rate
     config.device = "";
     EXPECT_FALSE(UartEndpoint::validate_config(config)) << "with device " << config.device;
+}
+
+TEST(UartEndpointTest, SetupWithMissingDeviceSchedulesRetry)
+{
+    Mainloop &mainloop = Mainloop::init();
+    ASSERT_EQ(0, mainloop.open());
+
+    UartEndpointConfig config;
+    config.device = "/dev/ttyFake";
+    config.baudrates.push_back(115200);
+    config.retry_timeout = 1;
+
+    UartEndpoint uart{"testname"};
+    EXPECT_TRUE(uart.setup(config));
+    EXPECT_EQ(1, uart.get_retry_timeout());
+    EXPECT_TRUE(uart.retry_timer_active());
+
+    mainloop.request_exit(0);
+    EXPECT_EQ(0, mainloop.loop());
+    mainloop.teardown();
+}
+
+static int open_pty_slave(std::string &device)
+{
+    int master = posix_openpt(O_RDWR | O_NOCTTY);
+    if (master < 0) {
+        return -1;
+    }
+
+    if (grantpt(master) < 0 || unlockpt(master) < 0) {
+        close(master);
+        return -1;
+    }
+
+    char buf[256];
+    if (ptsname_r(master, buf, sizeof(buf)) != 0) {
+        close(master);
+        return -1;
+    }
+
+    device = buf;
+    return master;
+}
+
+TEST(UartEndpointTest, RuntimeDisconnectSchedulesRetry)
+{
+    Mainloop &mainloop = Mainloop::init();
+    ASSERT_EQ(0, mainloop.open());
+
+    std::string device;
+    int master = open_pty_slave(device);
+    ASSERT_GE(master, 0);
+
+    UartEndpointConfig config;
+    config.device = device;
+    config.baudrates.push_back(115200);
+    config.retry_timeout = 1;
+
+    TestUartEndpoint uart{"testname"};
+    EXPECT_TRUE(uart.setup(config));
+    EXPECT_GE(uart.fd, 0);
+    EXPECT_FALSE(uart.retry_timer_active());
+
+    close(master);
+
+    buffer buf;
+    int ret = uart.read_msg(&buf);
+    EXPECT_EQ(0, ret);
+    EXPECT_EQ(-1, uart.fd);
+    EXPECT_TRUE(uart.retry_timer_active());
+
+    mainloop.request_exit(0);
+    EXPECT_EQ(0, mainloop.loop());
+    mainloop.teardown();
 }
 
 /**
