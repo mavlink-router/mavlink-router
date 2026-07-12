@@ -454,6 +454,18 @@ bool LogEndpoint::_fsync()
         // previous operation is still in progress
         return true;
     }
+
+    // Detect external deletion: st_nlink == 0 means the file was unlinked
+    // from the filesystem while we still hold an open fd. Reopen a new file
+    // so that logging is not silently lost.
+    struct stat st;
+    if (fstat(_file, &st) == 0 && st.st_nlink == 0) {
+        log_warning("Log file was deleted externally, reopening");
+        stop();
+        start();
+        return true;
+    }
+
     _fsync_cb.aio_fildes = _file;
     _fsync_cb.aio_sigevent.sigev_notify = SIGEV_NONE;
 
