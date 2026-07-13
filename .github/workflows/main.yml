@@ -10,9 +10,9 @@ jobs:
     name: Formatting Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Run clang-format style check on src directory
-        uses: jidicula/clang-format-action@v4.11.0
+        uses: jidicula/clang-format-action@v4.18.0
         with:
           clang-format-version: "13"
           check-path: "src"
@@ -32,7 +32,7 @@ jobs:
           - name: i686
             arch: native
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
           fetch-depth: 0  # otherwise the version header just contains the commit hash
@@ -109,18 +109,18 @@ jobs:
           overwrite: true
 
   alpine-linux:
-    name: alpine 3.14 (musl)
+    name: alpine 3.23 (musl)
     runs-on: ubuntu-24.04
     needs: [formatting-check]
-    container: alpine:3.14
+    container: alpine:3.23
     steps:
       - name: install dependencies
         run: apk update && apk add build-base git linux-headers pkgconf meson ninja
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
-          fetch-depth: 0  # otherwise the version header just contains the commit hash
+          fetch-depth: 0 # otherwise the version header just contains the commit hash
 
       - name: configure
         run: meson setup --werror -Dsystemdsystemunitdir=/usr/lib/systemd/system build .
