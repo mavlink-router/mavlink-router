@@ -1,6 +1,9 @@
 #include "mainloop.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfloat-equal"
 #include <gtest/gtest.h>
+#pragma GCC diagnostic pop
 
 TEST(MainLoopTest, termination)
 {
