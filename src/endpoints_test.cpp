@@ -650,7 +650,7 @@ TEST(UdpEndpointTest, ConfigValidateMode)
     EXPECT_FALSE(UdpEndpoint::validate_config(config)) << "with Undefined mode";
 }
 
-TEST(UdpEndpointTest, ConfigValidateSendPort)
+TEST(UdpEndpointTest, ConfigValidateSourcePort)
 {
     UdpEndpointConfig config;
     config.address = "127.0.0.1";
@@ -676,7 +676,7 @@ TEST(UdpEndpointTest, ConfigValidateSendPort)
     EXPECT_FALSE(UdpEndpoint::validate_config(config)) << "with send port ULONG_MAX";
 }
 
-TEST(UdpEndpointTest, FixedSendPortBind)
+TEST(UdpEndpointTest, FixedSourcePortBind)
 {
     Mainloop &mainloop = Mainloop::init();
 
@@ -700,7 +700,7 @@ TEST(UdpEndpointTest, FixedSendPortBind)
     mainloop.teardown();
 }
 
-TEST(UdpEndpointTest, FixedSendPortConflictFallsBackToDynamic)
+TEST(UdpEndpointTest, FixedSourcePortConflictFallsBackToDynamic)
 {
     Mainloop &mainloop = Mainloop::init();
 
@@ -799,7 +799,7 @@ TEST(TcpEndpointTest, ConfigValidatePort)
         << "with port " << std::to_string(config.port);
 }
 
-TEST(TcpEndpointTest, ConfigValidateSendPort)
+TEST(TcpEndpointTest, ConfigValidateSourcePort)
 {
     TcpEndpointConfig config;
     config.address = "127.0.0.1";
@@ -848,7 +848,7 @@ static int create_tcp_listener(unsigned long &server_port)
     return listener_fd;
 }
 
-TEST(TcpEndpointTest, FixedSendPortBind)
+TEST(TcpEndpointTest, FixedSourcePortBind)
 {
     Mainloop &mainloop = Mainloop::init();
 
@@ -880,7 +880,7 @@ TEST(TcpEndpointTest, FixedSendPortBind)
     mainloop.teardown();
 }
 
-TEST(TcpEndpointTest, FixedSendPortConflictFallsBackToDynamic)
+TEST(TcpEndpointTest, FixedSourcePortConflictFallsBackToDynamic)
 {
     Mainloop &mainloop = Mainloop::init();
 

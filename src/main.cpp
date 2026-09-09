@@ -71,12 +71,12 @@ static void help(FILE *fp)
         "                               continues increasing not to collide with previous\n"
         "                               ports. 'normal' mode. Optionally, a fixed local\n"
         "                               send port can be appended after '@' as\n"
-        "                               <sendport>, e.g. 192.168.7.1:14550@14580. If the\n"
+        "                               <sourceport>, e.g. 192.168.7.1:14550@14580. If the\n"
         "                               send port can't be bound (e.g. already in use),\n"
         "                               a dynamic port is used instead\n"
         "  -p --tcp-endpoint <ip:port>  Add TCP endpoint client, which will connect to given\n"
         "                               address. Optionally, a fixed local send port can\n"
-        "                               be appended after '@' as <sendport>, e.g.\n"
+        "                               be appended after '@' as <sourceport>, e.g.\n"
         "                               192.168.7.1:14550@14580. If the send port can't\n"
         "                               be bound (e.g. already in use), a dynamic port is\n"
         "                               used instead\n"
@@ -229,7 +229,7 @@ static int parse_argv(int argc, char *argv[], Configuration &config)
             opt_udp.mode = UdpEndpointConfig::Mode::Client;
 
             // Optional fixed local send port, separated from the target by '@':
-            // <ip[:port]>[@<sendport>], where <sendport> is a plain port number
+            // <ip[:port]>[@<sourceport>], where <sourceport> is a plain port number
             // (e.g. 14580). The socket is always bound to any local interface.
             char *arg = strdup(optarg);
             char *send_spec = strrchr(arg, '@');
@@ -330,7 +330,7 @@ static int parse_argv(int argc, char *argv[], Configuration &config)
             opt_tcp.name = "CLI";
 
             // Optional fixed local send port, separated from the target by '@':
-            // <ip:port>[@<sendport>], where <sendport> is a plain port number
+            // <ip:port>[@<sourceport>], where <sourceport> is a plain port number
             // (e.g. 14580). The socket is always bound to any local interface.
             char *arg = strdup(optarg);
             char *send_spec = strrchr(arg, '@');

@@ -234,7 +234,7 @@ Baud = 52000
 # Only used in <normal> mode, ignored (with a warning) in <server> mode.
 # Valid values: 1-65535
 # Default: 0 (dynamic, OS-assigned source port)
-#SendPort = 14580
+#SourcePort = 14580
 
 # See description at UartEndpoint
 #AllowMsgIdOut = 
@@ -257,7 +257,7 @@ Port = 11000
 Mode = Normal
 Address = 127.0.0.1
 Port = 11000
-SendPort = 14580
+SourcePort = 14580
 
 
 ##
@@ -283,7 +283,7 @@ SendPort = 14580
 # dynamic port.
 # Valid values: 1-65535
 # Default: 0 (dynamic, OS-assigned source port)
-#SendPort = 14580
+#SourcePort = 14580
 
 # Enable automatic reconnect after the configured timeout in seconds. Set to 0
 # to disable reconnection.
@@ -303,4 +303,4 @@ Port = 25760
 [TcpEndpoint epsilon]
 Address = 127.0.0.1
 Port = 25760
-SendPort = 14580
+SourcePort = 14580
