@@ -81,7 +81,7 @@ const ConfFile::OptionsTable UdpEndpoint::option_table[] = {
     {"address",         true,   ConfFile::parse_stdstring,      OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, address)},
     {"mode",            true,   UdpEndpoint::parse_udp_mode,    OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, mode)},
     {"port",            false,  ConfFile::parse_ul,             OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, port)},
-    {"SourcePort",      false,  ConfFile::parse_ul,             OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, send_port)},
+    {"SourcePort",      false,  ConfFile::parse_ul,             OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, source_port)},
     {"filter",          false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_msg_id_out)}, // legacy AllowMsgIdOut
     {"AllowMsgIdOut",   false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_msg_id_out)},
     {"BlockMsgIdOut",   false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, block_msg_id_out)},
@@ -103,7 +103,7 @@ const char *TcpEndpoint::section_pattern = "tcpendpoint *";
 const ConfFile::OptionsTable TcpEndpoint::option_table[] = {
     {"address",         true,   ConfFile::parse_stdstring,      OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, address)},
     {"port",            true,   ConfFile::parse_ul,             OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, port)},
-    {"SourcePort",      false,  ConfFile::parse_ul,             OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, send_port)},
+    {"SourcePort",      false,  ConfFile::parse_ul,             OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, source_port)},
     {"RetryTimeout",    false,  ConfFile::parse_i,              OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, retry_timeout)},
     {"AllowMsgIdOut",   false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, allow_msg_id_out)},
     {"BlockMsgIdOut",   false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(TcpEndpointConfig, block_msg_id_out)},
@@ -1084,12 +1084,12 @@ bool UdpEndpoint::setup(UdpEndpointConfig conf)
         return false;
     }
 
-    if (conf.mode == UdpEndpointConfig::Mode::Server && conf.send_port != 0) {
+    if (conf.mode == UdpEndpointConfig::Mode::Server && conf.source_port != 0) {
         log_warning("UDP %s: SourcePort is only used in client (normal) mode, ignoring it",
                     conf.name.c_str());
     }
 
-    if (!this->open(conf.address.c_str(), conf.port, conf.mode, conf.send_port)) {
+    if (!this->open(conf.address.c_str(), conf.port, conf.mode, conf.source_port)) {
         log_error("Could not open %s:%ld", conf.address.c_str(), conf.port);
         return false;
     }
@@ -1138,7 +1138,7 @@ bool UdpEndpoint::setup(UdpEndpointConfig conf)
 }
 
 int UdpEndpoint::open_ipv6(const char *ip, unsigned long port, UdpEndpointConfig::Mode mode,
-                           unsigned long send_port)
+                           unsigned long source_port)
 {
     fd = socket(AF_INET6, SOCK_DGRAM, 0);
     if (fd < 0) {
@@ -1190,21 +1190,21 @@ int UdpEndpoint::open_ipv6(const char *ip, unsigned long port, UdpEndpointConfig
     /* Bind a fixed local (send) port for client mode, if requested.
      * The socket is bound to any local interface.
      * On failure, warn and fall back to a dynamic (OS-assigned) port. */
-    if (mode == UdpEndpointConfig::Mode::Client && send_port != 0) {
+    if (mode == UdpEndpointConfig::Mode::Client && source_port != 0) {
         struct sockaddr_in6 bind_addr {};
         bind_addr.sin6_family = AF_INET6;
-        bind_addr.sin6_port = htons(send_port);
+        bind_addr.sin6_port = htons(source_port);
         bind_addr.sin6_addr = in6addr_any;
 
         if (bind(fd, (struct sockaddr *)&bind_addr, sizeof(bind_addr)) < 0) {
             log_warning("UDP %s: Could not bind fixed send port %lu for [%s]:%lu (%m), "
                         "falling back to dynamic port",
                         _name.c_str(),
-                        send_port,
+                        source_port,
                         ip_str,
                         port);
         } else {
-            log_info("UDP %s: Using fixed send port %lu", _name.c_str(), send_port);
+            log_info("UDP %s: Using fixed send port %lu", _name.c_str(), source_port);
         }
     }
 
@@ -1221,7 +1221,7 @@ fail:
 }
 
 int UdpEndpoint::open_ipv4(const char *ip, unsigned long port, UdpEndpointConfig::Mode mode,
-                           unsigned long send_port)
+                           unsigned long source_port)
 {
     fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (fd < 0) {
@@ -1236,21 +1236,21 @@ int UdpEndpoint::open_ipv4(const char *ip, unsigned long port, UdpEndpointConfig
     /* Bind a fixed local (send) port for client mode, if requested.
      * The socket is bound to any local interface.
      * On failure, warn and fall back to a dynamic (OS-assigned) port. */
-    if (mode == UdpEndpointConfig::Mode::Client && send_port != 0) {
+    if (mode == UdpEndpointConfig::Mode::Client && source_port != 0) {
         struct sockaddr_in bind_addr {};
         bind_addr.sin_family = AF_INET;
-        bind_addr.sin_port = htons(send_port);
+        bind_addr.sin_port = htons(source_port);
         bind_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
         if (bind(fd, (struct sockaddr *)&bind_addr, sizeof(bind_addr)) < 0) {
             log_warning("UDP %s: Could not bind fixed send port %lu for %s:%lu (%m), "
                         "falling back to dynamic port",
                         _name.c_str(),
-                        send_port,
+                        source_port,
                         ip,
                         port);
         } else {
-            log_info("UDP %s: Using fixed send port %lu for %s:%lu", _name.c_str(), send_port, ip, port);
+            log_info("UDP %s: Using fixed send port %lu for %s:%lu", _name.c_str(), source_port, ip, port);
         }
     }
 
@@ -1273,7 +1273,7 @@ fail:
 }
 
 bool UdpEndpoint::open(const char *ip, unsigned long port, UdpEndpointConfig::Mode mode,
-                       unsigned long send_port)
+                       unsigned long source_port)
 {
     const int broadcast_val = 1;
 
@@ -1281,9 +1281,9 @@ bool UdpEndpoint::open(const char *ip, unsigned long port, UdpEndpointConfig::Mo
 
     // setup the special IPv6/IPv4 part
     if (this->is_ipv6) {
-        open_ipv6(ip, port, mode, send_port);
+        open_ipv6(ip, port, mode, source_port);
     } else {
-        open_ipv4(ip, port, mode, send_port);
+        open_ipv4(ip, port, mode, source_port);
     }
 
     if (fd < 0) {
@@ -1481,8 +1481,8 @@ bool UdpEndpoint::validate_config(const UdpEndpointConfig &config)
         return false;
     }
 
-    if (config.send_port > 65535) {
-        log_error("UdpEndpoint %s: Invalid send port %lu", config.name.c_str(), config.send_port);
+    if (config.source_port > 65535) {
+        log_error("UdpEndpoint %s: Invalid send port %lu", config.name.c_str(), config.source_port);
         return false;
     }
 
@@ -1514,7 +1514,7 @@ bool TcpEndpoint::setup(TcpEndpointConfig conf)
 
     this->_ip = conf.address;
     this->_port = conf.port;
-    this->_send_port = conf.send_port;
+    this->_source_port = conf.source_port;
     this->_retry_timeout = conf.retry_timeout;
 
     for (auto msg_id : conf.allow_msg_id_out) {
@@ -1557,7 +1557,7 @@ bool TcpEndpoint::setup(TcpEndpointConfig conf)
 
     this->_group_name = conf.group;
 
-    if (!this->open(conf.address, conf.port, conf.send_port)) {
+    if (!this->open(conf.address, conf.port, conf.source_port)) {
         log_warning("Could not open %s:%ld, re-trying every %d sec",
                     conf.address.c_str(),
                     conf.port,
@@ -1574,7 +1574,7 @@ bool TcpEndpoint::setup(TcpEndpointConfig conf)
 
 bool TcpEndpoint::reopen()
 {
-    return this->open(_ip, _port, _send_port);
+    return this->open(_ip, _port, _source_port);
 }
 
 int TcpEndpoint::accept(int listener_fd)
@@ -1610,7 +1610,7 @@ int TcpEndpoint::accept(int listener_fd)
 }
 
 int TcpEndpoint::open_ipv6(const char *ip, unsigned long port, sockaddr_in6 &sockaddr6,
-                           unsigned long send_port)
+                           unsigned long source_port)
 {
     auto fd = socket(AF_INET6, SOCK_STREAM, 0);
     if (fd == -1) {
@@ -1640,10 +1640,10 @@ int TcpEndpoint::open_ipv6(const char *ip, unsigned long port, sockaddr_in6 &soc
     /* Bind a fixed local (send) port, if requested. The socket is bound to
      * any local interface. On failure, warn and fall back to a dynamic
      * (OS-assigned) port. */
-    if (send_port != 0) {
+    if (source_port != 0) {
         struct sockaddr_in6 bind_addr {};
         bind_addr.sin6_family = AF_INET6;
-        bind_addr.sin6_port = htons(send_port);
+        bind_addr.sin6_port = htons(source_port);
         bind_addr.sin6_addr = in6addr_any;
 
         /* allow rebinding the same send port on reconnect, while old sockets
@@ -1652,18 +1652,18 @@ int TcpEndpoint::open_ipv6(const char *ip, unsigned long port, sockaddr_in6 &soc
         if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
             log_warning("TCP %s: Could not set SO_REUSEADDR for fixed send port %lu (%m)",
                         _name.c_str(),
-                        send_port);
+                        source_port);
         }
 
         if (bind(fd, (struct sockaddr *)&bind_addr, sizeof(bind_addr)) < 0) {
             log_warning("TCP %s: Could not bind fixed send port %lu for [%s]:%lu (%m), "
                         "falling back to dynamic port",
                         _name.c_str(),
-                        send_port,
+                        source_port,
                         ip_str,
                         port);
         } else {
-            log_info("TCP %s: Using fixed send port %lu", _name.c_str(), send_port);
+            log_info("TCP %s: Using fixed send port %lu", _name.c_str(), source_port);
         }
     }
 
@@ -1678,7 +1678,7 @@ fail:
 }
 
 int TcpEndpoint::open_ipv4(const char *ip, unsigned long port, sockaddr_in &sockaddr,
-                           unsigned long send_port)
+                           unsigned long source_port)
 {
     auto fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd == -1) {
@@ -1689,10 +1689,10 @@ int TcpEndpoint::open_ipv4(const char *ip, unsigned long port, sockaddr_in &sock
     /* Bind a fixed local (send) port, if requested. The socket is bound to
      * any local interface. On failure, warn and fall back to a dynamic
      * (OS-assigned) port. */
-    if (send_port != 0) {
+    if (source_port != 0) {
         struct sockaddr_in bind_addr {};
         bind_addr.sin_family = AF_INET;
-        bind_addr.sin_port = htons(send_port);
+        bind_addr.sin_port = htons(source_port);
         bind_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
         /* allow rebinding the same send port on reconnect, while old sockets
@@ -1701,18 +1701,18 @@ int TcpEndpoint::open_ipv4(const char *ip, unsigned long port, sockaddr_in &sock
         if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
             log_warning("TCP %s: Could not set SO_REUSEADDR for fixed send port %lu (%m)",
                         _name.c_str(),
-                        send_port);
+                        source_port);
         }
 
         if (bind(fd, (struct sockaddr *)&bind_addr, sizeof(bind_addr)) < 0) {
             log_warning("TCP %s: Could not bind fixed send port %lu for %s:%lu (%m), "
                         "falling back to dynamic port",
                         _name.c_str(),
-                        send_port,
+                        source_port,
                         ip,
                         port);
         } else {
-            log_info("TCP %s: Using fixed send port %lu for %s:%lu", _name.c_str(), send_port, ip, port);
+            log_info("TCP %s: Using fixed send port %lu for %s:%lu", _name.c_str(), source_port, ip, port);
         }
     }
 
@@ -1723,7 +1723,7 @@ int TcpEndpoint::open_ipv4(const char *ip, unsigned long port, sockaddr_in &sock
     return fd;
 }
 
-bool TcpEndpoint::open(const std::string &ip, unsigned long port, unsigned long send_port)
+bool TcpEndpoint::open(const std::string &ip, unsigned long port, unsigned long source_port)
 {
     this->is_ipv6 = ip_str_is_ipv6(ip.c_str());
 
@@ -1731,11 +1731,11 @@ bool TcpEndpoint::open(const std::string &ip, unsigned long port, unsigned long 
     struct sockaddr *sock;
     socklen_t addrlen;
     if (this->is_ipv6) {
-        fd = open_ipv6(ip.c_str(), port, this->sockaddr6, send_port);
+        fd = open_ipv6(ip.c_str(), port, this->sockaddr6, source_port);
         sock = (struct sockaddr *)&this->sockaddr6;
         addrlen = sizeof(sockaddr6);
     } else {
-        fd = open_ipv4(ip.c_str(), port, this->sockaddr, send_port);
+        fd = open_ipv4(ip.c_str(), port, this->sockaddr, source_port);
         sock = (struct sockaddr *)&this->sockaddr;
         addrlen = sizeof(sockaddr);
     }
@@ -1902,8 +1902,8 @@ bool TcpEndpoint::validate_config(const TcpEndpointConfig &config)
         return false;
     }
 
-    if (config.send_port > 65535) {
-        log_error("TcpEndpoint %s: Invalid send port %lu", config.name.c_str(), config.send_port);
+    if (config.source_port > 65535) {
+        log_error("TcpEndpoint %s: Invalid send port %lu", config.name.c_str(), config.source_port);
         return false;
     }
 

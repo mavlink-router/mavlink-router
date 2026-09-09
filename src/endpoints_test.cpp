@@ -658,21 +658,21 @@ TEST(UdpEndpointTest, ConfigValidateSourcePort)
     config.mode = UdpEndpointConfig::Mode::Client;
 
     // unset send port (dynamic port) is valid
-    config.send_port = 0;
+    config.source_port = 0;
     EXPECT_TRUE(UdpEndpoint::validate_config(config)) << "with unset send port";
 
     // valid send ports
-    config.send_port = 1;
+    config.source_port = 1;
     EXPECT_TRUE(UdpEndpoint::validate_config(config)) << "with send port 1";
 
-    config.send_port = 65535;
+    config.source_port = 65535;
     EXPECT_TRUE(UdpEndpoint::validate_config(config)) << "with send port 65535";
 
     // invalid send ports
-    config.send_port = 65536;
+    config.source_port = 65536;
     EXPECT_FALSE(UdpEndpoint::validate_config(config)) << "with send port 65536";
 
-    config.send_port = ULONG_MAX;
+    config.source_port = ULONG_MAX;
     EXPECT_FALSE(UdpEndpoint::validate_config(config)) << "with send port ULONG_MAX";
 }
 
@@ -680,14 +680,14 @@ TEST(UdpEndpointTest, FixedSourcePortBind)
 {
     Mainloop &mainloop = Mainloop::init();
 
-    const unsigned long send_port = 45870;
+    const unsigned long source_port = 45870;
 
     UdpEndpointConfig config{};
     config.name = "fixed-send-port";
     config.mode = UdpEndpointConfig::Mode::Client;
     config.address = "127.0.0.1";
     config.port = 14550;
-    config.send_port = send_port;
+    config.source_port = source_port;
 
     UdpEndpoint udp{config.name};
     ASSERT_TRUE(udp.setup(config));
@@ -695,7 +695,7 @@ TEST(UdpEndpointTest, FixedSourcePortBind)
     struct sockaddr_in addr {};
     socklen_t addrlen = sizeof(addr);
     ASSERT_EQ(getsockname(udp.fd, (struct sockaddr *)&addr, &addrlen), 0);
-    EXPECT_EQ(ntohs(addr.sin_port), send_port);
+    EXPECT_EQ(ntohs(addr.sin_port), source_port);
 
     mainloop.teardown();
 }
@@ -704,14 +704,14 @@ TEST(UdpEndpointTest, FixedSourcePortConflictFallsBackToDynamic)
 {
     Mainloop &mainloop = Mainloop::init();
 
-    const unsigned long send_port = 45871;
+    const unsigned long source_port = 45871;
 
     UdpEndpointConfig config{};
     config.name = "conflicting-send-port";
     config.mode = UdpEndpointConfig::Mode::Client;
     config.address = "127.0.0.1";
     config.port = 14550;
-    config.send_port = send_port;
+    config.source_port = source_port;
 
     // occupy the requested send port, so the bind of the endpoint fails
     int blocker_fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -719,7 +719,7 @@ TEST(UdpEndpointTest, FixedSourcePortConflictFallsBackToDynamic)
     struct sockaddr_in blocker_addr {};
     blocker_addr.sin_family = AF_INET;
     blocker_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    blocker_addr.sin_port = htons(send_port);
+    blocker_addr.sin_port = htons(source_port);
     ASSERT_EQ(bind(blocker_fd, (struct sockaddr *)&blocker_addr, sizeof(blocker_addr)), 0);
 
     UdpEndpoint udp{config.name};
@@ -728,7 +728,7 @@ TEST(UdpEndpointTest, FixedSourcePortConflictFallsBackToDynamic)
     struct sockaddr_in addr {};
     socklen_t addrlen = sizeof(addr);
     ASSERT_EQ(getsockname(udp.fd, (struct sockaddr *)&addr, &addrlen), 0);
-    EXPECT_NE(ntohs(addr.sin_port), send_port);
+    EXPECT_NE(ntohs(addr.sin_port), source_port);
 
     close(blocker_fd);
     mainloop.teardown();
@@ -806,21 +806,21 @@ TEST(TcpEndpointTest, ConfigValidateSourcePort)
     config.port = 14550;
 
     // unset send port (dynamic port) is valid
-    config.send_port = 0;
+    config.source_port = 0;
     EXPECT_TRUE(TcpEndpoint::validate_config(config)) << "with unset send port";
 
     // valid send ports
-    config.send_port = 1;
+    config.source_port = 1;
     EXPECT_TRUE(TcpEndpoint::validate_config(config)) << "with send port 1";
 
-    config.send_port = 65535;
+    config.source_port = 65535;
     EXPECT_TRUE(TcpEndpoint::validate_config(config)) << "with send port 65535";
 
     // invalid send ports
-    config.send_port = 65536;
+    config.source_port = 65536;
     EXPECT_FALSE(TcpEndpoint::validate_config(config)) << "with send port 65536";
 
-    config.send_port = ULONG_MAX;
+    config.source_port = ULONG_MAX;
     EXPECT_FALSE(TcpEndpoint::validate_config(config)) << "with send port ULONG_MAX";
 }
 
@@ -852,7 +852,7 @@ TEST(TcpEndpointTest, FixedSourcePortBind)
 {
     Mainloop &mainloop = Mainloop::init();
 
-    const unsigned long send_port = 45874;
+    const unsigned long source_port = 45874;
     unsigned long server_port = 0;
 
     int listener_fd = create_tcp_listener(server_port);
@@ -862,7 +862,7 @@ TEST(TcpEndpointTest, FixedSourcePortBind)
     config.name = "fixed-send-port";
     config.address = "127.0.0.1";
     config.port = server_port;
-    config.send_port = send_port;
+    config.source_port = source_port;
     config.retry_timeout = 0;
 
     TcpEndpoint tcp{config.name};
@@ -872,7 +872,7 @@ TEST(TcpEndpointTest, FixedSourcePortBind)
     struct sockaddr_in addr {};
     socklen_t addrlen = sizeof(addr);
     ASSERT_EQ(getsockname(tcp.fd, (struct sockaddr *)&addr, &addrlen), 0);
-    EXPECT_EQ(ntohs(addr.sin_port), send_port);
+    EXPECT_EQ(ntohs(addr.sin_port), source_port);
 
     // close before mainloop teardown, b/c close() removes the fd from the mainloop
     tcp.close();
@@ -884,7 +884,7 @@ TEST(TcpEndpointTest, FixedSourcePortConflictFallsBackToDynamic)
 {
     Mainloop &mainloop = Mainloop::init();
 
-    const unsigned long send_port = 45875;
+    const unsigned long source_port = 45875;
     unsigned long server_port = 0;
 
     int listener_fd = create_tcp_listener(server_port);
@@ -896,14 +896,14 @@ TEST(TcpEndpointTest, FixedSourcePortConflictFallsBackToDynamic)
     struct sockaddr_in blocker_addr {};
     blocker_addr.sin_family = AF_INET;
     blocker_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    blocker_addr.sin_port = htons(send_port);
+    blocker_addr.sin_port = htons(source_port);
     ASSERT_EQ(bind(blocker_fd, (struct sockaddr *)&blocker_addr, sizeof(blocker_addr)), 0);
 
     TcpEndpointConfig config{};
     config.name = "conflicting-send-port";
     config.address = "127.0.0.1";
     config.port = server_port;
-    config.send_port = send_port;
+    config.source_port = source_port;
     config.retry_timeout = 0;
 
     TcpEndpoint tcp{config.name};
@@ -913,7 +913,7 @@ TEST(TcpEndpointTest, FixedSourcePortConflictFallsBackToDynamic)
     struct sockaddr_in addr {};
     socklen_t addrlen = sizeof(addr);
     ASSERT_EQ(getsockname(tcp.fd, (struct sockaddr *)&addr, &addrlen), 0);
-    EXPECT_NE(ntohs(addr.sin_port), send_port);
+    EXPECT_NE(ntohs(addr.sin_port), source_port);
 
     // close before mainloop teardown, b/c close() removes the fd from the mainloop
     tcp.close();

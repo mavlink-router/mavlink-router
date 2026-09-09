@@ -138,7 +138,7 @@ static int split_on_last_colon(const char *str, char **base, unsigned long *numb
  * The socket is always bound to any local interface, so only a plain port
  * number is accepted (e.g. 14580).
  */
-static int parse_send_port_spec(const char *spec, unsigned long &send_port)
+static int parse_source_port_spec(const char *spec, unsigned long &source_port)
 {
     unsigned long port;
 
@@ -147,7 +147,7 @@ static int parse_send_port_spec(const char *spec, unsigned long &send_port)
         return -EINVAL;
     }
 
-    send_port = port;
+    source_port = port;
 
     return 0;
 }
@@ -244,7 +244,7 @@ static int parse_argv(int argc, char *argv[], Configuration &config)
                     return -EINVAL;
                 }
 
-                if (parse_send_port_spec(send_spec, opt_udp.send_port) < 0) {
+                if (parse_source_port_spec(send_spec, opt_udp.source_port) < 0) {
                     free(arg);
                     help(stderr); // error message was already logged
                     return -EINVAL;
@@ -345,7 +345,7 @@ static int parse_argv(int argc, char *argv[], Configuration &config)
                     return -EINVAL;
                 }
 
-                if (parse_send_port_spec(send_spec, opt_tcp.send_port) < 0) {
+                if (parse_source_port_spec(send_spec, opt_tcp.source_port) < 0) {
                     free(arg);
                     help(stderr); // error message was already logged
                     return -EINVAL;
