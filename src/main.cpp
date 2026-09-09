@@ -69,9 +69,17 @@ static void help(FILE *fp)
         "  -e --endpoint <ip[:port]>    Add UDP endpoint to communicate. Port is optional\n"
         "                               and in case it's not given it starts in 14550 and\n"
         "                               continues increasing not to collide with previous\n"
-        "                               ports. 'normal' mode\n"
+        "                               ports. 'normal' mode. Optionally, a fixed local\n"
+        "                               send port can be appended after '@' as\n"
+        "                               <sendport>, e.g. 192.168.7.1:14550@14580. If the\n"
+        "                               send port can't be bound (e.g. already in use),\n"
+        "                               a dynamic port is used instead\n"
         "  -p --tcp-endpoint <ip:port>  Add TCP endpoint client, which will connect to given\n"
-        "                               address\n"
+        "                               address. Optionally, a fixed local send port can\n"
+        "                               be appended after '@' as <sendport>, e.g.\n"
+        "                               192.168.7.1:14550@14580. If the send port can't\n"
+        "                               be bound (e.g. already in use), a dynamic port is\n"
+        "                               used instead\n"
         "  -r --report_msg_statistics   Report message statistics\n"
         "  -t --tcp-port <port>         Port in which mavlink-router will listen for TCP\n"
         "                               connections. Pass 0 to disable TCP listening.\n"
@@ -121,6 +129,25 @@ static int split_on_last_colon(const char *str, char **base, unsigned long *numb
             return -EINVAL;
         }
     }
+
+    return 0;
+}
+
+/*
+ * Parse a fixed local (send) port spec for UDP/TCP client endpoints.
+ * The socket is always bound to any local interface, so only a plain port
+ * number is accepted (e.g. 14580).
+ */
+static int parse_send_port_spec(const char *spec, unsigned long &send_port)
+{
+    unsigned long port;
+
+    if (safe_atoul(spec, &port) < 0 || port == 0 || port > 65535) {
+        log_error("Invalid send port in argument: %s (must be within 1-65535)", spec);
+        return -EINVAL;
+    }
+
+    send_port = port;
 
     return 0;
 }
@@ -201,8 +228,32 @@ static int parse_argv(int argc, char *argv[], Configuration &config)
             opt_udp.name = "CLI";
             opt_udp.mode = UdpEndpointConfig::Mode::Client;
 
-            if (split_on_last_colon(optarg, &ip, &port) < 0) {
+            // Optional fixed local send port, separated from the target by '@':
+            // <ip[:port]>[@<sendport>], where <sendport> is a plain port number
+            // (e.g. 14580). The socket is always bound to any local interface.
+            char *arg = strdup(optarg);
+            char *send_spec = strrchr(arg, '@');
+            if (send_spec != nullptr) {
+                *send_spec = '\0';
+                send_spec++;
+
+                if (*arg == '\0' || *send_spec == '\0') {
+                    log_error("Invalid endpoint argument: %s", optarg);
+                    free(arg);
+                    help(stderr);
+                    return -EINVAL;
+                }
+
+                if (parse_send_port_spec(send_spec, opt_udp.send_port) < 0) {
+                    free(arg);
+                    help(stderr); // error message was already logged
+                    return -EINVAL;
+                }
+            }
+
+            if (split_on_last_colon(arg, &ip, &port) < 0) {
                 log_error("Invalid port in argument: %s", optarg);
+                free(arg);
                 help(stderr);
                 return -EINVAL;
             }
@@ -216,6 +267,7 @@ static int parse_argv(int argc, char *argv[], Configuration &config)
 
             if (!UdpEndpoint::validate_config(opt_udp)) {
                 free(ip);
+                free(arg);
                 help(stderr); // error message was already logged by validate_config()
                 return -EINVAL;
             }
@@ -223,6 +275,7 @@ static int parse_argv(int argc, char *argv[], Configuration &config)
             config.udp_configs.push_back(opt_udp);
 
             free(ip);
+            free(arg);
             break;
         }
         case 'r': {
@@ -276,8 +329,32 @@ static int parse_argv(int argc, char *argv[], Configuration &config)
             TcpEndpointConfig opt_tcp{};
             opt_tcp.name = "CLI";
 
-            if (split_on_last_colon(optarg, &ip, &port) < 0) {
+            // Optional fixed local send port, separated from the target by '@':
+            // <ip:port>[@<sendport>], where <sendport> is a plain port number
+            // (e.g. 14580). The socket is always bound to any local interface.
+            char *arg = strdup(optarg);
+            char *send_spec = strrchr(arg, '@');
+            if (send_spec != nullptr) {
+                *send_spec = '\0';
+                send_spec++;
+
+                if (*arg == '\0' || *send_spec == '\0') {
+                    log_error("Invalid endpoint argument: %s", optarg);
+                    free(arg);
+                    help(stderr);
+                    return -EINVAL;
+                }
+
+                if (parse_send_port_spec(send_spec, opt_tcp.send_port) < 0) {
+                    free(arg);
+                    help(stderr); // error message was already logged
+                    return -EINVAL;
+                }
+            }
+
+            if (split_on_last_colon(arg, &ip, &port) < 0) {
                 log_error("Invalid port in argument: %s", optarg);
+                free(arg);
                 help(stderr);
                 return -EINVAL;
             }
@@ -286,6 +363,7 @@ static int parse_argv(int argc, char *argv[], Configuration &config)
             if (ULONG_MAX == opt_tcp.port) {
                 log_error("Missing port in argument: %s", optarg);
                 free(ip);
+                free(arg);
                 help(stderr);
                 return -EINVAL;
             }
@@ -294,6 +372,7 @@ static int parse_argv(int argc, char *argv[], Configuration &config)
 
             if (!TcpEndpoint::validate_config(opt_tcp)) {
                 free(ip);
+                free(arg);
                 help(stderr); // error message was already logged by validate_config()
                 return -EINVAL;
             }
@@ -301,6 +380,7 @@ static int parse_argv(int argc, char *argv[], Configuration &config)
             config.tcp_configs.push_back(opt_tcp);
 
             free(ip);
+            free(arg);
             break;
         }
         case 'c':

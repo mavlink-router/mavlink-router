@@ -114,6 +114,19 @@ line options. The most important facts are:
   - TCP and UDP endpoints can be added multiple times
   - UDP endpoints added with the `-e` option are started in `normal` mode
     (sending data to the specified address and port)
+  - A fixed local (send) port can be requested for `-e` UDP endpoints by
+    appending `@<sendport>` to the argument, where `<sendport>` is a plain
+    port number (e.g. `14580`). The socket is then bound to this local port
+    instead of an OS-assigned ephemeral one, so the remote side always knows
+    where to send data back. If the send port cannot be bound (e.g. it's
+    already in use), mavlink-router prints a warning and falls back to a
+    dynamic port
+  - The same fixed local (send) port can be requested for `-p` TCP endpoints
+    by appending `@<sendport>` to the argument. The TCP socket is then bound
+    to this local source port before connecting, so the remote side always
+    sees the connection coming from this known port. If the send port cannot
+    be bound (e.g. it's already in use), mavlink-router prints a warning and
+    falls back to a dynamic port
   - The last parameter (without a key) can either be one UART device or an UDP
     connection. This UDP endpoint will be started in `server` mode (waiting for
     an incoming connection)!
@@ -126,6 +139,26 @@ following command:
 
 The `1500000` after the colon in `/dev/ttyS1:1500000` sets the UART baudrate.
 See more options with `mavlink-routerd --help`.
+
+A fixed local (send) port can be requested for a UDP endpoint by appending
+`@<sendport>` to the endpoint argument:
+
+    $ mavlink-routerd -e 192.168.7.1:14550@14580 /dev/ttyS1:1500000
+
+This sends to `192.168.7.1:14550` from the fixed local port `14580`. The
+`<sendport>` part is a plain port number; the same can be configured with the
+`SendPort` key in the config file (see
+[examples/config.sample](examples/config.sample)). If the send port cannot be
+bound (e.g. it's already in use), mavlink-router prints a warning and falls
+back to a dynamic port.
+
+The same syntax works for TCP endpoints given with the `-p` option:
+
+    $ mavlink-routerd -p 192.168.7.1:14550@14580 /dev/ttyS1:1500000
+
+This connects to `192.168.7.1:14550` from the fixed local (source) port
+`14580`, which can also be configured with the `SendPort` key of a
+`TcpEndpoint` section in the config file.
 
 It's also possible to route mavlinks packets from an incoming UDP connection
 instead of UART:
@@ -165,11 +198,18 @@ config file format):
     * Configuration: UART device path/name and baudrate
     * Behavior: Data is received and sent without waiting for incoming data first
   - UDP:
-    * Configuration: Mode (client or server), IP address and port
+    * Configuration: Mode (client or server), IP address and port. In client
+      mode, a fixed local (send) port can be configured with the `SendPort`
+      key or the `@<sendport>` CLI syntax
     * Behavior in client mode: Endpoint is configured with a target IP and port
       combination. So MAVLink messages can be sent directly after startup, but
       will only be recevied after the first message was received by the remote
       side, it doesn't know our IP and port otherwise.  
+      By default, the local (send) port of the socket is assigned dynamically
+      by the operating system. When a fixed send port is configured, the socket
+      is bound to it instead, so the remote side can always send data back to
+      this known port. If that port cannot be bound (e.g. it's already in
+      use), mavlink-router prints a warning and falls back to a dynamic port.  
       When using any non-unicast IP address, e.g. an IPv4 broadcast or IPv6
       local network multicast (ff02::1), messages will be "broadcasted" until
       somebody sends data back. From then on, UDP packets will only be sent to
@@ -185,9 +225,16 @@ config file format):
       incoming message was received.
   - TCP Client:
     * Configuration: Target IP address and port, reconnection interval in case
-      of disconnection
+      of disconnection. A fixed local (send) port can be configured with the
+      `SendPort` key or the `@<sendport>` CLI syntax
     * Behavior: Data is received and sent right after the TCP session is
-      established
+      established  
+      By default, the local (source) port of the TCP connection is assigned
+      dynamically by the operating system. When a fixed send port is
+      configured, the socket is bound to it before connecting, so the remote
+      side always sees the connection coming from this known port. If that
+      port cannot be bound (e.g. it's already in use), mavlink-router prints a
+      warning and falls back to a dynamic port.
 
 Defining endpoints:
 

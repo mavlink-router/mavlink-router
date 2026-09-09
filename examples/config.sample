@@ -226,6 +226,16 @@ Baud = 52000
 #   starting from 14550 when not speciifed.
 #Port = 
 
+# Fixed local UDP (send) port for this endpoint in <normal> (client) mode.
+# When set, the socket is bound to this port instead of an OS-assigned
+# ephemeral port, so the remote side always knows where to send data back.
+# If the port cannot be bound (e.g. it's already in use), mavlink-router
+# prints a warning and falls back to a dynamic port.
+# Only used in <normal> mode, ignored (with a warning) in <server> mode.
+# Valid values: 1-65535
+# Default: 0 (dynamic, OS-assigned source port)
+#SendPort = 14580
+
 # See description at UartEndpoint
 #AllowMsgIdOut = 
 
@@ -242,6 +252,13 @@ Mode = Normal
 Address = 127.0.0.1
 Port = 11000
 
+# send to 127.0.0.1:11000 from the fixed local (send) port 14580
+[UdpEndpoint charlie]
+Mode = Normal
+Address = 127.0.0.1
+Port = 11000
+SendPort = 14580
+
 
 ##
 ## TCP Client Endpoint Configurations
@@ -257,7 +274,16 @@ Port = 11000
 
 # TCP port to be used with the configured address.
 # Mandatory, no default value
-#Port = 
+#Port =
+
+# Fixed local (send) port for this endpoint. When set, the socket is bound to
+# this port before connecting, so the remote side always sees the connection
+# coming from this known source port. If the port cannot be bound (e.g. it's
+# already in use), mavlink-router prints a warning and falls back to a
+# dynamic port.
+# Valid values: 1-65535
+# Default: 0 (dynamic, OS-assigned source port)
+#SendPort = 14580
 
 # Enable automatic reconnect after the configured timeout in seconds. Set to 0
 # to disable reconnection.
@@ -272,3 +298,9 @@ Port = 11000
 [TcpEndpoint delta]
 Address = 127.0.0.1
 Port = 25760
+
+# connect to 127.0.0.1:25760 from the fixed local (send) port 14580
+[TcpEndpoint epsilon]
+Address = 127.0.0.1
+Port = 25760
+SendPort = 14580
