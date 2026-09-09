@@ -63,6 +63,7 @@ struct UdpEndpointConfig {
     std::string address;
     unsigned long port;
     Mode mode;
+    unsigned long source_port{0};
     std::vector<uint32_t> allow_msg_id_out;
     std::vector<uint32_t> block_msg_id_out;
     std::vector<uint8_t> allow_src_comp_out;
@@ -82,6 +83,7 @@ struct TcpEndpointConfig {
     std::string name;
     std::string address;
     unsigned long port;
+    unsigned long source_port{0};
     int retry_timeout{5};
     std::vector<uint32_t> allow_msg_id_out;
     std::vector<uint32_t> block_msg_id_out;
@@ -339,9 +341,12 @@ public:
 
 protected:
     bool open(const char *ip, unsigned long port,
-              UdpEndpointConfig::Mode mode = UdpEndpointConfig::Mode::Client);
-    int open_ipv4(const char *ip, unsigned long port, UdpEndpointConfig::Mode mode);
-    int open_ipv6(const char *ip, unsigned long port, UdpEndpointConfig::Mode mode);
+              UdpEndpointConfig::Mode mode = UdpEndpointConfig::Mode::Client,
+              unsigned long source_port = 0);
+    int open_ipv4(const char *ip, unsigned long port, UdpEndpointConfig::Mode mode,
+                  unsigned long source_port);
+    int open_ipv6(const char *ip, unsigned long port, UdpEndpointConfig::Mode mode,
+                  unsigned long source_port);
 
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
 
@@ -381,9 +386,11 @@ public:
     static bool validate_config(const TcpEndpointConfig &config);
 
 protected:
-    bool open(const std::string &ip, unsigned long port);
-    static int open_ipv4(const char *ip, unsigned long port, sockaddr_in &sockaddr);
-    static int open_ipv6(const char *ip, unsigned long port, sockaddr_in6 &sockaddr6);
+    bool open(const std::string &ip, unsigned long port, unsigned long source_port = 0);
+    int open_ipv4(const char *ip, unsigned long port, sockaddr_in &sockaddr,
+                  unsigned long source_port);
+    int open_ipv6(const char *ip, unsigned long port, sockaddr_in6 &sockaddr6,
+                  unsigned long source_port);
 
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
 
@@ -393,6 +400,7 @@ protected:
 private:
     std::string _ip{};
     unsigned long _port = 0;
+    unsigned long _source_port = 0;
     bool _valid = true;
 
     bool is_ipv6;
