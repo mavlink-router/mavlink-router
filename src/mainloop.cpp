@@ -18,8 +18,11 @@
 #include "mainloop.h"
 
 #include <assert.h>
+#include <errno.h>
+#include <netinet/in.h>
 #include <signal.h>
 #include <sys/epoll.h>
+#include <sys/socket.h>
 #include <sys/timerfd.h>
 #include <unistd.h>
 
@@ -36,6 +39,44 @@ static std::atomic<bool> should_exit{false};
 
 Mainloop Mainloop::_instance{};
 bool Mainloop::_initialized = false;
+
+static int tcp_bind_socket(int family, unsigned long tcp_port)
+{
+    int fd = socket(family, SOCK_STREAM | SOCK_NONBLOCK, 0);
+    if (fd < 0) {
+        return -1;
+    }
+
+    int val = 1;
+    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
+
+    int bind_result;
+    if (family == AF_INET6) {
+        struct sockaddr_in6 sockaddr = {};
+        sockaddr.sin6_family = AF_INET6;
+        sockaddr.sin6_port = htons(tcp_port);
+        sockaddr.sin6_addr = in6addr_any;
+        bind_result = bind(fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
+    } else if (family == AF_INET) {
+        struct sockaddr_in sockaddr = {};
+        sockaddr.sin_family = AF_INET;
+        sockaddr.sin_port = htons(tcp_port);
+        sockaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+        bind_result = bind(fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
+    } else {
+        errno = EAFNOSUPPORT;
+        bind_result = -1;
+    }
+
+    if (bind_result < 0) {
+        int error = errno;
+        close(fd);
+        errno = error;
+        return -1;
+    }
+
+    return fd;
+}
 
 static void exit_signal_handler(int signum)
 {
@@ -468,25 +509,16 @@ void Mainloop::clear_endpoints()
 
 int Mainloop::tcp_open(unsigned long tcp_port)
 {
-    int fd;
-    struct sockaddr_in6 sockaddr = {};
-    int val = 1;
+    int fd = tcp_bind_socket(AF_INET6, tcp_port);
+    bool ipv4_fallback = false;
 
-    fd = socket(AF_INET6, SOCK_STREAM | SOCK_NONBLOCK, 0);
-    if (fd == -1) {
-        log_error("TCP Server: Could not create tcp socket (%m)");
-        return -1;
+    if (fd < 0 && errno == EAFNOSUPPORT) {
+        fd = tcp_bind_socket(AF_INET, tcp_port);
+        ipv4_fallback = true;
     }
 
-    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
-
-    sockaddr.sin6_family = AF_INET6;
-    sockaddr.sin6_port = htons(tcp_port);
-    sockaddr.sin6_addr = in6addr_any;
-
-    if (bind(fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) < 0) {
-        log_error("TCP Server: Could not bind to tcp socket (%m)");
-        close(fd);
+    if (fd < 0) {
+        log_error("TCP Server: Could not create or bind tcp socket (%m)");
         return -1;
     }
 
@@ -498,7 +530,11 @@ int Mainloop::tcp_open(unsigned long tcp_port)
 
     add_fd(fd, &g_tcp_fd, EPOLLIN);
 
-    log_info("Opened TCP Server [%d] [::]:%lu", fd, tcp_port);
+    if (ipv4_fallback) {
+        log_info("Opened TCP Server [%d] 0.0.0.0:%lu", fd, tcp_port);
+    } else {
+        log_info("Opened TCP Server [%d] [::]:%lu", fd, tcp_port);
+    }
 
     return fd;
 }
