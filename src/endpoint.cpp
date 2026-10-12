@@ -243,7 +243,15 @@ int Endpoint::handle_read()
                           buf.curr.src_compid);
             }
         } else {
-            _add_sys_comp_id(buf.curr.src_sysid, buf.curr.src_compid);
+            // Only learn routes from messages we could actually validate
+            // (recognized msgid + passing CRC). An unrecognized or
+            // corrupted frame can carry arbitrary sysid/compid bytes;
+            // learning a route from one can permanently poison this
+            // endpoint's loop-prevention state for whatever identity it
+            // happened to collide with.
+            if (buf.curr.validated) {
+                _add_sys_comp_id(buf.curr.src_sysid, buf.curr.src_compid);
+            }
             Mainloop::get_instance().route_msg(&buf);
         }
     }
@@ -432,7 +440,8 @@ int Endpoint::read_msg(struct buffer *pbuf)
         msg_id = msg_entry->msgid;
     }
 
-    pbuf->curr = {msg_id, target_sysid, target_compid, src_sysid, src_compid, payload_len, payload};
+    pbuf->curr = {msg_id, target_sysid, target_compid, src_sysid, src_compid, payload_len, payload,
+                  msg_entry != nullptr};
 
     // Check for sequence drops
     if (_stat.read.expected_seq != seq) {
