@@ -248,8 +248,6 @@ protected:
     virtual ssize_t _read_msg(uint8_t *buf, size_t len) = 0;
     bool _check_crc(const mavlink_msg_entry_t *msg_entry) const;
     void _add_sys_comp_id(uint8_t sysid, uint8_t compid);
-    // Learn a route only from a message that passed CRC validation; see
-    // comment on buffer::curr.validated for why.
     void _learn_route(const struct buffer *pbuf);
 
     const std::string _type; ///< UART, UDP, TCP, Log
