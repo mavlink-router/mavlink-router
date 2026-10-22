@@ -243,12 +243,7 @@ int Endpoint::handle_read()
                           buf.curr.src_compid);
             }
         } else {
-            // Only learn routes from messages we could actually validate
-            // (recognized msgid + passing CRC). An unrecognized or
-            // corrupted frame can carry arbitrary sysid/compid bytes;
-            // learning a route from one can permanently poison this
-            // endpoint's loop-prevention state for whatever identity it
-            // happened to collide with.
+            // Only learn routes from validated messages.
             if (buf.curr.validated) {
                 _add_sys_comp_id(buf.curr.src_sysid, buf.curr.src_compid);
             }

@@ -40,15 +40,8 @@ struct buffer {
         uint8_t src_compid;
         uint8_t payload_len;
         uint8_t *payload;
-        /*
-         * Whether this message had a recognized msgid and passed CRC
-         * validation. Unrecognized/corrupted frames are still forwarded
-         * (for forward-compat with newer message types), but must not be
-         * used to learn routing state: a corrupted frame can carry
-         * arbitrary sysid/compid bytes that happen to collide with a real
-         * endpoint's identity, permanently poisoning that endpoint's
-         * loop-prevention table for the colliding identity.
-         */
+        // Whether this message had a recognized message ID, and passed CRC
+        // validation.
         bool validated;
     } curr;
 };
