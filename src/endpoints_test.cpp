@@ -118,6 +118,25 @@ TEST(EndpointTest, HasSysCompId)
     EXPECT_FALSE(endpoint.has_sys_comp_id(255, 1));
 }
 
+TEST(EndpointTest, LearnRoute_OnlyWhenValidated)
+{
+    TestEndpoint endpoint;
+    buffer test_msg;
+    test_msg.curr.src_sysid = 42;
+    test_msg.curr.src_compid = 1;
+
+    // an unvalidated frame must not be learned, even if its sysid/compid
+    // happen to collide with a real endpoint's identity
+    test_msg.curr.validated = false;
+    endpoint._learn_route(&test_msg);
+    EXPECT_FALSE(endpoint.has_sys_comp_id(42, 1));
+
+    // a validated frame should be learned normally
+    test_msg.curr.validated = true;
+    endpoint._learn_route(&test_msg);
+    EXPECT_TRUE(endpoint.has_sys_comp_id(42, 1));
+}
+
 TEST(EndpointTest, AcceptMsg_EmptyKnownSystems)
 {
     TestEndpoint endpoint;

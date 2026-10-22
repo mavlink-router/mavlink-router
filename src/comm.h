@@ -40,5 +40,8 @@ struct buffer {
         uint8_t src_compid;
         uint8_t payload_len;
         uint8_t *payload;
+        // Whether this message had a recognized message ID, and passed CRC
+        // validation.
+        bool validated;
     } curr;
 };
