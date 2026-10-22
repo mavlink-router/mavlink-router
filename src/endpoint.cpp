@@ -243,10 +243,7 @@ int Endpoint::handle_read()
                           buf.curr.src_compid);
             }
         } else {
-            // Only learn routes from validated messages.
-            if (buf.curr.validated) {
-                _add_sys_comp_id(buf.curr.src_sysid, buf.curr.src_compid);
-            }
+            _learn_route(&buf);
             Mainloop::get_instance().route_msg(&buf);
         }
     }
@@ -480,6 +477,13 @@ void Endpoint::_add_sys_comp_id(uint8_t sysid, uint8_t compid)
     // add to grouped endpoints as well
     for (auto e : _group_members) {
         e->_add_sys_comp_id(sysid, compid);
+    }
+}
+
+void Endpoint::_learn_route(const struct buffer *pbuf)
+{
+    if (pbuf->curr.validated) {
+        _add_sys_comp_id(pbuf->curr.src_sysid, pbuf->curr.src_compid);
     }
 }
 
