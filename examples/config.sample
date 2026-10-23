@@ -82,6 +82,11 @@
 # Default: 0 (disabled)
 #MaxLogFiles = 0
 
+# Log data waits in memory, up to this many bytes, while the storage device is
+# slow. When it is full, new log data is dropped until the device catches up.
+# Default: 4194304 (4 MiB)
+#LogWriteQueueSize = 4194304
+
 # SnifferSysid
 # Forward all traffic to endpoints on which this MAVLink system ID is connected.
 # This can be used to log or view all messages flowing though mavlink-router.

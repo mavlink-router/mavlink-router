@@ -20,6 +20,7 @@
 #include <assert.h>
 #include <endian.h>
 #include <fcntl.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -64,6 +65,9 @@ int TLog::write_msg(const struct buffer *buffer)
 
     /* Check if we should start or stop logging */
     _handle_auto_start_stop(buffer);
+    if (_file == -1) {
+        return buffer->len;
+    }
 
     uint64_t ms_since_epoch = std::chrono::duration_cast<std::chrono::microseconds>(
                                   std::chrono::system_clock::now().time_since_epoch())
@@ -71,7 +75,10 @@ int TLog::write_msg(const struct buffer *buffer)
 
     ms_since_epoch = htobe64(ms_since_epoch);
 
-    write(_file, (void *)&ms_since_epoch, sizeof(uint64_t));
-    write(_file, buffer->data, buffer->len);
+    // One write per record, so a full write queue drops whole records
+    uint8_t record[sizeof(uint64_t) + MAVLINK_MAX_PACKET_LEN];
+    memcpy(record, &ms_since_epoch, sizeof(uint64_t));
+    memcpy(record + sizeof(uint64_t), buffer->data, buffer->len);
+    _write(record, sizeof(uint64_t) + buffer->len);
     return buffer->len;
 }
