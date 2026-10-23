@@ -109,10 +109,10 @@ jobs:
           overwrite: true
 
   alpine-linux:
-    name: alpine 3.14 (musl)
+    name: alpine 3.23 (musl)
     runs-on: ubuntu-24.04
     needs: [formatting-check]
-    container: alpine:3.14
+    container: alpine:3.23
     steps:
       - name: install dependencies
         run: apk update && apk add build-base git linux-headers pkgconf meson ninja
