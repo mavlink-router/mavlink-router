@@ -34,7 +34,7 @@ if systemd_system_unit_dir == 'auto'
 		systemd_system_unit_dir = dep_systemd.get_variable(pkgconfig: 'systemdsystemunitdir')
 endif
 
-dep_gtest = dependency('gtest', main : true, required : false)
+dep_gtest = dependency('gtest', main : true, required : false, include_type : 'system')
 
 # Additional warnings
 possible_cc_flags = [
