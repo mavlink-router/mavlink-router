@@ -108,9 +108,6 @@ add_project_arguments(cc.get_supported_arguments(possible_cxx_flags), language :
 has_waddress_of_packed_member = cxx.has_argument('-Waddress-of-packed-member')
 conf.set10('HAVE_WADDRESS_OF_PACKED_MEMBER', has_waddress_of_packed_member)
 
-has_aio_init_symbols = cxx.has_header_symbol('aio.h', 'aio_init')
-conf.set10('HAVE_DECL_AIO_INIT', has_aio_init_symbols)
-
 # Always include config.h
 config_h = configure_file(output : 'config.h', configuration : conf)
 add_project_arguments('-include', 'config.h', language : 'cpp')

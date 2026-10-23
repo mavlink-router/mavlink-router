@@ -195,32 +195,13 @@ void BinLog::_logging_data_process(mavlink_remote_log_data_block_t *msg)
 {
     ssize_t r;
 
-    if (lseek(_file, msg->seqno * MAVLINK_MSG_REMOTE_LOG_DATA_BLOCK_FIELD_DATA_LEN, SEEK_SET) < 0) {
-        log_error("lseek failed (%m)");
-        _restart();
-        return;
-    }
-
-    r = write(_file, msg->data, MAVLINK_MSG_REMOTE_LOG_DATA_BLOCK_FIELD_DATA_LEN);
-    if (r < 0 && errno != EAGAIN) {
-        log_error("Error writing data (%m)");
-        _restart();
-        return;
-    }
-    if (r != MAVLINK_MSG_REMOTE_LOG_DATA_BLOCK_FIELD_DATA_LEN) {
-        // partial writes are handled by not sending ack. Flight stack should resend
-        // msg. We hope that partial writes are rare enough
-        log_error("Log partial write %zd", r);
+    r = _write(msg->data,
+               MAVLINK_MSG_REMOTE_LOG_DATA_BLOCK_FIELD_DATA_LEN,
+               (off_t)msg->seqno * MAVLINK_MSG_REMOTE_LOG_DATA_BLOCK_FIELD_DATA_LEN);
+    if (r < 0) {
         return;
     }
 
     // TODO should we send acks on a different fashion. e.g. queueing and sending?
     _send_ack(msg->seqno);
-}
-
-void BinLog::_restart()
-{
-    log_info("Restarting log...");
-    stop();
-    start();
 }
