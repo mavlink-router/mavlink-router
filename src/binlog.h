@@ -52,5 +52,4 @@ private:
 
     void _send_ack(uint32_t seqno);
     void _send_stop();
-    void _restart();
 };

@@ -21,6 +21,8 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <limits.h>
+#include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -52,6 +54,7 @@ const ConfFile::OptionsTable LogEndpoint::option_table[] = {
     {"MavlinkDialect",  false, LogEndpoint::parse_mavlink_dialect,  OPTIONS_TABLE_STRUCT_FIELD(LogOptions, mavlink_dialect)},
     {"MinFreeSpace",    false, ConfFile::parse_ul,                  OPTIONS_TABLE_STRUCT_FIELD(LogOptions, min_free_space)},
     {"MaxLogFiles",     false, ConfFile::parse_ul,                  OPTIONS_TABLE_STRUCT_FIELD(LogOptions, max_log_files)},
+    {"LogWriteQueueSize", false, ConfFile::parse_ul,                OPTIONS_TABLE_STRUCT_FIELD(LogOptions, write_queue_size)},
     {"LogSystemId",     false, LogEndpoint::parse_fcu_id,           OPTIONS_TABLE_STRUCT_FIELD(LogOptions, fcu_id)},
     {"LogTelemetry",    false, ConfFile::parse_bool,                OPTIONS_TABLE_STRUCT_FIELD(LogOptions, log_telemetry)},
     {}
@@ -64,19 +67,95 @@ LogEndpoint::LogEndpoint(std::string name, LogOptions conf)
 {
     assert(!_config.logs_dir.empty());
     _add_sys_comp_id(LOG_ENDPOINT_SYSTEM_ID, 0);
-    _fsync_cb.aio_fildes = -1;
-
-#if HAVE_DECL_AIO_INIT
-    aioinit aio_init_data{};
-    aio_init_data.aio_threads = 1;
-    aio_init_data.aio_num = 1;
-    aio_init_data.aio_idle_time = 3; // make sure to keep the thread running
-    aio_init(&aio_init_data);
-#endif
     if (_config.fcu_id != -1) {
         _target_system_id = _config.fcu_id;
     } else {
         _target_system_id = -1;
+    }
+
+    _writer = std::thread(&LogEndpoint::_writer_loop, this);
+}
+
+LogEndpoint::~LogEndpoint()
+{
+    {
+        std::lock_guard<std::mutex> lock(_writer_mutex);
+        _writer_exit = true;
+    }
+    _writer_cv.notify_one();
+    _writer.join();
+}
+
+ssize_t LogEndpoint::_write(const void *data, size_t len, off_t offset)
+{
+    {
+        std::lock_guard<std::mutex> lock(_writer_mutex);
+        if (_writer_bytes + len > _config.write_queue_size) {
+            if (!_writer_full) {
+                log_warning("Log write queue full, dropping log data until the disk catches up");
+                _writer_full = true;
+            }
+            errno = EAGAIN;
+            return -1;
+        }
+        _writer_full = false;
+    }
+
+    const auto *bytes = static_cast<const uint8_t *>(data);
+    _queue_job({WriteJob::Write, _file, offset, std::vector<uint8_t>(bytes, bytes + len)});
+    return len;
+}
+
+void LogEndpoint::_queue_job(WriteJob job)
+{
+    {
+        std::lock_guard<std::mutex> lock(_writer_mutex);
+        _writer_bytes += job.data.size();
+        _writer_jobs.push_back(std::move(job));
+    }
+    _writer_cv.notify_one();
+}
+
+void LogEndpoint::_writer_loop()
+{
+    // SIGINT and SIGTERM must interrupt the main loop's epoll_wait(), so this thread doesn't take them
+    sigset_t signals;
+    sigemptyset(&signals);
+    sigaddset(&signals, SIGINT);
+    sigaddset(&signals, SIGTERM);
+    pthread_sigmask(SIG_BLOCK, &signals, nullptr);
+
+    bool failing = false;
+    std::unique_lock<std::mutex> lock(_writer_mutex);
+    while (true) {
+        _writer_cv.wait(lock, [this] { return _writer_exit || !_writer_jobs.empty(); });
+        if (_writer_jobs.empty()) {
+            return; // exit requested and everything is written
+        }
+        WriteJob job = std::move(_writer_jobs.front());
+        _writer_jobs.pop_front();
+        lock.unlock();
+
+        bool ok;
+        if (job.kind == WriteJob::Write) {
+            const ssize_t r = job.offset < 0
+                ? write(job.fd, job.data.data(), job.data.size())
+                : pwrite(job.fd, job.data.data(), job.data.size(), job.offset);
+            ok = r == (ssize_t)job.data.size();
+        } else {
+            ok = fsync(job.fd) == 0;
+            if (job.kind == WriteJob::Close) {
+                close(job.fd);
+            }
+        }
+        // Log only the first of a series of errors, e.g. when the disk is full
+        if (!ok && !failing) {
+            log_error("Unable to write log file: (%m)");
+        }
+        failing = !ok;
+
+        lock.lock();
+        _writer_bytes -= job.data.size();
     }
 }
 
@@ -343,8 +422,9 @@ int LogEndpoint::_get_file(const char *extension)
         }
 
         // Ensure the directory entry of the file is written to disk
-        if (fsync(dir_fd) == -1) {
-            log_error("fsync failed: %m");
+        const int dir_copy = dup(dir_fd);
+        if (dir_copy >= 0) {
+            _queue_job({WriteJob::Close, dir_copy, -1, {}});
         }
 
         return r;
@@ -372,10 +452,9 @@ void LogEndpoint::stop()
         _timeout.fsync = nullptr;
     }
 
-    fsync(_file);
-    close(_file);
+    // The writer thread closes the file after writing everything queued for it
+    _queue_job({WriteJob::Close, _file, -1, {}});
     _file = -1;
-    _fsync_cb.aio_fildes = -1;
 
     // change file permissions to read-only to mark them as finished
     char log_file[PATH_MAX];
@@ -450,15 +529,7 @@ bool LogEndpoint::_fsync()
         return false;
     }
 
-    if (_fsync_cb.aio_fildes >= 0 && aio_error(&_fsync_cb) == EINPROGRESS) {
-        // previous operation is still in progress
-        return true;
-    }
-    _fsync_cb.aio_fildes = _file;
-    _fsync_cb.aio_sigevent.sigev_notify = SIGEV_NONE;
-
-    aio_fsync(O_SYNC, &_fsync_cb);
-
+    _queue_job({WriteJob::Fsync, _file, -1, {}});
     return true;
 }
 

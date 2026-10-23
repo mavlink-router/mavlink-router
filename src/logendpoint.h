@@ -19,10 +19,15 @@
 
 #include <common/conf_file.h>
 
-#include <aio.h>
 #include <assert.h>
 #include <dirent.h>
+
+#include <condition_variable>
+#include <deque>
+#include <mutex>
 #include <string>
+#include <thread>
+#include <vector>
 
 #include "endpoint.h"
 #include "timeout.h"
@@ -44,6 +49,7 @@ struct LogOptions {
     MavDialect mavlink_dialect{MavDialect::Auto}; // conf "MavlinkDialect"
     unsigned long min_free_space;                 // conf "MinFreeSpace"
     unsigned long max_log_files;                  // conf "MaxLogFiles"
+    unsigned long write_queue_size{4ul << 20};    // conf "LogWriteQueueSize"
     int fcu_id{-1};                               // conf "LogSystemId"
     bool log_telemetry{false};                    // conf "LogTelemetry"
 };
@@ -51,6 +57,7 @@ struct LogOptions {
 class LogEndpoint : public Endpoint {
 public:
     LogEndpoint(std::string name, LogOptions conf);
+    ~LogEndpoint() override;
 
     virtual bool start();
     virtual void stop();
@@ -79,7 +86,12 @@ protected:
         Timeout *alive = nullptr;
     } _timeout;
     uint32_t _timeout_write_total = 0;
-    aiocb _fsync_cb = {};
+
+    /**
+     * Queue data for the writer thread, which writes it at offset, or at the end of the file if offset is -1.
+     * Never blocks. Returns len, or -1 with errno EAGAIN if too much data is already waiting.
+     */
+    ssize_t _write(const void *data, size_t len, off_t offset = -1);
 
     virtual const char *_get_logfile_extension() = 0;
 
@@ -106,4 +118,22 @@ private:
     void _delete_old_logs();
 
     char _filename[64];
+
+    // Log files are written by a separate thread, so a slow disk never blocks message routing
+    struct WriteJob {
+        enum { Write, Fsync, Close } kind;
+        int fd;
+        off_t offset;
+        std::vector<uint8_t> data;
+    };
+    void _queue_job(WriteJob job);
+    void _writer_loop();
+
+    std::thread _writer;
+    std::mutex _writer_mutex;
+    std::condition_variable _writer_cv;
+    std::deque<WriteJob> _writer_jobs;
+    size_t _writer_bytes = 0;
+    bool _writer_exit = false;
+    bool _writer_full = false;
 };
