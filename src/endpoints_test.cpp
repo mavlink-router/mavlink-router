@@ -19,6 +19,7 @@
 #include "autolog.h"
 #include "binlog.h"
 #include "endpoint.h"
+#include "mainloop.h"
 #include "tlog.h"
 #include "ulog.h"
 
@@ -649,6 +650,90 @@ TEST(UdpEndpointTest, ConfigValidateMode)
     EXPECT_FALSE(UdpEndpoint::validate_config(config)) << "with Undefined mode";
 }
 
+TEST(UdpEndpointTest, ConfigValidateSourcePort)
+{
+    UdpEndpointConfig config;
+    config.address = "127.0.0.1";
+    config.port = 14550;
+    config.mode = UdpEndpointConfig::Mode::Client;
+
+    // unset send port (dynamic port) is valid
+    config.source_port = 0;
+    EXPECT_TRUE(UdpEndpoint::validate_config(config)) << "with unset send port";
+
+    // valid send ports
+    config.source_port = 1;
+    EXPECT_TRUE(UdpEndpoint::validate_config(config)) << "with send port 1";
+
+    config.source_port = 65535;
+    EXPECT_TRUE(UdpEndpoint::validate_config(config)) << "with send port 65535";
+
+    // invalid send ports
+    config.source_port = 65536;
+    EXPECT_FALSE(UdpEndpoint::validate_config(config)) << "with send port 65536";
+
+    config.source_port = ULONG_MAX;
+    EXPECT_FALSE(UdpEndpoint::validate_config(config)) << "with send port ULONG_MAX";
+}
+
+TEST(UdpEndpointTest, FixedSourcePortBind)
+{
+    Mainloop &mainloop = Mainloop::init();
+
+    const unsigned long source_port = 45870;
+
+    UdpEndpointConfig config{};
+    config.name = "fixed-send-port";
+    config.mode = UdpEndpointConfig::Mode::Client;
+    config.address = "127.0.0.1";
+    config.port = 14550;
+    config.source_port = source_port;
+
+    UdpEndpoint udp{config.name};
+    ASSERT_TRUE(udp.setup(config));
+
+    struct sockaddr_in addr {};
+    socklen_t addrlen = sizeof(addr);
+    ASSERT_EQ(getsockname(udp.fd, (struct sockaddr *)&addr, &addrlen), 0);
+    EXPECT_EQ(ntohs(addr.sin_port), source_port);
+
+    mainloop.teardown();
+}
+
+TEST(UdpEndpointTest, FixedSourcePortConflictFallsBackToDynamic)
+{
+    Mainloop &mainloop = Mainloop::init();
+
+    const unsigned long source_port = 45871;
+
+    UdpEndpointConfig config{};
+    config.name = "conflicting-send-port";
+    config.mode = UdpEndpointConfig::Mode::Client;
+    config.address = "127.0.0.1";
+    config.port = 14550;
+    config.source_port = source_port;
+
+    // occupy the requested send port, so the bind of the endpoint fails
+    int blocker_fd = socket(AF_INET, SOCK_DGRAM, 0);
+    ASSERT_GE(blocker_fd, 0);
+    struct sockaddr_in blocker_addr {};
+    blocker_addr.sin_family = AF_INET;
+    blocker_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    blocker_addr.sin_port = htons(source_port);
+    ASSERT_EQ(bind(blocker_fd, (struct sockaddr *)&blocker_addr, sizeof(blocker_addr)), 0);
+
+    UdpEndpoint udp{config.name};
+    EXPECT_TRUE(udp.setup(config)) << "should fall back to a dynamic port";
+
+    struct sockaddr_in addr {};
+    socklen_t addrlen = sizeof(addr);
+    ASSERT_EQ(getsockname(udp.fd, (struct sockaddr *)&addr, &addrlen), 0);
+    EXPECT_NE(ntohs(addr.sin_port), source_port);
+
+    close(blocker_fd);
+    mainloop.teardown();
+}
+
 /**
  * TCP Endpoint
  */
@@ -712,6 +797,129 @@ TEST(TcpEndpointTest, ConfigValidatePort)
     config.port = 0;
     EXPECT_FALSE(TcpEndpoint::validate_config(config))
         << "with port " << std::to_string(config.port);
+}
+
+TEST(TcpEndpointTest, ConfigValidateSourcePort)
+{
+    TcpEndpointConfig config;
+    config.address = "127.0.0.1";
+    config.port = 14550;
+
+    // unset send port (dynamic port) is valid
+    config.source_port = 0;
+    EXPECT_TRUE(TcpEndpoint::validate_config(config)) << "with unset send port";
+
+    // valid send ports
+    config.source_port = 1;
+    EXPECT_TRUE(TcpEndpoint::validate_config(config)) << "with send port 1";
+
+    config.source_port = 65535;
+    EXPECT_TRUE(TcpEndpoint::validate_config(config)) << "with send port 65535";
+
+    // invalid send ports
+    config.source_port = 65536;
+    EXPECT_FALSE(TcpEndpoint::validate_config(config)) << "with send port 65536";
+
+    config.source_port = ULONG_MAX;
+    EXPECT_FALSE(TcpEndpoint::validate_config(config)) << "with send port ULONG_MAX";
+}
+
+// Create a local TCP server on 127.0.0.1 with an ephemeral port and return its fd,
+// storing the bound port in @server_port. Assertion failures mark it invalid.
+static int create_tcp_listener(unsigned long &server_port)
+{
+    int listener_fd = socket(AF_INET, SOCK_STREAM, 0);
+    EXPECT_GE(listener_fd, 0);
+    if (listener_fd < 0) {
+        return -1;
+    }
+
+    struct sockaddr_in addr {};
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    addr.sin_port = 0;
+    EXPECT_EQ(bind(listener_fd, (struct sockaddr *)&addr, sizeof(addr)), 0);
+    EXPECT_EQ(listen(listener_fd, 1), 0);
+
+    socklen_t addrlen = sizeof(addr);
+    EXPECT_EQ(getsockname(listener_fd, (struct sockaddr *)&addr, &addrlen), 0);
+    server_port = ntohs(addr.sin_port);
+
+    return listener_fd;
+}
+
+TEST(TcpEndpointTest, FixedSourcePortBind)
+{
+    Mainloop &mainloop = Mainloop::init();
+
+    const unsigned long source_port = 45874;
+    unsigned long server_port = 0;
+
+    int listener_fd = create_tcp_listener(server_port);
+    ASSERT_GE(listener_fd, 0);
+
+    TcpEndpointConfig config{};
+    config.name = "fixed-send-port";
+    config.address = "127.0.0.1";
+    config.port = server_port;
+    config.source_port = source_port;
+    config.retry_timeout = 0;
+
+    TcpEndpoint tcp{config.name};
+    ASSERT_TRUE(tcp.setup(config));
+    ASSERT_GE(tcp.fd, 0) << "endpoint should be connected to the local test server";
+
+    struct sockaddr_in addr {};
+    socklen_t addrlen = sizeof(addr);
+    ASSERT_EQ(getsockname(tcp.fd, (struct sockaddr *)&addr, &addrlen), 0);
+    EXPECT_EQ(ntohs(addr.sin_port), source_port);
+
+    // close before mainloop teardown, b/c close() removes the fd from the mainloop
+    tcp.close();
+    close(listener_fd);
+    mainloop.teardown();
+}
+
+TEST(TcpEndpointTest, FixedSourcePortConflictFallsBackToDynamic)
+{
+    Mainloop &mainloop = Mainloop::init();
+
+    const unsigned long source_port = 45875;
+    unsigned long server_port = 0;
+
+    int listener_fd = create_tcp_listener(server_port);
+    ASSERT_GE(listener_fd, 0);
+
+    // occupy the requested send port, so the bind of the endpoint fails
+    int blocker_fd = socket(AF_INET, SOCK_STREAM, 0);
+    ASSERT_GE(blocker_fd, 0);
+    struct sockaddr_in blocker_addr {};
+    blocker_addr.sin_family = AF_INET;
+    blocker_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    blocker_addr.sin_port = htons(source_port);
+    ASSERT_EQ(bind(blocker_fd, (struct sockaddr *)&blocker_addr, sizeof(blocker_addr)), 0);
+
+    TcpEndpointConfig config{};
+    config.name = "conflicting-send-port";
+    config.address = "127.0.0.1";
+    config.port = server_port;
+    config.source_port = source_port;
+    config.retry_timeout = 0;
+
+    TcpEndpoint tcp{config.name};
+    EXPECT_TRUE(tcp.setup(config)) << "should fall back to a dynamic port";
+    ASSERT_GE(tcp.fd, 0) << "endpoint should be connected to the local test server";
+
+    struct sockaddr_in addr {};
+    socklen_t addrlen = sizeof(addr);
+    ASSERT_EQ(getsockname(tcp.fd, (struct sockaddr *)&addr, &addrlen), 0);
+    EXPECT_NE(ntohs(addr.sin_port), source_port);
+
+    // close before mainloop teardown, b/c close() removes the fd from the mainloop
+    tcp.close();
+    close(blocker_fd);
+    close(listener_fd);
+    mainloop.teardown();
 }
 
 /**
