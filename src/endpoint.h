@@ -41,6 +41,7 @@ struct UartEndpointConfig {
     std::string device;
     std::vector<uint32_t> baudrates;
     bool flowcontrol{false};
+    int retry_timeout{5};
     std::vector<uint32_t> allow_msg_id_out;
     std::vector<uint32_t> block_msg_id_out;
     std::vector<uint8_t> allow_src_comp_out;
@@ -298,8 +299,13 @@ public:
 
     int write_msg(const struct buffer *pbuf) override;
     int flush_pending_msgs() override { return -ENOSYS; }
+    bool is_valid() override { return _valid; };
+    bool is_critical() override { return false; };
+    void handle_error() override;
 
     bool setup(UartEndpointConfig config); ///< open UART device and apply config
+    bool reopen();                         ///< re-try opening the device
+    void close();
 
     static const ConfFile::OptionsTable option_table[];
     static const char *section_pattern;
@@ -314,7 +320,15 @@ protected:
     int read_msg(struct buffer *pbuf) override;
     ssize_t _read_msg(uint8_t *buf, size_t len) override;
 
+    void _schedule_reconnect();
+    bool _retry_timeout_cb(void *data);
+
 private:
+    std::string _device{};
+    bool _flowcontrol = false;
+    bool _valid = true;
+    int _retry_timeout = 0; // disable retry by default
+
     size_t _current_baud_idx = 0;
     Timeout *_change_baud_timeout = nullptr;
     std::vector<uint32_t> _baudrates;

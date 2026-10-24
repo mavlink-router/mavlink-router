@@ -162,8 +162,10 @@ Endpoint types (see [examples/config.sample](examples/config.sample) for the
 config file format):
 
   - UART: For telemetry radios or other serial links
-    * Configuration: UART device path/name and baudrate
-    * Behavior: Data is received and sent without waiting for incoming data first
+    * Configuration: UART device path/name, baudrate, and optional reconnection interval
+    * Behavior: Data is received and sent without waiting for incoming data first.
+      If the device is disconnected or unavailable at startup, automatic reconnection
+      will be attempted at the configured interval (default: 5 seconds)
   - UDP:
     * Configuration: Mode (client or server), IP address and port
     * Behavior in client mode: Endpoint is configured with a target IP and port
@@ -199,7 +201,8 @@ Defining endpoints:
     * A TCP client disconnects from the TCP server port
     * MAVLink Router is terminated
     * (This means that UART, UDP and TCP client endpoints are never destroyed
-      during runtime.)
+      during runtime. UART and TCP client endpoints will automatically attempt
+      to reconnect if disconnected.)
 
 ### Message Routing
 In general, each message received on one endpoint is delivered to all endpoints

@@ -296,6 +296,7 @@ int Mainloop::loop()
                     request_exit(EXIT_FAILURE);
                 } else {
                     log_debug("Non-critical fd %i, error is okay.", p->fd);
+                    p->handle_error();
                 }
             }
         }
