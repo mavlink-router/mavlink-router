@@ -156,6 +156,117 @@ static bool validate_ip(const std::string &ip)
     return validate_ipv4(ip) || validate_ipv6(ip);
 }
 
+static bool validate_hostname(const std::string &hostname)
+{
+    if (hostname.empty() || hostname.size() > 253) {
+        return false;
+    }
+
+    size_t label_len = 0;
+
+    for (size_t i = 0; i < hostname.size(); i++) {
+        char c = hostname[i];
+
+        if (c == '.') {
+            /* dot terminates a label: must not be empty or start/end with hyphen */
+            if (label_len == 0) {
+                return false; /* empty label (leading dot or double dot) */
+            }
+            if (hostname[i - 1] == '-') {
+                return false; /* label ends with hyphen */
+            }
+            label_len = 0;
+        } else {
+            if (label_len == 0 && c == '-') {
+                return false; /* label starts with hyphen */
+            }
+            if (!isalnum((unsigned char)c) && c != '-') {
+                return false; /* invalid character */
+            }
+            label_len++;
+            if (label_len > 63) {
+                return false; /* label too long */
+            }
+        }
+    }
+
+    /* trailing dot is allowed (fully-qualified); otherwise last label must be non-empty */
+    if (label_len == 0 && hostname.back() != '.') {
+        return false;
+    }
+    /* last label must not end with a hyphen */
+    if (hostname.back() == '-') {
+        return false;
+    }
+
+    return true;
+}
+
+static bool validate_address(const std::string &addr)
+{
+    return validate_ip(addr) || validate_hostname(addr);
+}
+
+struct ResolvedAddr {
+    std::string ip;
+    bool is_ipv6;
+    bool valid;
+};
+
+static ResolvedAddr resolve_address(const std::string &address)
+{
+    /* Already a numeric IPv4 or bracketed IPv6 — use as-is */
+    if (validate_ipv4(address)) {
+        return {address, false, true};
+    }
+    if (validate_ipv6(address)) {
+        return {address, true, true};
+    }
+
+    /* Hostname — resolve via getaddrinfo.
+     * This handles plain DNS, mDNS (.local via nss-mdns/avahi),
+     * and Tailscale (*.ts.net) transparently. */
+    struct addrinfo hints;
+    struct addrinfo *result = nullptr;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family   = AF_UNSPEC;
+    hints.ai_socktype = SOCK_DGRAM;
+    hints.ai_flags    = AI_ADDRCONFIG;
+
+    int rc = getaddrinfo(address.c_str(), nullptr, &hints, &result);
+    if (rc != 0) {
+        log_error("Could not resolve hostname '%s': %s", address.c_str(), gai_strerror(rc));
+        return {"", false, false};
+    }
+
+    char buf[INET6_ADDRSTRLEN + 2]; /* +2 for brackets around IPv6 */
+    ResolvedAddr resolved{"", false, false};
+
+    for (struct addrinfo *rp = result; rp != nullptr; rp = rp->ai_next) {
+        if (rp->ai_family == AF_INET) {
+            struct sockaddr_in *sin = (struct sockaddr_in *)rp->ai_addr;
+            inet_ntop(AF_INET, &sin->sin_addr, buf, sizeof(buf));
+            resolved = {buf, false, true};
+            break; /* prefer IPv4 over IPv6 */
+        }
+        if (rp->ai_family == AF_INET6 && !resolved.valid) {
+            struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)rp->ai_addr;
+            char tmp[INET6_ADDRSTRLEN];
+            inet_ntop(AF_INET6, &sin6->sin6_addr, tmp, sizeof(tmp));
+            /* wrap in brackets to match the rest of the code's convention */
+            snprintf(buf, sizeof(buf), "[%s]", tmp);
+            resolved = {buf, true, true};
+        }
+    }
+
+    freeaddrinfo(result);
+
+    if (!resolved.valid) {
+        log_error("Could not resolve hostname '%s' to a usable address", address.c_str());
+    }
+    return resolved;
+}
+
 static unsigned int ipv6_get_scope_id(const char *ip)
 {
     struct ifaddrs *addrs;
@@ -1082,6 +1193,19 @@ bool UdpEndpoint::setup(UdpEndpointConfig conf)
         return false;
     }
 
+    /* Resolve hostname to numeric IP if needed */
+    if (!validate_ip(conf.address)) {
+        ResolvedAddr resolved = resolve_address(conf.address);
+        if (!resolved.valid) {
+            log_error("UdpEndpoint %s: Could not resolve address '%s'",
+                      conf.name.c_str(), conf.address.c_str());
+            return false;
+        }
+        log_info("UdpEndpoint %s: Resolved '%s' -> '%s'",
+                 conf.name.c_str(), conf.address.c_str(), resolved.ip.c_str());
+        conf.address = resolved.ip;
+    }
+
     if (!this->open(conf.address.c_str(), conf.port, conf.mode)) {
         log_error("Could not open %s:%ld", conf.address.c_str(), conf.port);
         return false;
@@ -1415,8 +1539,8 @@ bool UdpEndpoint::validate_config(const UdpEndpointConfig &config)
         return false;
     }
 
-    if (!validate_ip(config.address)) {
-        log_error("UdpEndpoint %s: Invalid IP address %s",
+    if (!validate_address(config.address)) {
+        log_error("UdpEndpoint %s: Invalid IP address or hostname '%s'",
                   config.name.c_str(),
                   config.address.c_str());
         return false;
@@ -1455,7 +1579,7 @@ bool TcpEndpoint::setup(TcpEndpointConfig conf)
         return false;
     }
 
-    this->_ip = conf.address;
+    this->_hostname = conf.address;
     this->_port = conf.port;
     this->_retry_timeout = conf.retry_timeout;
 
@@ -1499,6 +1623,25 @@ bool TcpEndpoint::setup(TcpEndpointConfig conf)
 
     this->_group_name = conf.group;
 
+    /* Resolve hostname to numeric IP if needed */
+    if (!validate_ip(conf.address)) {
+        ResolvedAddr resolved = resolve_address(conf.address);
+        if (!resolved.valid) {
+            log_warning("TcpEndpoint %s: Could not resolve '%s', re-trying every %d sec",
+                        conf.name.c_str(), conf.address.c_str(), this->_retry_timeout);
+            if (this->_retry_timeout > 0) {
+                _schedule_reconnect();
+                return true;
+            }
+            return false;
+        }
+        log_info("TcpEndpoint %s: Resolved '%s' -> '%s'",
+                 conf.name.c_str(), conf.address.c_str(), resolved.ip.c_str());
+        conf.address = resolved.ip;
+    }
+
+    this->_ip = conf.address;
+
     if (!this->open(conf.address, conf.port)) {
         log_warning("Could not open %s:%ld, re-trying every %d sec",
                     conf.address.c_str(),
@@ -1516,7 +1659,33 @@ bool TcpEndpoint::setup(TcpEndpointConfig conf)
 
 bool TcpEndpoint::reopen()
 {
-    return this->open(_ip, _port);
+    std::string addr = _hostname;
+
+    /* Re-resolve the hostname on every reconnect attempt. This ensures that
+     * dynamic DNS entries (e.g. Tailscale *.ts.net or mDNS *.local) are
+     * refreshed rather than using a potentially stale cached IP. */
+    if (!validate_ip(_hostname)) {
+        ResolvedAddr resolved = resolve_address(_hostname);
+        if (resolved.valid) {
+            addr = resolved.ip;
+            _ip = addr;
+        } else {
+            /* Resolution failed — fall back to last known good IP if we have
+             * one, otherwise report failure and let the caller retry later. */
+            if (_ip.empty()) {
+                log_warning("TcpEndpoint %s: Could not resolve '%s' for reconnect",
+                            _name.c_str(), _hostname.c_str());
+                return false;
+            }
+            log_warning("TcpEndpoint %s: Could not resolve '%s', retrying with last known IP %s",
+                        _name.c_str(), _hostname.c_str(), _ip.c_str());
+            addr = _ip;
+        }
+    } else {
+        _ip = _hostname; /* it was always a bare IP, keep _ip consistent */
+    }
+
+    return this->open(addr, _port);
 }
 
 int TcpEndpoint::accept(int listener_fd)
@@ -1768,8 +1937,8 @@ bool TcpEndpoint::validate_config(const TcpEndpointConfig &config)
         return false;
     }
 
-    if (!validate_ip(config.address)) {
-        log_error("TcpEndpoint %s: Invalid IP address %s",
+    if (!validate_address(config.address)) {
+        log_error("TcpEndpoint %s: Invalid IP address or hostname '%s'",
                   config.name.c_str(),
                   config.address.c_str());
         return false;
@@ -1802,7 +1971,7 @@ void TcpEndpoint::_schedule_reconnect()
     if (t == nullptr) {
         log_warning("Could not create retry timeout for TCP endpoint %s:%lu\n"
                     "No attempts to reconnect will be made",
-                    _ip.c_str(),
+                    _hostname.c_str(),
                     _port);
     }
 }

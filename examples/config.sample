@@ -217,6 +217,7 @@ Baud = 52000
 # Binding or target IP address (depending on mode).
 # IPv6 addresses must be encosed in square brackets like `[::1]`.
 # Binding to `0.0.0.0` or `[::]` will listen on all interfaces.
+# Can also use hostname.
 # Mandatory, no default value
 #Address = 
 
@@ -252,6 +253,7 @@ Port = 11000
 
 # Server IP address to connect to.
 # IPv6 addresses must be encosed in square brackets like `[::1]`.
+# Can also use hostname.
 # Mandatory, no default value
 #Address = 
 

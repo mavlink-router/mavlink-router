@@ -165,7 +165,7 @@ config file format):
     * Configuration: UART device path/name and baudrate
     * Behavior: Data is received and sent without waiting for incoming data first
   - UDP:
-    * Configuration: Mode (client or server), IP address and port
+    * Configuration: Mode (client or server), IP address or hostname and port
     * Behavior in client mode: Endpoint is configured with a target IP and port
       combination. So MAVLink messages can be sent directly after startup, but
       will only be recevied after the first message was received by the remote
@@ -184,7 +184,7 @@ config file format):
       MAVLink messages are always sent to the IP and port from which the last
       incoming message was received.
   - TCP Client:
-    * Configuration: Target IP address and port, reconnection interval in case
+    * Configuration: Target IP address or hostname and port, reconnection interval in case
       of disconnection
     * Behavior: Data is received and sent right after the TCP session is
       established
