@@ -42,7 +42,6 @@
 
 #include "mainloop.h"
 
-#define ALIVE_TIMEOUT 5
 #define MAX_RETRIES   10
 
 // clang-format off
@@ -136,6 +135,23 @@ void LogEndpoint::mark_unfinished_logs()
         }
     }
     closedir(dir);
+}
+
+void LogEndpoint::_delete_last_log()
+{
+    fsync(_file);
+    close(_file);
+    char log_file[PATH_MAX];
+    if (snprintf(log_file, sizeof(log_file), "%s/%s", _config.logs_dir.c_str(), _filename)
+        < (int)sizeof(log_file)) {
+        int err_code = remove(log_file);
+        if (err_code != 0) {
+            log_error("[Log Deletion] Error deleting last logfile %s: %m", _filename);
+        } else {
+            log_error("[Log Deletion] %s", _filename);
+        }
+    }
+
 }
 
 void LogEndpoint::_delete_old_logs()
