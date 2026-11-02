@@ -228,12 +228,9 @@ int Endpoint::handle_read()
             break;
         }
 
-        // check incoming message filters
-        if (!allowed_by_dedup(&buf)) {
-            if (Log::get_max_level() >= Log::Level::DEBUG) {
-                log_trace("Message %u discarded by de-duplication", buf.curr.msg_id);
-            }
-        } else if (!allowed_by_incoming_filters(&buf)) {
+        // check incoming message filters first, so that a message rejected by
+        // this endpoint never enters the shared de-duplication cache
+        if (!allowed_by_incoming_filters(&buf)) {
             if (Log::get_max_level() >= Log::Level::DEBUG) {
                 log_trace("Message %u to %d/%d from %u/%u discarded by incoming filters",
                           buf.curr.msg_id,
@@ -241,6 +238,10 @@ int Endpoint::handle_read()
                           buf.curr.target_compid,
                           buf.curr.src_sysid,
                           buf.curr.src_compid);
+            }
+        } else if (!allowed_by_dedup(&buf)) {
+            if (Log::get_max_level() >= Log::Level::DEBUG) {
+                log_trace("Message %u discarded by de-duplication", buf.curr.msg_id);
             }
         } else {
             _add_sys_comp_id(buf.curr.src_sysid, buf.curr.src_compid);
