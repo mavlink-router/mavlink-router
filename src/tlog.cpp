@@ -21,6 +21,7 @@
 #include <endian.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/uio.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -65,13 +66,49 @@ int TLog::write_msg(const struct buffer *buffer)
     /* Check if we should start or stop logging */
     _handle_auto_start_stop(buffer);
 
+    if (_file < 0) {
+        return buffer->len;
+    }
+
+    const size_t record_size = sizeof(uint64_t) + buffer->len;
+
     uint64_t ms_since_epoch = std::chrono::duration_cast<std::chrono::microseconds>(
                                   std::chrono::system_clock::now().time_since_epoch())
                                   .count();
 
     ms_since_epoch = htobe64(ms_since_epoch);
 
-    write(_file, (void *)&ms_since_epoch, sizeof(uint64_t));
-    write(_file, buffer->data, buffer->len);
+    // This check is best-effort: other writers can consume space before writev().
+    const int space_result = _check_minimum_free_space(record_size);
+    if (space_result < 0) {
+        if (space_result == -ENOSPC) {
+            _config.log_mode = LogMode::disabled;
+            stop();
+        }
+        return space_result;
+    }
+
+    struct iovec iov[2] = {
+        {(void *)&ms_since_epoch, sizeof(ms_since_epoch)},
+        {buffer->data, buffer->len},
+    };
+    ssize_t written;
+    do {
+        written = writev(_file, iov, 2);
+    } while (written < 0 && errno == EINTR);
+    if (written < 0) {
+        const int write_errno = errno;
+        log_error("Unable to write telemetry log record: %m");
+        _config.log_mode = LogMode::disabled;
+        stop();
+        return -write_errno;
+    }
+    if (written != (ssize_t)record_size) {
+        log_error("Short telemetry log write: wrote %zd of %zu bytes", written, record_size);
+        _config.log_mode = LogMode::disabled;
+        stop();
+        return -EIO;
+    }
+
     return buffer->len;
 }
