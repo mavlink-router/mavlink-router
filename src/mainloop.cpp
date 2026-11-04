@@ -209,6 +209,11 @@ void Mainloop::process_tcp_hangups()
         if (it->get()->get_type() == ENDPOINT_TYPE_TCP) {
             auto *tcp_endpoint = static_cast<TcpEndpoint *>(it->get());
             if (!tcp_endpoint->is_valid()) {
+                if (tcp_endpoint->is_server_connection()) {
+                    if (_tcp_server_connections > 0) {
+                        _tcp_server_connections--;
+                    }
+                }
                 it = g_endpoints.erase(it);
             } else {
                 ++it;
@@ -225,21 +230,57 @@ void Mainloop::handle_tcp_connection()
 {
     log_debug("TCP Server: New client");
 
-    auto *tcp = new TcpEndpoint{"dynamic"};
-
-    int fd = tcp->accept(g_tcp_fd);
-    if (fd == -1) {
+    if (_tcp_server_connections >= _tcp_server_max_connections) {
+        const int rejected_fd = accept4(g_tcp_fd, nullptr, nullptr, SOCK_NONBLOCK | SOCK_CLOEXEC);
+        if (rejected_fd >= 0) {
+            ::close(rejected_fd);
+            return;
+        }
         goto accept_error;
     }
 
-    g_endpoints.emplace_back(tcp);
-    this->add_fd(g_endpoints.back()->fd, g_endpoints.back().get(), EPOLLIN);
+    {
+        auto *tcp = new TcpEndpoint{"dynamic"};
+
+        int fd = tcp->accept(g_tcp_fd);
+        if (fd == -1) {
+            delete tcp;
+            goto accept_error;
+        }
+
+        if (this->add_fd(tcp->fd, tcp, EPOLLIN) < 0) {
+            delete tcp;
+            return;
+        }
+
+        g_endpoints.emplace_back(tcp);
+        _tcp_server_connections++;
+    }
 
     return;
 
 accept_error:
+    const int accept_errno = errno;
+    if ((accept_errno == EMFILE || accept_errno == ENFILE) && !_tcp_accept_paused
+        && _tcp_accept_retry_timer && remove_fd(g_tcp_fd) == 0) {
+        _tcp_accept_paused = true;
+    }
+    errno = accept_errno;
     log_error("TCP Server: Could not accept TCP connection (%m)");
-    delete tcp;
+}
+
+bool Mainloop::_retry_tcp_accept(void *data)
+{
+    if (!_tcp_accept_paused) {
+        return true;
+    }
+
+    if (add_fd(g_tcp_fd, &g_tcp_fd, EPOLLIN) == 0) {
+        _tcp_accept_paused = false;
+    } else {
+        log_error("TCP Server: Could not re-enable listening socket");
+    }
+    return true;
 }
 
 int Mainloop::loop()
@@ -361,6 +402,8 @@ bool Mainloop::dedup_check_msg(const buffer *buf)
 
 bool Mainloop::add_endpoints(const Configuration &config)
 {
+    _tcp_server_max_connections = config.tcp_max_connections;
+
     // Create UART and UDP endpoints
     if (config.sniffer_sysid != 0) {
         Endpoint::sniffer_sysid = config.sniffer_sysid;
@@ -418,6 +461,20 @@ bool Mainloop::add_endpoints(const Configuration &config)
     // Create TCP server
     if (config.tcp_port != 0u) {
         g_tcp_fd = tcp_open(config.tcp_port);
+        if (g_tcp_fd < 0) {
+            return false;
+        }
+
+        _tcp_accept_retry_timer = add_timeout(
+            MSEC_PER_SEC,
+            std::bind(&Mainloop::_retry_tcp_accept, this, std::placeholders::_1),
+            this);
+        if (!_tcp_accept_retry_timer) {
+            remove_fd(g_tcp_fd);
+            close(g_tcp_fd);
+            g_tcp_fd = -1;
+            return false;
+        }
     }
 
     // Create Log endpoint
@@ -496,7 +553,10 @@ int Mainloop::tcp_open(unsigned long tcp_port)
         return -1;
     }
 
-    add_fd(fd, &g_tcp_fd, EPOLLIN);
+    if (add_fd(fd, &g_tcp_fd, EPOLLIN) < 0) {
+        close(fd);
+        return -1;
+    }
 
     log_info("Opened TCP Server [%d] [::]:%lu", fd, tcp_port);
 

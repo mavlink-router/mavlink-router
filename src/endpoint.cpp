@@ -1540,6 +1540,8 @@ int TcpEndpoint::accept(int listener_fd)
         return -1;
     }
 
+    _server_connection = true;
+
     log_info("TCP [%d]%s: Connection accepted", fd, _name.c_str());
 
     int tcp_nodelay_state = 1;

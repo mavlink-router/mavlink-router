@@ -34,6 +34,7 @@ struct Configuration {
     std::string conf_file_name;        ///< CLI "conf-file" only!
     std::string conf_dir;              ///< CLI "conf-dir" only!
     unsigned long tcp_port{5760};      ///< conf "TcpServerPort" or CLI "tcp-port"
+    unsigned long tcp_max_connections{64}; ///< conf "TcpServerMaxConnections"
     bool report_msg_statistics{false}; ///< conf "ReportStats" or CLI "report_msg_statistics"
     Log::Level debug_log_level{Log::Level::INFO}; ///< conf "DebugLogLevel" or CLI "debug-log-level"
     Log::Backend log_backend{Log::Backend::STDERR}; ///< CLI "syslog"
@@ -112,6 +113,10 @@ private:
 
     std::vector<std::shared_ptr<Endpoint>> g_endpoints{};
     int g_tcp_fd = -1; ///< for TCP server
+    unsigned long _tcp_server_max_connections = 64;
+    unsigned long _tcp_server_connections = 0;
+    bool _tcp_accept_paused = false;
+    Timeout *_tcp_accept_retry_timer = nullptr;
     std::shared_ptr<LogEndpoint> _log_endpoint{nullptr};
 
     Timeout *_timeouts = nullptr;
@@ -125,6 +130,7 @@ private:
     int _retcode;
 
     int tcp_open(unsigned long tcp_port);
+    bool _retry_tcp_accept(void *data);
     void _del_timeouts();
     bool _retry_timeout_cb(void *data);
     bool _log_aggregate_timeout(void *data);

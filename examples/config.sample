@@ -48,6 +48,11 @@
 # Default: 5760
 #TcpServerPort = 5760
 
+# Maximum number of simultaneous clients accepted by the TCP server. Additional
+# connections are accepted and immediately closed. Set to 0 to reject all clients.
+# Default: 64
+#TcpServerMaxConnections = 64
+
 ## Flight Stack Logging
 
 # Define the MAVLink dialect used by the flight stack, so mavlink-router can
