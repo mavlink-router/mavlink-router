@@ -93,8 +93,10 @@ protected:
     bool _fsync();
 
     void _handle_auto_start_stop(const struct buffer *pbuf);
+    int _check_minimum_free_space(size_t write_size) const;
 
 private:
+    bool _start_retryable = false;
     int _get_file(const char *extension);
     static uint32_t _get_prefix(DIR *dir);
     static DIR *_open_or_create_dir(const char *name);

@@ -261,6 +261,38 @@ void LogEndpoint::_delete_old_logs()
     closedir(dir);
 }
 
+int LogEndpoint::_check_minimum_free_space(size_t write_size) const
+{
+    if (_config.min_free_space == 0) {
+        return 0;
+    }
+
+    struct statvfs buf;
+    int result;
+    do {
+        result = fstatvfs(_file, &buf);
+    } while (result != 0 && errno == EINTR);
+
+    if (result != 0) {
+        const int stat_errno = errno;
+        log_error("Unable to measure free log space: %m");
+        return -stat_errno;
+    }
+
+    const uint64_t free_space = (uint64_t)buf.f_frsize * buf.f_bavail;
+    if (free_space < _config.min_free_space
+        || write_size > free_space - _config.min_free_space) {
+        log_error(
+            "Refusing log write: free space=%" PRIu64 " bytes, reserve=%lu bytes, write=%zu bytes",
+            free_space,
+            _config.min_free_space,
+            write_size);
+        return -ENOSPC;
+    }
+
+    return 0;
+}
+
 uint32_t LogEndpoint::_get_prefix(DIR *dir)
 {
     struct dirent *ent;
@@ -387,6 +419,8 @@ void LogEndpoint::stop()
 
 bool LogEndpoint::start()
 {
+    _start_retryable = false;
+
     if (_file != -1) {
         log_warning("Log already started");
         return false;
@@ -398,6 +432,22 @@ bool LogEndpoint::start()
     _file = _get_file(_get_logfile_extension());
     if (_file < 0) {
         _file = -1;
+        return false;
+    }
+
+    const int space_result = _check_minimum_free_space(0);
+    if (space_result < 0) {
+        close(_file);
+        _file = -1;
+
+        char log_file[PATH_MAX];
+        if (snprintf(log_file, sizeof(log_file), "%s/%s", _config.logs_dir.c_str(), _filename)
+            < (int)sizeof(log_file)
+            && remove(log_file) != 0) {
+            log_error("Unable to remove empty log file: %m");
+        }
+
+        _start_retryable = space_result != -ENOSPC;
         return false;
     }
 
@@ -486,7 +536,7 @@ void LogEndpoint::_handle_auto_start_stop(const struct buffer *pbuf)
 
     if (_config.log_mode == LogMode::always) {
         if (_file == -1) {
-            if (!start()) {
+            if (!start() && !_start_retryable) {
                 _config.log_mode = LogMode::disabled;
             }
         }
@@ -503,7 +553,7 @@ void LogEndpoint::_handle_auto_start_stop(const struct buffer *pbuf)
             const bool is_armed = heartbeat->base_mode & MAV_MODE_FLAG_SAFETY_ARMED;
 
             if (_file == -1 && is_armed) {
-                if (!start()) {
+                if (!start() && !_start_retryable) {
                     _config.log_mode = LogMode::disabled;
                 }
             } else if (_file != -1 && !is_armed) {
