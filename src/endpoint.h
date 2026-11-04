@@ -368,6 +368,7 @@ public:
     int flush_pending_msgs() override { return -ENOSYS; }
     bool is_valid() override { return _valid; };
     bool is_critical() override { return false; };
+    bool is_server_connection() const { return _server_connection; }
 
     Endpoint::AcceptState accept_msg(const struct buffer *pbuf) const;
 
@@ -394,6 +395,7 @@ private:
     std::string _ip{};
     unsigned long _port = 0;
     bool _valid = true;
+    bool _server_connection = false;
 
     bool is_ipv6;
     int _retry_timeout = 0; // disable retry by default
