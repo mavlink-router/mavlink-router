@@ -116,6 +116,11 @@
 # Default: <false>
 #FlowControl = false
 
+# Retry timeout in seconds when opening the UART device fails or the device is
+# disconnected. Set to 0 to disable automatic reconnect.
+# Default: 0 (disabled)
+#RetryTimeout = 5
+
 # Only allow specified MAVLink message IDs to be sent via this endpoint. An
 # empty list allows all message IDs.
 # Format: Comma separated list of integers

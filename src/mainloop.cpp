@@ -66,7 +66,12 @@ Mainloop &Mainloop::init()
 
 void Mainloop::teardown()
 {
+    if (_instance.epollfd != -1) {
+        close(_instance.epollfd);
+        _instance.epollfd = -1;
+    }
     _initialized = false;
+    should_exit.store(false, std::memory_order_relaxed);
 }
 
 Mainloop &Mainloop::instance()
@@ -376,7 +381,9 @@ bool Mainloop::add_endpoints(const Configuration &config)
 
         g_endpoints.push_back(uart);
         auto endpoint = g_endpoints.back();
-        this->add_fd(endpoint->fd, endpoint.get(), EPOLLIN);
+        if (endpoint->fd >= 0) {
+            this->add_fd(endpoint->fd, endpoint.get(), EPOLLIN);
+        }
     }
 
     for (const auto &conf : config.udp_configs) {
