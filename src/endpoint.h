@@ -19,7 +19,7 @@
 
 #include <common/conf_file.h>
 #include <common/mavlink.h>
-
+#include <unordered_map>
 #include <memory>
 #include <string>
 #include <utility>
@@ -53,6 +53,8 @@ struct UartEndpointConfig {
     std::vector<uint8_t> block_src_comp_in;
     std::vector<uint8_t> allow_src_sys_in;
     std::vector<uint8_t> block_src_sys_in;
+    std::vector<uint32_t> rate_limit_msg_id_out;
+    std::vector<uint32_t> rate_limit_period_out;
     std::string group;
 };
 
@@ -75,6 +77,8 @@ struct UdpEndpointConfig {
     std::vector<uint8_t> block_src_comp_in;
     std::vector<uint8_t> allow_src_sys_in;
     std::vector<uint8_t> block_src_sys_in;
+    std::vector<uint32_t> rate_limit_msg_id_out;
+    std::vector<uint32_t> rate_limit_period_out;
     std::string group;
 };
 
@@ -95,6 +99,8 @@ struct TcpEndpointConfig {
     std::vector<uint8_t> block_src_comp_in;
     std::vector<uint8_t> allow_src_sys_in;
     std::vector<uint8_t> block_src_sys_in;
+    std::vector<uint32_t> rate_limit_msg_id_out;
+    std::vector<uint32_t> rate_limit_period_out;
     std::string group;
 };
 
@@ -228,6 +234,10 @@ public:
         _blocked_incoming_src_systems.push_back(src_sys);
     }
 
+   void rate_limit_set(uint32_t msg_id, uint32_t period_ms) {
+       _msg_and_rate_map[msg_id] = period_ms;
+   }
+
     bool allowed_by_dedup(const buffer *pbuf) const;
     bool allowed_by_incoming_filters(const struct buffer *pbuf) const;
 
@@ -248,6 +258,12 @@ protected:
     virtual ssize_t _read_msg(uint8_t *buf, size_t len) = 0;
     bool _check_crc(const mavlink_msg_entry_t *msg_entry) const;
     void _add_sys_comp_id(uint8_t sysid, uint8_t compid);
+    // Returns true if allowed to send now (does NOT update "last-sent" msg information)
+    bool _rate_limit_allows(uint32_t msg_id, uint64_t now_ms) const;
+    // Record successful msg send time
+    void _rate_limit_record_msg_sent(uint32_t msg_id, uint64_t now_ms);
+    // Monotonic now in ms
+    static uint64_t _now_monotonic_ms();
 
     const std::string _type; ///< UART, UDP, TCP, Log
     std::string _name;       ///< Endpoint name from config file
@@ -275,6 +291,8 @@ protected:
 
     uint32_t _incomplete_msgs = 0;
     std::vector<uint16_t> _sys_comp_ids;
+    std::unordered_map<uint32_t, uint32_t> _msg_and_rate_map;
+    std::unordered_map<uint32_t, uint64_t> _throttled_msgs_last_send;
 
 private:
     std::vector<uint32_t> _allowed_outgoing_msg_ids;
