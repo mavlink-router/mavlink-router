@@ -22,7 +22,12 @@
 #include "tlog.h"
 #include "ulog.h"
 
+#include <fcntl.h>
 #include <limits.h>
+#include <unistd.h>
+
+#include <string>
+#include <vector>
 
 #include <gtest/gtest.h>
 
@@ -733,4 +738,68 @@ TEST(LogEndpointTest, Init)
 
     TLog tlog{conf};
     EXPECT_EQ(tlog.get_type(), ENDPOINT_TYPE_LOG);
+}
+
+class TestLogEndpoint : public LogEndpoint {
+public:
+    TestLogEndpoint(LogOptions conf, int file)
+        : LogEndpoint{"TestLog", conf}
+    {
+        _file = file;
+    }
+
+    int write_msg(const struct buffer *pbuf) override { return 0; }
+    int flush_pending_msgs() override { return -ENOSYS; }
+    ssize_t _read_msg(uint8_t *buf, size_t len) override { return 0; }
+    const char *_get_logfile_extension() override { return "test"; }
+    bool _logging_start_timeout() override { return false; }
+
+    using LogEndpoint::_write;
+};
+
+TEST(LogEndpointTest, StalledDiskDoesNotBlockWrites)
+{
+    // A full pipe stands in for a disk that does not complete writes
+    int fds[2];
+    ASSERT_EQ(pipe(fds), 0);
+    fcntl(fds[1], F_SETFL, O_NONBLOCK);
+    const char zero = 0;
+    size_t filled = 0;
+    while (write(fds[1], &zero, 1) == 1) {
+        filled++;
+    }
+    fcntl(fds[1], F_SETFL, 0);
+
+    {
+        const size_t chunk_size = 1024;
+        const int chunks_that_fit = 4;
+
+        LogOptions conf;
+        conf.logs_dir = "./";
+        conf.write_queue_size = chunks_that_fit * chunk_size;
+        TestLogEndpoint log{conf, fds[1]};
+
+        std::string expected;
+        for (int i = 0; i < chunks_that_fit; i++) {
+            const std::string chunk(chunk_size, '0' + i);
+            EXPECT_EQ(log._write(chunk.data(), chunk.size()), (ssize_t)chunk.size());
+            expected += chunk;
+        }
+        const ssize_t dropped = log._write(expected.data(), chunk_size);
+        const int err = errno;
+        EXPECT_EQ(dropped, -1);
+        EXPECT_EQ(err, EAGAIN);
+
+        std::vector<char> out(filled + expected.size());
+        size_t got = 0;
+        while (got < out.size()) {
+            const ssize_t r = read(fds[0], out.data() + got, out.size() - got);
+            ASSERT_GT(r, 0);
+            got += r;
+        }
+        EXPECT_EQ(std::string(out.begin() + filled, out.end()), expected);
+    }
+
+    close(fds[0]);
+    close(fds[1]);
 }
