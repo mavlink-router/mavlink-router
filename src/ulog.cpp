@@ -91,11 +91,7 @@ void ULog::stop()
 
     _buffer_len = 0;
     /* Write the last partial message to avoid corrupt the end of the file */
-    while (_buffer_partial_len) {
-        if (!_logging_flush()) {
-            break;
-        }
-    }
+    _logging_flush();
 
     LogEndpoint::stop();
 }
@@ -313,7 +309,7 @@ void ULog::_logging_data_process(mavlink_logging_data_t *msg)
 bool ULog::_logging_flush()
 {
     while (_buffer_partial_len) {
-        const ssize_t r = write(_file, _buffer_partial, _buffer_partial_len);
+        const ssize_t r = _write(_buffer_partial, _buffer_partial_len);
         if (r == 0 || (r == -1 && errno == EAGAIN)) {
             return true;
         }
@@ -334,7 +330,7 @@ bool ULog::_logging_flush()
             break;
         }
 
-        const ssize_t r = write(_file, header, full_msg_size);
+        const ssize_t r = _write(header, full_msg_size);
         if (r == full_msg_size) {
             _buffer_len -= full_msg_size;
             _buffer_index += full_msg_size;
