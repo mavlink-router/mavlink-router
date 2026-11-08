@@ -255,8 +255,17 @@ void ULog::_logging_data_process(mavlink_logging_data_t *msg)
         _buffer_partial_len = ULOG_HEADER_SIZE;
         memcpy(_buffer_partial, msg->data, ULOG_HEADER_SIZE);
 
-        memmove(msg->data, &msg->data[ULOG_HEADER_SIZE], msg->length);
+        /*
+         * msg->length is an attacker-controlled wire field (up to 255) but
+         * msg->data[] is only sizeof(msg->data) bytes. Clamp before using it,
+         * and drop the header (shifting only the payload) so the memmove reads
+         * and writes stay inside msg->data[].
+         */
+        if (msg->length > sizeof(msg->data)) {
+            msg->length = sizeof(msg->data);
+        }
         msg->length -= ULOG_HEADER_SIZE;
+        memmove(msg->data, &msg->data[ULOG_HEADER_SIZE], msg->length);
         _waiting_header = false;
     }
 
@@ -301,6 +310,17 @@ void ULog::_logging_data_process(mavlink_logging_data_t *msg)
     }
 
     if (!msg->length) {
+        return;
+    }
+
+    /*
+     * begin (first_message_offset) and length are untrusted wire fields. Without
+     * begin <= length the subtraction underflows in uint8 and the memcpy reads far
+     * past msg->data[]; length itself must also fit msg->data[]. Drop if either
+     * relationship is violated rather than reading out of bounds.
+     */
+    if (begin > msg->length || msg->length > sizeof(msg->data)) {
+        log_warning("Invalid ULog LOGGING_DATA offset/length, dropping message");
         return;
     }
 
