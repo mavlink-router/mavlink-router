@@ -152,6 +152,7 @@ public:
         Accepted = 1,
         Filtered,
         Rejected,
+        Observed, ///< write to this endpoint, but it is not a destination of the message
     };
 
     Endpoint(std::string type, std::string name);
@@ -177,7 +178,7 @@ public:
         return has_sys_comp_id(sys_comp_id);
     }
 
-    AcceptState accept_msg(const struct buffer *pbuf) const;
+    virtual AcceptState accept_msg(const struct buffer *pbuf) const;
 
     void filter_add_allowed_out_msg_id(uint32_t msg_id)
     {
@@ -369,7 +370,7 @@ public:
     bool is_valid() override { return _valid; };
     bool is_critical() override { return false; };
 
-    Endpoint::AcceptState accept_msg(const struct buffer *pbuf) const;
+    Endpoint::AcceptState accept_msg(const struct buffer *pbuf) const override;
 
     int accept(int listener_fd);        ///< accept incoming connection
     bool setup(TcpEndpointConfig conf); ///< open connection and apply config

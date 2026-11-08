@@ -80,6 +80,26 @@ LogEndpoint::LogEndpoint(std::string name, LogOptions conf)
     }
 }
 
+Endpoint::AcceptState LogEndpoint::accept_msg(const struct buffer *pbuf) const
+{
+    // Messages this log endpoint emitted itself (e.g. BinLog's remote-log
+    // control messages) must not be written back into the log
+    if (has_sys_comp_id(pbuf->curr.src_sysid, pbuf->curr.src_compid)) {
+        return Endpoint::AcceptState::Rejected;
+    }
+
+    auto state = Endpoint::accept_msg(pbuf);
+
+    // Point-to-point traffic between other systems (e.g. COMMAND_INT,
+    // COMMAND_ACK) is still logged, but as an observer: the log endpoint is
+    // not a destination, so a message to an unknown target stays unknown
+    if (state == Endpoint::AcceptState::Rejected) {
+        return Endpoint::AcceptState::Observed;
+    }
+
+    return state;
+}
+
 void LogEndpoint::_send_msg(const mavlink_message_t *msg, int target_sysid)
 {
     uint8_t data[MAVLINK_MAX_PACKET_LEN] = {};

@@ -76,6 +76,12 @@ public:
 
     void print_statistics();
 
+    /*
+     * Number of messages routed to an unknown sysid/compid since the last
+     * aggregated report
+     */
+    uint32_t msg_to_unknown_count() const { return _errors_aggregate.msg_to_unknown; }
+
     int epollfd = -1;
     bool should_process_tcp_hangups = false;
 

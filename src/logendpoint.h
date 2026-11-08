@@ -56,6 +56,14 @@ public:
     virtual void stop();
 
     /**
+     * Log endpoints also capture point-to-point traffic between other systems
+     * (e.g. COMMAND_INT, COMMAND_ACK). Those messages are returned as
+     * Observed instead of Accepted, so the log gets a copy without counting
+     * as a destination for the message.
+     */
+    Endpoint::AcceptState accept_msg(const struct buffer *pbuf) const override;
+
+    /**
      * Check existing log files and mark logs as read-only if needed.
      * This handles the case where the system (or mavlink-router) crashed or
      * lost power.

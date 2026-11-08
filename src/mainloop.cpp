@@ -186,6 +186,20 @@ void Mainloop::route_msg(struct buffer *buf)
                       buf->curr.src_compid);
             unknown = false;
             break;
+        case Endpoint::AcceptState::Observed:
+            log_trace("Endpoint [%d] observed message %u to %d/%d from %u/%u",
+                      e->fd,
+                      buf->curr.msg_id,
+                      buf->curr.target_sysid,
+                      buf->curr.target_compid,
+                      buf->curr.src_sysid,
+                      buf->curr.src_compid);
+            // passive endpoints (e.g. logs) get a copy, but don't count as a
+            // destination, so this doesn't clear the unknown state
+            if (write_msg(e, buf) == -EPIPE) {
+                should_process_tcp_hangups = true;
+            }
+            break;
         case Endpoint::AcceptState::Rejected:
             // fall through
         default:
