@@ -56,12 +56,10 @@ public:
     virtual void stop();
 
     /**
-     * Override to capture every routed message regardless of its target
-     * sysid/compid. Log endpoints are passive observers: they do not consume
-     * an address on the MAVLink network, so the standard target-matching
-     * rules in Endpoint::accept_msg would drop point-to-point traffic (e.g.
-     * COMMAND_INT, COMMAND_ACK), leaving the log with broadcast messages
-     * only.
+     * Log endpoints also capture point-to-point traffic between other systems
+     * (e.g. COMMAND_INT, COMMAND_ACK). Those messages are returned as
+     * Observed instead of Accepted, so the log gets a copy without counting
+     * as a destination for the message.
      */
     Endpoint::AcceptState accept_msg(const struct buffer *pbuf) const override;
 

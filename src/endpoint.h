@@ -152,6 +152,7 @@ public:
         Accepted = 1,
         Filtered,
         Rejected,
+        Observed, ///< write to this endpoint, but it is not a destination of the message
     };
 
     Endpoint(std::string type, std::string name);

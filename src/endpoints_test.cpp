@@ -751,19 +751,27 @@ TEST(LogEndpointTest, AcceptMsg_CapturesTargetedMessages)
     test_msg.curr.target_compid = 0;
     EXPECT_EQ(tlog.accept_msg(&test_msg), Endpoint::AcceptState::Accepted);
 
-    // point-to-point message addressed to the FCU: must be captured even
+    // point-to-point message addressed to the FCU: observed (logged) even
     // though the log endpoint has neither its sysid nor a matching sniffer
     test_msg.curr.src_sysid = 255;
     test_msg.curr.src_compid = 190;
     test_msg.curr.target_sysid = 1;
     test_msg.curr.target_compid = 1;
-    EXPECT_EQ(tlog.accept_msg(&test_msg), Endpoint::AcceptState::Accepted);
+    EXPECT_EQ(tlog.accept_msg(&test_msg), Endpoint::AcceptState::Observed);
 
-    // point-to-point response from FCU back to GCS: also captured
+    // point-to-point response from FCU back to GCS: also observed
     test_msg.curr.src_sysid = 1;
     test_msg.curr.src_compid = 1;
     test_msg.curr.target_sysid = 255;
     test_msg.curr.target_compid = 190;
+    EXPECT_EQ(tlog.accept_msg(&test_msg), Endpoint::AcceptState::Observed);
+
+    // message addressed to the log endpoint itself (e.g. FCU replying to
+    // BinLog): accepted as a real destination, same as before
+    test_msg.curr.src_sysid = 1;
+    test_msg.curr.src_compid = 1;
+    test_msg.curr.target_sysid = LOG_ENDPOINT_SYSTEM_ID;
+    test_msg.curr.target_compid = 0;
     EXPECT_EQ(tlog.accept_msg(&test_msg), Endpoint::AcceptState::Accepted);
 
     // message emitted by the log endpoint itself is rejected to avoid

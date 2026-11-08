@@ -82,19 +82,22 @@ LogEndpoint::LogEndpoint(std::string name, LogOptions conf)
 
 Endpoint::AcceptState LogEndpoint::accept_msg(const struct buffer *pbuf) const
 {
-    // Reject messages that this log endpoint emitted itself (e.g. BinLog's
-    // remote-log control messages). Without this check, those would be
-    // written back into the log file, creating a loop.
+    // Messages this log endpoint emitted itself (e.g. BinLog's remote-log
+    // control messages) must not be written back into the log
     if (has_sys_comp_id(pbuf->curr.src_sysid, pbuf->curr.src_compid)) {
         return Endpoint::AcceptState::Rejected;
     }
 
-    // Accept everything else, including point-to-point messages whose
-    // target_sysid/target_compid do not match this endpoint. A log endpoint
-    // is a passive observer of the bus, not an addressable participant, so
-    // the standard target-matching rules in Endpoint::accept_msg would
-    // otherwise drop targeted traffic like COMMAND_INT or COMMAND_ACK.
-    return Endpoint::AcceptState::Accepted;
+    auto state = Endpoint::accept_msg(pbuf);
+
+    // Point-to-point traffic between other systems (e.g. COMMAND_INT,
+    // COMMAND_ACK) is still logged, but as an observer: the log endpoint is
+    // not a destination, so a message to an unknown target stays unknown
+    if (state == Endpoint::AcceptState::Rejected) {
+        return Endpoint::AcceptState::Observed;
+    }
+
+    return state;
 }
 
 void LogEndpoint::_send_msg(const mavlink_message_t *msg, int target_sysid)
