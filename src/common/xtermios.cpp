@@ -1,3 +1,4 @@
+#ifdef __linux__
 /*
  * This file is part of the MAVLink Router project
  *
@@ -63,3 +64,34 @@ int reset_uart(int fd)
 
     return 0;
 }
+
+#else
+/* BSD-compat reset_uart. Linux's NCCS=32 vs BSD's NCCS=20 means
+ * the verbatim Linux body would static_assert; this branch uses
+ * cfmakeraw plus a few flag tweaks that produce a known-good raw
+ * mode equivalent to the Linux "stty-sane" defaults for USB CDC
+ * ACM. Real RS-232 / UART at non-standard baud rates may need a
+ * fuller port using cfsetspeed + per-flag handling. */
+
+#include <termios.h>
+#include <unistd.h>
+#include "log.h"
+#include "xtermios.h"
+
+int reset_uart(int fd)
+{
+    struct termios tc;
+    if (tcgetattr(fd, &tc) != 0) {
+        return -1;
+    }
+    cfmakeraw(&tc);
+    tc.c_cflag |= (CLOCAL | CREAD);
+    tc.c_cflag &= ~(CRTSCTS);
+    tc.c_cc[VMIN] = 0;
+    tc.c_cc[VTIME] = 0;
+    if (tcsetattr(fd, TCSANOW, &tc) != 0) {
+        return -1;
+    }
+    return 0;
+}
+#endif /* __linux__ */

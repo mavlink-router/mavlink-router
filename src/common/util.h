@@ -66,5 +66,4 @@ template <typename type> bool vector_contains(std::vector<type> vect, type elem)
             (char *)memcpy(__out, __in, __len);      \
         }))
 
-#    include <asm/ioctls.h>
 #endif

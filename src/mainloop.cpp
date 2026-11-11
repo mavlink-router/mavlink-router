@@ -20,6 +20,9 @@
 #include <assert.h>
 #include <signal.h>
 #include <sys/epoll.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
 #include <sys/timerfd.h>
 #include <unistd.h>
 
@@ -469,10 +472,21 @@ void Mainloop::clear_endpoints()
 int Mainloop::tcp_open(unsigned long tcp_port)
 {
     int fd;
+#ifdef __FreeBSD__
+    /* IPv6 sockets are not allowed in non-vnet jails without an
+     * explicit ip6.addr; fall back to IPv4 on FreeBSD. The TCP
+     * debug port targets MAVProxy / Wireshark on the local
+     * network where IPv4 is sufficient. */
+    struct sockaddr_in sockaddr = {};
+    int val = 1;
+
+    fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+#else
     struct sockaddr_in6 sockaddr = {};
     int val = 1;
 
     fd = socket(AF_INET6, SOCK_STREAM | SOCK_NONBLOCK, 0);
+#endif
     if (fd == -1) {
         log_error("TCP Server: Could not create tcp socket (%m)");
         return -1;
@@ -480,9 +494,15 @@ int Mainloop::tcp_open(unsigned long tcp_port)
 
     setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
 
+#ifdef __FreeBSD__
+    sockaddr.sin_family = AF_INET;
+    sockaddr.sin_port = htons(tcp_port);
+    sockaddr.sin_addr.s_addr = INADDR_ANY;
+#else
     sockaddr.sin6_family = AF_INET6;
     sockaddr.sin6_port = htons(tcp_port);
     sockaddr.sin6_addr = in6addr_any;
+#endif
 
     if (bind(fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) < 0) {
         log_error("TCP Server: Could not bind to tcp socket (%m)");

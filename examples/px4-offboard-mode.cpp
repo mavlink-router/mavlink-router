@@ -43,6 +43,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/timerfd.h>
 #include <time.h>
@@ -65,7 +66,7 @@
 static volatile bool g_should_exit;
 
 static int tcp_fd = -1;
-static struct sockaddr_in sockaddr;
+static struct sockaddr_in srv_addr;
 
 static int timeout_fd = -1;
 
@@ -153,7 +154,7 @@ static int msg_send(mavlink_message_t *msg)
     uint8_t data[MAVLINK_MAX_PACKET_LEN];
 
     uint16_t len = mavlink_msg_to_send_buffer(data, msg);
-    int r = sendto(tcp_fd, data, len, 0, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
+    int r = sendto(tcp_fd, data, len, 0, (struct sockaddr *)&srv_addr, sizeof(srv_addr));
     if (r < 0) {
         fprintf(stderr, "Could not send to %d: r=%d (%m)\n", tcp_fd, r);
     }
@@ -524,8 +525,8 @@ static int tcp_fd_poll_handle(const struct pollfd *d)
         mavlink_message_t msg;
         mavlink_status_t status;
         uint8_t buf[MAVLINK_MAX_PACKET_LEN];
-        socklen_t addrlen = sizeof(sockaddr);
-        ssize_t n = recvfrom(tcp_fd, buf, sizeof(buf), 0, (struct sockaddr *)&sockaddr, &addrlen);
+        socklen_t addrlen = sizeof(srv_addr);
+        ssize_t n = recvfrom(tcp_fd, buf, sizeof(buf), 0, (struct sockaddr *)&srv_addr, &addrlen);
 
         if (n == -1) {
             if (errno == EINTR) {
@@ -602,13 +603,13 @@ static int setup_connection(const char *ip, int port)
         return -1;
     }
 
-    sockaddr.sin_family = AF_INET;
-    sockaddr.sin_addr.s_addr = inet_addr(ip);
-    sockaddr.sin_port = htons(port);
+    srv_addr.sin_family = AF_INET;
+    srv_addr.sin_addr.s_addr = inet_addr(ip);
+    srv_addr.sin_port = htons(port);
 
     printf("Connecting to TCP: %s:%i\n", ip, port);
 
-    if (connect(tcp_fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) != 0) {
+    if (connect(tcp_fd, (struct sockaddr *)&srv_addr, sizeof(srv_addr)) != 0) {
         fprintf(stderr, "Could not connect to socket (%m)\n");
         return -1;
     }

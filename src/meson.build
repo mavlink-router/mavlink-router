@@ -21,6 +21,7 @@ exe_mavlink_router = executable('mavlink-routerd',
                 dep_math,
                 dep_rt,
                 dep_thread,
+                dep_epoll_shim,
         ],
         link_with: libcommon_private,
         install: true,
@@ -46,6 +47,7 @@ if dep_gtest.found()
           dependencies : [
             dep_gtest,
             dep_rt,
+            dep_epoll_shim,
           ],
           link_with: libcommon_private,
           install: false,
@@ -71,6 +73,7 @@ if dep_gtest.found()
           dependencies : [
             dep_gtest,
             dep_rt,
+            dep_epoll_shim,
           ],
           link_with: libcommon_private,
           install: false,

@@ -18,7 +18,11 @@
 #pragma once
 
 #include <arpa/inet.h>
+#ifdef __linux__
 #include <asm/termbits.h>
+#else
+#include <termios.h>
+#endif
 #include <errno.h>
 #include <inttypes.h>
 
