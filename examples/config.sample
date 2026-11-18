@@ -196,9 +196,10 @@
 #Group = 
 
 ## Example
-[UartEndpoint alpha]
-Device = /dev/ttyS0
-Baud = 52000
+
+# [UartEndpoint alpha]
+# Device = /dev/ttyS0
+# Baud = 52000
 
 
 ##
@@ -231,16 +232,18 @@ Baud = 52000
 
 ## Examples
 # bind to 0.0.0.0:10000
-[UdpEndpoint bravo]
-Mode = Server
-Address = 0.0.0.0
-Port = 10000
+
+# [UdpEndpoint bravo]
+# Mode = Server
+# Address = 0.0.0.0
+# Port = 10000
 
 # send to 127.0.0.1:11000
-[UdpEndpoint charlie]
-Mode = Normal
-Address = 127.0.0.1
-Port = 11000
+
+# [UdpEndpoint charlie]
+# Mode = Normal
+# Address = 127.0.0.1
+# Port = 11000
 
 
 ##
@@ -269,6 +272,7 @@ Port = 11000
 
 ## Example
 # connect to 127.0.0.1:25760 (e.g. another mavlink-router)
-[TcpEndpoint delta]
-Address = 127.0.0.1
-Port = 25760
+
+# [TcpEndpoint delta]
+# Address = 127.0.0.1
+# Port = 25760
