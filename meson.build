@@ -4,7 +4,7 @@ project(
         version: '3',
         license: 'Apache 2.0',
         default_options: [
-                'cpp_std=gnu++14',
+                'cpp_std=gnu++17',
                 'prefix=/usr',
                 'warning_level=2',
                 'buildtype=debugoptimized',
