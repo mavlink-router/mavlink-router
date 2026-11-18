@@ -307,9 +307,9 @@ public:
 
 protected:
     bool open(const char *path);
-    int set_speed(speed_t baudrate);
+    int set_speed(uint32_t baudrate);
     int set_flow_control(bool enabled);
-    int add_speeds(const std::vector<speed_t> &bauds);
+    int add_speeds(const std::vector<uint32_t> &bauds);
 
     int read_msg(struct buffer *pbuf) override;
     ssize_t _read_msg(uint8_t *buf, size_t len) override;

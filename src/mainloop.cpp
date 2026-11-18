@@ -17,6 +17,7 @@
  */
 #include "mainloop.h"
 
+#include "common/time_compat.h"
 #include <assert.h>
 #include <signal.h>
 #include <sys/epoll.h>
@@ -472,9 +473,14 @@ int Mainloop::tcp_open(unsigned long tcp_port)
     struct sockaddr_in6 sockaddr = {};
     int val = 1;
 
-    fd = socket(AF_INET6, SOCK_STREAM | SOCK_NONBLOCK, 0);
+    fd = socket(AF_INET6, SOCK_STREAM, 0);
     if (fd == -1) {
         log_error("TCP Server: Could not create tcp socket (%m)");
+        return -1;
+    }
+    if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
+        log_error("TCP Server: Could not set socket as non-blocking (%m)");
+        close(fd);
         return -1;
     }
 
@@ -546,7 +552,10 @@ void Mainloop::mod_timeout(Timeout *t, uint32_t timeout_msec)
     ts.it_value.tv_sec = ts.it_interval.tv_sec;
     ts.it_value.tv_nsec = ts.it_interval.tv_nsec;
 
-    timerfd_settime(t->fd, 0, &ts, nullptr);
+    int ret = timerfd_settime(t->fd, 0, &ts, nullptr);
+    if (ret == -1) {
+        log_error("Unable to set timerfd: %m");
+    }
 }
 
 void Mainloop::_del_timeouts()

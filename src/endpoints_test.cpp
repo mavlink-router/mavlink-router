@@ -627,9 +627,9 @@ TEST_P(UdpEndpointConfigPortTestFixture, UdpPortRangeCheck)
         << "with port " << std::to_string(config.port);
 }
 
-INSTANTIATE_TEST_CASE_P(UdpEndpointTest, UdpEndpointConfigPortTestFixture,
-                        ::testing::Values(UdpEndpointConfig::Mode::Client,
-                                          UdpEndpointConfig::Mode::Server));
+INSTANTIATE_TEST_SUITE_P(UdpEndpointTest, UdpEndpointConfigPortTestFixture,
+                         ::testing::Values(UdpEndpointConfig::Mode::Client,
+                                           UdpEndpointConfig::Mode::Server));
 
 TEST(UdpEndpointTest, ConfigValidateMode)
 {

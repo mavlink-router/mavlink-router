@@ -18,7 +18,6 @@
 #pragma once
 
 #include <arpa/inet.h>
-#include <asm/termbits.h>
 #include <errno.h>
 #include <inttypes.h>
 

@@ -41,6 +41,10 @@
 
 extern const char *BUILD_VERSION;
 
+#ifdef __APPLE__
+const char *program_invocation_short_name = "mavlink-routerd";
+#endif
+
 static const struct option long_options[] = {{"endpoints", required_argument, nullptr, 'e'},
                                              {"conf-file", required_argument, nullptr, 'c'},
                                              {"conf-dir", required_argument, nullptr, 'd'},

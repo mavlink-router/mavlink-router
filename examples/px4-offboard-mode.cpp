@@ -36,6 +36,7 @@
  */
 
 #include <arpa/inet.h>
+#include <common/time_compat.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
@@ -45,7 +46,6 @@
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <sys/timerfd.h>
-#include <time.h>
 #include <unistd.h>
 
 #include <common/mavlink.h>
@@ -651,7 +651,7 @@ int main(int argc, char *argv[])
     if (argc > 1) {
         free(ip);
         ip = strdup(argv[1]);
-        char *portstr = strchrnul(ip, ':');
+        char *portstr = strchr(ip, ':');
         if (portstr && *portstr) {
             *portstr = '\0';
             port = atoi(portstr + 1);

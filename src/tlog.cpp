@@ -18,7 +18,7 @@
 #include "tlog.h"
 
 #include <assert.h>
-#include <endian.h>
+#include <common/endian_compat.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>

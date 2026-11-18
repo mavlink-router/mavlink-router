@@ -79,7 +79,7 @@ int main(int argc, char *argv[])
     }
 
     char *ip = strdup(argv[1]);
-    char *portstr = strchrnul(ip, ':');
+    char *portstr = strchr(ip, ':');
     if (portstr && *portstr) {
         *portstr = '\0';
         port = atoi(portstr + 1);

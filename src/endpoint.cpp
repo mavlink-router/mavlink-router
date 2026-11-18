@@ -22,12 +22,13 @@
 #include <regex>
 #include <utility>
 
+#include "common/serial.h"
+#include "common/socket_compat.h"
 #include <arpa/inet.h>
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <ifaddrs.h>
-#include <linux/serial.h>
 #include <net/if.h>
 #include <netdb.h>
 #include <netinet/tcp.h>
@@ -36,14 +37,12 @@
 #include <string.h>
 #include <sys/epoll.h>
 #include <sys/ioctl.h>
-#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 #include <common/log.h>
 #include <common/util.h>
-#include <common/xtermios.h>
 
 #include "mainloop.h"
 
@@ -737,18 +736,20 @@ bool UartEndpoint::setup(UartEndpointConfig conf)
         return false;
     }
 
+    if (conf.flowcontrol) {
+        if (this->set_flow_control(true) < 0) {
+            return false;
+        }
+    }
+
+    // On macOS baudrate should be set after flow control and other termios parameters,
+    // see https://docs.rs/crate/serialport/latest/source/NOTES.md for details
     if (conf.baudrates.size() == 1) {
         if (this->set_speed(conf.baudrates[0]) < 0) {
             return false;
         }
     } else {
         if (this->add_speeds(conf.baudrates) < 0) {
-            return false;
-        }
-    }
-
-    if (conf.flowcontrol) {
-        if (this->set_flow_control(true) < 0) {
             return false;
         }
     }
@@ -796,159 +797,45 @@ bool UartEndpoint::setup(UartEndpointConfig conf)
     return true;
 }
 
-int UartEndpoint::set_speed(speed_t baudrate)
+int UartEndpoint::set_speed(uint32_t baudrate)
 {
-    struct termios2 tc;
-
-    if (fd < 0) {
-        return -1;
-    }
-
-    bzero(&tc, sizeof(tc));
-    if (ioctl(fd, TCGETS2, &tc) == -1) {
-        log_error("UART [%d]%s: Could not get termios2 (%m)", fd, _name.c_str());
-        return -1;
-    }
-
-    /* speed is configured by c_[io]speed */
-    tc.c_cflag &= ~CBAUD;
-    tc.c_cflag |= BOTHER;
-    tc.c_ispeed = baudrate;
-    tc.c_ospeed = baudrate;
-
-    if (ioctl(fd, TCSETS2, &tc) == -1) {
-        log_error("Could not set terminal attributes (%m)");
+    if (set_serial_speed(fd, baudrate) < 0) {
+        log_error("UART [%d]%s: Could not set speed", fd, _name.c_str());
         return -1;
     }
 
     log_info("UART [%d]%s: speed = %u", fd, _name.c_str(), baudrate);
-
-    if (ioctl(fd, TCFLSH, TCIOFLUSH) == -1) {
-        log_error("UART [%d]%s: Could not flush terminal (%m)", fd, _name.c_str());
-        return -1;
-    }
-
     return 0;
 }
 
 int UartEndpoint::set_flow_control(bool enabled)
 {
-    struct termios2 tc;
-
-    if (fd < 0) {
-        return -1;
-    }
-
-    bzero(&tc, sizeof(tc));
-    if (ioctl(fd, TCGETS2, &tc) == -1) {
-        log_error("UART [%d]%s: Could not get termios2 (%m)", fd, _name.c_str());
-        return -1;
-    }
-
-    if (enabled) {
-        tc.c_cflag |= CRTSCTS;
-    } else {
-        tc.c_cflag &= ~CRTSCTS;
-    }
-
-    if (ioctl(fd, TCSETS2, &tc) == -1) {
-        log_error("UART [%d]%s: Could not set terminal attributes (%m)", fd, _name.c_str());
+    if (set_serial_flow_control(fd, enabled) < 0) {
+        log_error("UART [%d]%s: Could not set flow control", fd, _name.c_str());
         return -1;
     }
 
     log_info("UART [%d]%s: flowcontrol = %s", fd, _name.c_str(), enabled ? "enabled" : "disabled");
-
     return 0;
 }
 
 bool UartEndpoint::open(const char *path)
 {
-    struct termios2 tc;
-
     fd = ::open(path, O_RDWR | O_NONBLOCK | O_CLOEXEC | O_NOCTTY);
     if (fd < 0) {
         log_error("Could not open %s (%m)", path);
         return false;
     }
 
-    if (reset_uart(fd) < 0) {
-        log_error("Could not reset uart on %s", path);
-        goto fail;
-    }
-
-    bzero(&tc, sizeof(tc));
-
-    if (ioctl(fd, TCGETS2, &tc) == -1) {
-        log_error("Could not get termios2 on %s (%m)", path);
-        goto fail;
-    }
-
-    tc.c_iflag &= ~(IGNBRK | BRKINT | ICRNL | INLCR | PARMRK | INPCK | ISTRIP | IXON);
-    tc.c_oflag &= ~(OCRNL | ONLCR | ONLRET | ONOCR | OFILL | OPOST);
-
-    tc.c_lflag &= ~(ECHO | ECHOE | ECHOK | ECHOCTL | ECHOKE | ECHONL | ICANON | IEXTEN | ISIG);
-
-    /* never send SIGTTOU*/
-    tc.c_lflag &= ~(TOSTOP);
-
-    /* disable flow control */
-    tc.c_cflag &= ~(CRTSCTS);
-    tc.c_cflag &= ~(CSIZE | PARENB);
-
-    /* ignore modem control lines */
-    tc.c_cflag |= CLOCAL;
-
-    /* 8 bits */
-    tc.c_cflag |= CS8;
-
-    /* we use epoll to get notification of available bytes */
-    tc.c_cc[VMIN] = 0;
-    tc.c_cc[VTIME] = 0;
-
-    if (ioctl(fd, TCSETS2, &tc) == -1) {
-        log_error("Could not set terminal attributes on %s (%m)", path);
-        goto fail;
-    }
-
-    // For Linux, set high speed polling at the chip
-    // level. Since this routine relies on a USB latency
-    // change at the chip level it may fail on certain
-    // chip sets if their driver does not support this
-    // configuration request
-
-    {
-        struct serial_struct serial_ctl;
-
-        int result = ioctl(fd, TIOCGSERIAL, &serial_ctl);
-        if (result < 0) {
-            log_warning("Error while trying to read serial port configuration on %s: %m", path);
-            goto set_latency_failed;
-        }
-
-        serial_ctl.flags |= ASYNC_LOW_LATENCY;
-
-        result = ioctl(fd, TIOCSSERIAL, &serial_ctl);
-        if (result < 0) {
-            if (errno != ENODEV && errno != ENOTTY) {
-                log_warning("Error while trying to write serial port latency on %s: %m", path);
-            }
-        }
-    }
-
-set_latency_failed:
-    if (ioctl(fd, TCFLSH, TCIOFLUSH) == -1) {
-        log_error("Could not flush terminal on %s (%m)", path);
-        goto fail;
+    if (init_serial(fd, path) < 0) {
+        log_error("Could not initialize serial on %s", path);
+        ::close(fd);
+        fd = -1;
+        return false;
     }
 
     log_info("Opened UART [%d]%s: %s", fd, _name.c_str(), path);
-
     return true;
-
-fail:
-    ::close(fd);
-    fd = -1;
-    return false;
 }
 
 bool UartEndpoint::_change_baud_cb(void *data)
@@ -1029,7 +916,7 @@ int UartEndpoint::write_msg(const struct buffer *pbuf)
     return r;
 }
 
-int UartEndpoint::add_speeds(const std::vector<speed_t> &bauds)
+int UartEndpoint::add_speeds(const std::vector<uint32_t> &bauds)
 {
     if (bauds.empty()) {
         return -EINVAL;
@@ -1535,8 +1422,11 @@ int TcpEndpoint::accept(int listener_fd)
         sock = (struct sockaddr *)&sockaddr;
     }
 
-    fd = accept4(listener_fd, sock, &addrlen, SOCK_NONBLOCK);
+    fd = ::accept(listener_fd, sock, &addrlen);
     if (fd == -1) {
+        return -1;
+    }
+    if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
         return -1;
     }
 

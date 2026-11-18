@@ -17,9 +17,9 @@ exe_mavlink_router = executable('mavlink-routerd',
          version_h,
         ],
         include_directories: [src_inc, mavlink_inc],
-        dependencies: [
+        dependencies: deps_platform + 
+        [
                 dep_math,
-                dep_rt,
                 dep_thread,
         ],
         link_with: libcommon_private,
@@ -43,9 +43,9 @@ if dep_gtest.found()
             version_h,
           ],
           include_directories: [src_inc, mavlink_inc],
-          dependencies : [
+          dependencies : deps_platform + 
+          [
             dep_gtest,
-            dep_rt,
           ],
           link_with: libcommon_private,
           install: false,
@@ -68,12 +68,13 @@ if dep_gtest.found()
             version_h,
           ],
           include_directories: [src_inc, mavlink_inc],
-          dependencies : [
+          dependencies : deps_platform + 
+          [
             dep_gtest,
-            dep_rt,
           ],
           link_with: libcommon_private,
           install: false,
   )
   test('endpoints', exe_endpoints_test)
 endif
+
