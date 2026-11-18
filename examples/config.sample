@@ -217,8 +217,18 @@ Baud = 52000
 # Binding or target IP address (depending on mode).
 # IPv6 addresses must be encosed in square brackets like `[::1]`.
 # Binding to `0.0.0.0` or `[::]` will listen on all interfaces.
-# Mandatory, no default value
+# Either Address or Interface must be specified (see Interface below).
+# Default: no default value
 #Address = 
+
+# Network interface name to bind to (e.g. eth0, eth0.10, wlan0).
+# Only used in <server> mode. When set, the IPv4 address of the given
+# interface is resolved at startup and used as the bind address, instead
+# of the Address field. This allows the configuration to remain stable
+# even when the interface's IP address changes (e.g. DHCP renewal).
+# Either Address or Interface must be specified.
+# Default: Empty (disabled, use Address instead)
+#Interface = 
 
 # UDP port to be used with the configured address.
 # Mandatory in <server> mode, no default value
@@ -235,6 +245,18 @@ Baud = 52000
 Mode = Server
 Address = 0.0.0.0
 Port = 10000
+
+# bind to the IP address of eth0 on port 10001
+[UdpEndpoint bravo-eth0]
+Mode = Server
+Interface = eth0
+Port = 10001
+
+# bind to the IP address of a VLAN interface on port 10002
+[UdpEndpoint bravo-vlan]
+Mode = Server
+Interface = eth0.10
+Port = 10002
 
 # send to 127.0.0.1:11000
 [UdpEndpoint charlie]

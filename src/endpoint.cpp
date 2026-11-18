@@ -78,7 +78,8 @@ const ConfFile::OptionsTable UartEndpoint::option_table[] = {
 
 const char *UdpEndpoint::section_pattern = "udpendpoint *";
 const ConfFile::OptionsTable UdpEndpoint::option_table[] = {
-    {"address",         true,   ConfFile::parse_stdstring,      OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, address)},
+    {"address",         false,   ConfFile::parse_stdstring,     OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, address)},
+    {"interface",       false,   ConfFile::parse_stdstring,     OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, interface)},
     {"mode",            true,   UdpEndpoint::parse_udp_mode,    OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, mode)},
     {"port",            false,  ConfFile::parse_ul,             OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, port)},
     {"filter",          false,  ConfFile::parse_uint32_vector,  OPTIONS_TABLE_STRUCT_FIELD(UdpEndpointConfig, allow_msg_id_out)}, // legacy AllowMsgIdOut
@@ -1076,10 +1077,61 @@ UdpEndpoint::~UdpEndpoint()
     }
 }
 
+bool UdpEndpoint::resolve_interface_address(const std::string &iface_name, std::string &ip_out)
+{
+    struct ifaddrs *ifaddr = nullptr;
+
+    if (getifaddrs(&ifaddr) == -1) {
+        log_error("Failed to enumerate network interfaces: %m");
+        return false;
+    }
+
+    bool found = false;
+    for (auto *ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
+        if (!ifa->ifa_addr)
+            continue;
+        if (ifa->ifa_addr->sa_family != AF_INET)
+            continue;
+        if (iface_name != ifa->ifa_name)
+            continue;
+
+        char buf[INET_ADDRSTRLEN];
+        auto *sin = reinterpret_cast<struct sockaddr_in *>(ifa->ifa_addr);
+        if (inet_ntop(AF_INET, &sin->sin_addr, buf, sizeof(buf))) {
+            ip_out = buf;
+            found = true;
+        }
+        break;
+    }
+
+    freeifaddrs(ifaddr);
+
+    if (!found) {
+        log_error("Interface '%s' not found or has no IPv4 address", iface_name.c_str());
+    }
+
+    return found;
+}
+
 bool UdpEndpoint::setup(UdpEndpointConfig conf)
 {
     if (!this->validate_config(conf)) {
         return false;
+    }
+
+    /*
+     * If an interface name is provided, resolve its IPv4 address
+     * and use it as the bind address. This takes priority over
+     * the 'address' field.
+     */
+    if (!conf.interface.empty()) {
+        std::string resolved_ip;
+        if (!resolve_interface_address(conf.interface, resolved_ip)) {
+            log_error("Could not resolve address for interface '%s'", conf.interface.c_str());
+            return false;
+        }
+        log_info("Interface '%s' resolved to %s", conf.interface.c_str(), resolved_ip.c_str());
+        conf.address = resolved_ip;
     }
 
     if (!this->open(conf.address.c_str(), conf.port, conf.mode)) {
@@ -1410,16 +1462,27 @@ int UdpEndpoint::parse_udp_mode(const char *val, size_t val_len, void *storage, 
 
 bool UdpEndpoint::validate_config(const UdpEndpointConfig &config)
 {
-    if (config.address.empty()) {
-        log_error("UdpEndpoint %s: IP address must be specified", config.name.c_str());
+    /*
+     * An endpoint must specify either an explicit IP address or
+     * a network interface name to resolve at bind time.
+     */
+    if (config.address.empty() && config.interface.empty()) {
+        log_error("UdpEndpoint %s: Either an IP address or an interface name must be specified",
+                  config.name.c_str());
         return false;
     }
 
-    if (!validate_ip(config.address)) {
-        log_error("UdpEndpoint %s: Invalid IP address %s",
-                  config.name.c_str(),
-                  config.address.c_str());
-        return false;
+    /*
+     * When an interface name is provided, the address will be resolved
+     * later in setup(), so skip IP validation here.
+     */
+    if (config.interface.empty()) {
+        if (!validate_ip(config.address)) {
+            log_error("UdpEndpoint %s: Invalid IP address %s",
+                      config.name.c_str(),
+                      config.address.c_str());
+            return false;
+        }
     }
 
     if (config.port == 0 || config.port == ULONG_MAX) {

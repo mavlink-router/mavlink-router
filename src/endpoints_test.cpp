@@ -586,6 +586,7 @@ TEST(UdpEndpointTest, ConfigValidateAddress)
 
     // build invalid IP address
     config.address = "";
+    config.interface = "";
     EXPECT_FALSE(UdpEndpoint::validate_config(config)) << "with address " << config.address;
 
     config.address = "[127.0.0.1]";
@@ -593,6 +594,46 @@ TEST(UdpEndpointTest, ConfigValidateAddress)
 
     config.address = "::1";
     EXPECT_FALSE(UdpEndpoint::validate_config(config)) << "with address " << config.address;
+}
+
+TEST(UdpEndpointTest, ConfigValidateInterface)
+{
+    UdpEndpointConfig config;
+    config.port = 14550;
+    config.mode = UdpEndpointConfig::Mode::Server;
+
+    // Interface name provided without address: validation should pass
+    // (address will be resolved later in setup())
+    config.address = "";
+    config.interface = "eth0";
+    EXPECT_TRUE(UdpEndpoint::validate_config(config))
+        << "with interface '" << config.interface << "' and no address";
+
+    // Both interface and address provided: validation should pass
+    config.address = "127.0.0.1";
+    config.interface = "eth0";
+    EXPECT_TRUE(UdpEndpoint::validate_config(config))
+        << "with interface '" << config.interface << "' and address " << config.address;
+
+    // Neither address nor interface: validation should fail
+    config.address = "";
+    config.interface = "";
+    EXPECT_FALSE(UdpEndpoint::validate_config(config))
+        << "with empty address and empty interface";
+}
+
+TEST(UdpEndpointTest, ResolveInterfaceAddress)
+{
+    std::string ip;
+
+    // Loopback interface is always available on Linux
+    EXPECT_TRUE(UdpEndpoint::resolve_interface_address("lo", ip));
+    EXPECT_EQ(ip, "127.0.0.1");
+
+    // Non-existent interface should fail
+    ip.clear();
+    EXPECT_FALSE(UdpEndpoint::resolve_interface_address("nonexistent_iface99", ip));
+    EXPECT_TRUE(ip.empty());
 }
 
 class UdpEndpointConfigPortTestFixture : public ::testing::TestWithParam<UdpEndpointConfig::Mode> {
