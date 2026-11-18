@@ -67,6 +67,11 @@
 # Default: <always>
 #LogMode = always
 
+# Delay stopping while-armed logs after disarm.
+# This leaves time for post-disarm logger data to arrive.
+# Default: 0 seconds (stop immediately on disarm).
+#LogStopDelay = 0
+
 # Preset the FCU MAVLink ID from which logs should be received. If absent, it
 # will be set to the system ID of the first flight stack heartbeat received.
 # No default value.

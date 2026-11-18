@@ -46,6 +46,7 @@ struct LogOptions {
     unsigned long max_log_files;                  // conf "MaxLogFiles"
     int fcu_id{-1};                               // conf "LogSystemId"
     bool log_telemetry{false};                    // conf "LogTelemetry"
+    unsigned long log_stop_delay{0};              // conf "LogStopDelay"
 };
 
 class LogEndpoint : public Endpoint {
@@ -77,6 +78,7 @@ protected:
         Timeout *logging_start = nullptr;
         Timeout *fsync = nullptr;
         Timeout *alive = nullptr;
+        Timeout *stop_delay = nullptr;
     } _timeout;
     uint32_t _timeout_write_total = 0;
     aiocb _fsync_cb = {};
@@ -86,11 +88,13 @@ protected:
     void _send_msg(const mavlink_message_t *msg, int target_sysid);
     void _remove_logging_start_timeout();
     bool _start_alive_timeout();
+    void _cancel_stop_delay_timeout();
 
     virtual bool _logging_start_timeout() = 0;
     virtual bool _alive_timeout();
 
     bool _fsync();
+    bool _stop_delay_timeout();
 
     void _handle_auto_start_stop(const struct buffer *pbuf);
 
