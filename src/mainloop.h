@@ -44,6 +44,7 @@ struct Configuration {
     std::vector<UdpEndpointConfig> udp_configs;
     std::vector<TcpEndpointConfig> tcp_configs;
     unsigned long sniffer_sysid;
+    bool skip_failed_endpoints{false};
 };
 
 struct endpoint_entry {
@@ -110,6 +111,7 @@ public:
 private:
     static const unsigned int LOG_AGGREGATE_INTERVAL_SEC = 5;
 
+    Configuration _configuration;
     std::vector<std::shared_ptr<Endpoint>> g_endpoints{};
     int g_tcp_fd = -1; ///< for TCP server
     std::shared_ptr<LogEndpoint> _log_endpoint{nullptr};

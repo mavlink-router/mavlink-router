@@ -54,9 +54,10 @@ static const struct option long_options[] = {{"endpoints", required_argument, nu
                                              {"verbose", no_argument, nullptr, 'v'},
                                              {"version", no_argument, nullptr, 'V'},
                                              {"sniffer-sysid", required_argument, nullptr, 's'},
+                                             {"disable-failed-endpoint", no_argument, nullptr, 'F'},
                                              {}};
 
-static const char *short_options = "he:rt:c:d:l:p:g:vV:s:T:y";
+static const char *short_options = "he:rt:c:d:l:p:g:vV:s:T:y:F";
 
 static void help(FILE *fp)
 {
@@ -84,6 +85,8 @@ static void help(FILE *fp)
         "                               logging directoy is set.\n"
         "  -g --debug-log-level <level> Set debug log level. Levels are\n"
         "                               <error|warning|info|debug>\n"
+        "  -F --disable-failed-endpoint Disable failed endpoints during init or operation\n"
+        "                               and continue to work. Default: disabled, exit on failure.\n"
         "  -v --verbose                 Verbose. Same as --debug-log-level=debug\n"
         "  -V --version                 Show version\n"
         "  -s --sniffer-sysid           Sysid that all messages are sent to.\n"
@@ -301,6 +304,10 @@ static int parse_argv(int argc, char *argv[], Configuration &config)
             config.tcp_configs.push_back(opt_tcp);
 
             free(ip);
+            break;
+        }
+        case 'F': {
+            config.skip_failed_endpoints = true;
             break;
         }
         case 'c':

@@ -234,7 +234,10 @@ public:
     void link_group_member(std::shared_ptr<Endpoint> other);
 
     std::string get_type() const { return this->_type; }
-    std::string get_group_name() const { return this->_group_name; };
+    std::string get_group_name() const { return this->_group_name; }
+    std::string get_name() const { return this->_name; }
+    bool is_disabled() const { return this->_disabled; }
+    void disabled(bool disabled) { this->_disabled = disabled; }
 
     struct buffer rx_buf;
     struct buffer tx_buf;
@@ -252,6 +255,7 @@ protected:
     const std::string _type; ///< UART, UDP, TCP, Log
     std::string _name;       ///< Endpoint name from config file
     size_t _last_packet_len = 0;
+    bool _disabled = false;
 
     std::string _group_name{}; // empty name to disable endpoint groups
     std::vector<std::shared_ptr<Endpoint>> _group_members{};
