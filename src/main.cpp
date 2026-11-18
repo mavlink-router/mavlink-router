@@ -54,9 +54,10 @@ static const struct option long_options[] = {{"endpoints", required_argument, nu
                                              {"verbose", no_argument, nullptr, 'v'},
                                              {"version", no_argument, nullptr, 'V'},
                                              {"sniffer-sysid", required_argument, nullptr, 's'},
+                                             {"max-tlog-size", required_argument, nullptr, 'S'},
                                              {}};
 
-static const char *short_options = "he:rt:c:d:l:p:g:vV:s:T:y";
+static const char *short_options = "he:rt:c:d:l:p:g:vV:s:S:T:y";
 
 static void help(FILE *fp)
 {
@@ -87,6 +88,7 @@ static void help(FILE *fp)
         "  -v --verbose                 Verbose. Same as --debug-log-level=debug\n"
         "  -V --version                 Show version\n"
         "  -s --sniffer-sysid           Sysid that all messages are sent to.\n"
+        "  -S --max-tlog-size           Max size of tlog files.\n"
         "  -y --syslog                  Use syslog output instead of stderr\n"
         "  -h --help                    Print this message\n",
         program_invocation_short_name);
@@ -269,6 +271,14 @@ static int parse_argv(int argc, char *argv[], Configuration &config)
             config.sniffer_sysid = id;
             break;
         }
+        case 'S': {
+            if (safe_atoul(optarg, &config.log_config.max_tlog_file_size) < 0) {
+                log_error("Invalid argument for max-log-file-size = %s", optarg);
+                help(stderr);
+                return -EINVAL;
+            }
+            break;
+        }
         case 'p': {
             char *ip;
             unsigned long port;
@@ -441,6 +451,7 @@ static int parse_confs(ConfFile &conffile, Configuration &config)
         {"DebugLogLevel",       false, parse_log_level,         OPTIONS_TABLE_STRUCT_FIELD(Configuration, debug_log_level)},
         {"DeduplicationPeriod", false, ConfFile::parse_ul,      OPTIONS_TABLE_STRUCT_FIELD(Configuration, dedup_period_ms)},
         {"SnifferSysid",    false, ConfFile::parse_ul,      OPTIONS_TABLE_STRUCT_FIELD(Configuration, sniffer_sysid)},
+        {"MaxTLogFileSize",      false, ConfFile::parse_ul,      OPTIONS_TABLE_STRUCT_FIELD(Configuration, max_tlog_file_size)},
         {}
     };
     // clang-format on
@@ -449,6 +460,9 @@ static int parse_confs(ConfFile &conffile, Configuration &config)
     if (ret < 0) {
         return ret;
     }
+
+    log_info("MaxTLogFileSize parsed from config: %lu", config.max_tlog_file_size);
+    config.log_config.max_tlog_file_size = config.max_tlog_file_size;
 
     ret = conffile.extract_options("General", LogEndpoint::option_table, &config.log_config);
     if (ret < 0) {

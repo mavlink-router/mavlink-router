@@ -46,6 +46,7 @@ struct LogOptions {
     unsigned long max_log_files;                  // conf "MaxLogFiles"
     int fcu_id{-1};                               // conf "LogSystemId"
     bool log_telemetry{false};                    // conf "LogTelemetry"
+    unsigned long max_tlog_file_size{209715200};  // conf "MaxTLogFileSize"
 };
 
 class LogEndpoint : public Endpoint {
@@ -72,6 +73,8 @@ protected:
     LogOptions _config;
     int _target_system_id;
     int _file = -1;
+    int _get_file(const char *extension);
+    char _filename[64];
 
     struct {
         Timeout *logging_start = nullptr;
@@ -95,7 +98,6 @@ protected:
     void _handle_auto_start_stop(const struct buffer *pbuf);
 
 private:
-    int _get_file(const char *extension);
     static uint32_t _get_prefix(DIR *dir);
     static DIR *_open_or_create_dir(const char *name);
 
@@ -104,6 +106,4 @@ private:
      * This can be configured using the .conf file, options MinFreeSpace and MaxLogFiles.
      */
     void _delete_old_logs();
-
-    char _filename[64];
 };

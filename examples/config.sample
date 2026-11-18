@@ -94,6 +94,10 @@
 # Default: <false>
 # LogTelemetry = false
 
+# Max size for tlog files before they are split/rotated. Specified in bytes.
+# Valid values: <0 - 999999999999>
+# Default: 200209715200 (200MB)
+# MaxTLogFileSize = 200209715200
 
 ##
 ## UART Endpoint Configurations
